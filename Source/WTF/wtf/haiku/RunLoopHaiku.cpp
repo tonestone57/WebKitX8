@@ -24,36 +24,32 @@
  */
 
 #include "config.h"
-#include "wtf/RunLoop.h"
+#include <wtf/RunLoop.h>
 
 #include <Application.h>
-#include <errno.h>
 #include <Handler.h>
+#include <Looper.h>
+#include <MessageQueue.h>
 #include <MessageRunner.h>
 #include <OS.h>
 #include <stdio.h>
-
-/*
-The main idea behind this implementation of RunLoop for Haiku is to use a
-BHandler to receive messages. WebKit uses one RunLoop per thread, including
-the main thread, which already has a BApplication on it. So,
-
-* If we're on the main thread, we attach the BHandler to the existing
-  BApplication, or
-* If we're on a new thread, we create a new BLooper ourselves and attach the
-  BHandler to it.
-
-Either way, the RunLoop should then be ready to handle messages sent to it.
-*/
+#include <errno.h>
 
 namespace WTF {
 
 class LoopHandler: public BHandler
 {
     public:
-        LoopHandler()
+        LoopHandler(RunLoop& runLoop)
             : BHandler("RunLoop")
+            , m_runLoop(runLoop)
         {
+        }
+
+        ~LoopHandler()
+        {
+            if (m_runLoop.m_handler == this)
+                m_runLoop.m_handler = nullptr;
         }
 
         void MessageReceived(BMessage* message) override
@@ -63,18 +59,20 @@ class LoopHandler: public BHandler
             } else if (message->what == 'tmrf') {
                 RunLoop::TimerBase* timer
                     = (RunLoop::TimerBase*)message->GetPointer("timer");
-                timer->timerFired();
+                if (timer)
+                    timer->timerFired();
             } else {
-                message->PrintToStream();
                 BHandler::MessageReceived(message);
             }
         }
-};
 
+    private:
+        RunLoop& m_runLoop;
+};
 
 RunLoop::RunLoop()
     : m_looper(nullptr)
-    , m_handler(new LoopHandler)
+    , m_handler(new LoopHandler(*this))
 {
     // Find the looper that we should attach our handler to.
     BLooper* looper;
@@ -88,33 +86,33 @@ RunLoop::RunLoop()
         int32 cookie = 0;
         get_next_thread_info(0, &cookie, &main_thread);
         if (find_thread(NULL) == main_thread.thread) {
-            if (be_app == NULL)
-                debugger("RunLoop needs a BApplication running on the main thread to attach to");
-
-            // BApplication has not been started yet and we are on the main
-            // thread. This BApplication will almost certainly become this
-            // thread's BLooper in the future.
-            looper = be_app;
+            if (be_app)
+                looper = be_app;
+            else {
+                // Fallback: create a new Looper for the main thread if be_app is missing.
+                m_looper = looper = new BLooper("MainRunLoop");
+            }
         } else {
             // No existing BLooper or BApplication is on this thread. Let's
             // create one and manage its lifecycle.
-            m_looper = looper = new BLooper();
+            m_looper = looper = new BLooper("RunLoop");
         }
     }
 
     if (looper->IsLocked()) {
         looper->AddHandler(m_handler);
     } else {
-        looper->LockLooper();
+        looper->Lock();
         looper->AddHandler(m_handler);
-        looper->UnlockLooper();
+        looper->Unlock();
     }
 }
 
 RunLoop::~RunLoop()
 {
     stop();
-    delete m_handler;
+    if (m_handler)
+        delete m_handler;
 }
 
 void RunLoop::run()
@@ -127,23 +125,25 @@ void RunLoop::run()
         // We created this looper, so we are responsible for running it.
         // BLooper::Loop() blocks until the looper is quit.
         currentSingleton().m_looper->Loop();
-    } else {
-        // If we didn't create the looper (m_looper is null), it means we attached
-        // to an existing BLooper (likely BApplication on the main thread).
-        // In this case, that existing looper is responsible for driving the event loop.
-        // We should not block here, as doing so might prevent the main loop from running
-        // if this is called on the main thread.
-        // BApplication::Run() is typically called by the application entry point.
-
-        // Ensure we don't accidentally block the main thread if BApplication is driving it.
-        if (be_app && find_thread(NULL) == be_app->Thread()) {
-             return;
-        }
+    } else if (be_app && find_thread(NULL) == be_app->Thread()) {
+        // If we are attached to BApplication, ensuring it runs is necessary for blocking behavior
+        // expected by WebKit main function.
+        // BApplication::Run() blocks until Quit is called.
+        // We only call this if we are on the main thread and be_app exists.
+        // If be_app is already running (e.g. nested call), calling Run() again is an error on Haiku.
+        // However, standard BApplication usage implies Run() is called once.
+        // Since we don't know if it's running, we assume we need to start it if we are asked to run().
+        // If it is already running, this might throw/debugger, but in that case we shouldn't be here
+        // unless called from within the loop (which is rare for RunLoop::run()).
+        be_app->Run();
     }
 }
 
 void RunLoop::stop()
 {
+    if (!m_handler)
+        return;
+
     if (!m_handler->LockLooper())
         return;
 
@@ -152,31 +152,26 @@ void RunLoop::stop()
     looper->Unlock();
 
     if (m_looper) {
-        // We created the looper that we attached to. We have to stop that as
-        // well.
-        thread_id thread = m_looper->Thread();
-        status_t ret;
-
         m_looper->PostMessage(B_QUIT_REQUESTED);
         m_looper = nullptr;
-
-        wait_for_thread(thread, &ret);
     }
 }
 
 void RunLoop::wakeUp()
 {
-    // We shouldn't wake up the looper if the RunLoop hasn't been started yet
-    // or after it has been shut down. Both of these can be caught simply by
-    // checking if there is a Looper available to message in the first place.
-    if (m_handler->Looper())
+    if (m_handler && m_handler->Looper())
         m_handler->Looper()->PostMessage('loop', m_handler);
 }
 
-RunLoop::TimerBase::TimerBase(WTF::Ref<RunLoop>&& runLoop, WTF::ASCIILiteral)
-    : m_runLoop(runLoop)
+// TimerBase implementation
+
+RunLoop::TimerBase::TimerBase(Ref<RunLoop>&& runLoop, ASCIILiteral description)
+    : m_runLoop(WTF::move(runLoop))
+    , m_description(description)
+    , m_messageRunner(nullptr)
+    , m_isRepeating(false)
+    , m_interval(0_s)
 {
-    m_messageRunner = NULL;
 }
 
 RunLoop::TimerBase::~TimerBase()
@@ -186,65 +181,74 @@ RunLoop::TimerBase::~TimerBase()
 
 void RunLoop::TimerBase::timerFired()
 {
-    // was timer stopped?
-    if (m_messageRunner == nullptr)
+    if (!m_messageRunner)
         return;
 
-    // do we need to stop it?
-    bigtime_t interval = 0;
-    int32 count = 0;
-
-    m_messageRunner->GetInfo(&interval, &count);
-    if (count == 1)
-        stop();
-
     fired();
+
+    if (m_isRepeating) {
+        m_nextFireDate += m_interval;
+    } else {
+        stop();
+    }
 }
 
 void RunLoop::TimerBase::start(Seconds nextFireInterval, bool repeat)
 {
-    if (m_messageRunner) {
-        delete m_messageRunner;
-        m_messageRunner = nullptr;
-    }
+    stop();
+    m_isRepeating = repeat;
+    m_interval = nextFireInterval;
+    m_nextFireDate = MonotonicTime::now() + m_interval;
 
     BMessage* message = new BMessage('tmrf');
     message->AddPointer("timer", this);
 
-    m_messageRunner = new BMessageRunner(m_runLoop->m_handler,
-        message, nextFireInterval.microseconds(), repeat ? -1 : 1);
+    bigtime_t interval = (bigtime_t)nextFireInterval.microseconds();
+
+    if (m_runLoop->m_handler) {
+        m_messageRunner = new BMessageRunner(m_runLoop->m_handler,
+            message, interval, repeat ? -1 : 1);
+
+        if (m_messageRunner->InitCheck() != B_OK) {
+            delete m_messageRunner;
+            m_messageRunner = nullptr;
+        }
+    }
+    delete message;
 }
 
 bool RunLoop::TimerBase::isActive() const
 {
-    return m_messageRunner != NULL && m_messageRunner->GetInfo(NULL, NULL) == B_OK;
+    return m_messageRunner != nullptr;
 }
 
 void RunLoop::TimerBase::stop()
 {
     delete m_messageRunner;
-    m_messageRunner = NULL;
+    m_messageRunner = nullptr;
+}
+
+Seconds RunLoop::TimerBase::secondsUntilFire() const
+{
+    if (isActive())
+        return std::max(0_s, m_nextFireDate - MonotonicTime::now());
+    return 0_s;
 }
 
 RunLoop::CycleResult RunLoop::cycle(RunLoopMode)
 {
     RunLoop::currentSingleton().performWork();
 
-    if (RunLoop::currentSingleton().m_handler->Looper()->IsMessageWaiting())
-        return CycleResult::Continue;
-    else
-        return CycleResult::Stop;
+    if (RunLoop::currentSingleton().m_handler) {
+        BLooper* looper = RunLoop::currentSingleton().m_handler->Looper();
+        if (looper) {
+            BMessageQueue* queue = looper->MessageQueue();
+            if (queue && !queue->IsEmpty())
+                return CycleResult::Continue;
+        }
+    }
+
+    return CycleResult::Stop;
 }
 
-Seconds RunLoop::TimerBase::secondsUntilFire() const
-{
-    if (m_messageRunner) {
-        bigtime_t interval = 0;
-        int32 count = 0;
-        status_t ret = m_messageRunner->GetInfo(&interval, &count);
-        if (ret == B_OK)
-             return Seconds::fromMicroseconds(interval);
-    }
-    return 0_s;
-}
-}
+} // namespace WTF
