@@ -40,6 +40,7 @@ list(APPEND WebKit_SOURCES
     UIProcess/haiku/TextCheckerHaiku.cpp
     UIProcess/haiku/WebPageProxyHaiku.cpp
     UIProcess/haiku/WebProcessPoolHaiku.cpp
+    UIProcess/haiku/WebPopupMenuProxyHaiku.cpp
     UIProcess/Launcher/haiku/ProcessLauncherHaiku.cpp
     UIProcess/WebsiteData/haiku/WebsiteDataStoreHaiku.cpp
 

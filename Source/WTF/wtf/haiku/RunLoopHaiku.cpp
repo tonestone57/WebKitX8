@@ -76,16 +76,6 @@ RunLoop::RunLoop()
     : m_looper(nullptr)
     , m_handler(new LoopHandler)
 {
-}
-
-RunLoop::~RunLoop()
-{
-    stop();
-    delete m_handler;
-}
-
-void RunLoop::run()
-{
     // Find the looper that we should attach our handler to.
     BLooper* looper;
     BLooper* currentLooper = BLooper::LooperForThread(find_thread(NULL));
@@ -108,14 +98,23 @@ void RunLoop::run()
         } else {
             // No existing BLooper or BApplication is on this thread. Let's
             // create one and manage its lifecycle.
-            currentSingleton().m_looper = looper = new BLooper();
+            m_looper = looper = new BLooper();
         }
     }
 
     looper->LockLooper();
-    looper->AddHandler(currentSingleton().m_handler);
+    looper->AddHandler(m_handler);
     looper->UnlockLooper();
+}
 
+RunLoop::~RunLoop()
+{
+    stop();
+    delete m_handler;
+}
+
+void RunLoop::run()
+{
     // There might already be messages available to process, so lets address
     // those if there are any.
     currentSingleton().wakeUp();

@@ -51,6 +51,9 @@ using namespace WebKit;
 BWebView::BWebView(BRect frame, BWindow* myWindow)
     : fAppLooper(myWindow->Looper())
 {
+    // Ensure the main thread run loop is initialized so that it attaches to the BApplication
+    WTF::RunLoop::initializeMain();
+
     RefPtr<API::PageConfiguration> config = API::PageConfiguration::create();
 
     RefPtr<WebPreferences> prefs = WebPreferences::create(String(), "WebKit2."_s, "WebKit2."_s);
@@ -63,10 +66,6 @@ BWebView::BWebView(BRect frame, BWindow* myWindow)
     config->setProcessPool(std::move(processPool));
 
     fWebViewBase = WebViewBase::create("Webkit", frame, myWindow, *config.get());
-
-    // TODO: Can we run WebKit's main thread on its own thread instead of on
-    // BApplication's main thread?
-    WTF::RunLoop::run();
 }
 
 void BWebView::navigationCallbacks()

@@ -30,6 +30,7 @@
 #include "WebColorPicker.h"
 #include "WebDataListSuggestionsDropdown.h"
 #include "WebViewBase.h"
+#include "../../haiku/WebPopupMenuProxyHaiku.h"
 
 #include "WebCore/Region.h"
 
@@ -188,9 +189,7 @@ void PageClientImpl::doneWithKeyEvent(const NativeWebKeyboardEvent& event, bool 
 
 RefPtr<WebPopupMenuProxy> PageClientImpl::createPopupMenuProxy(WebPageProxy& page)
 {
-    notImplemented();
-    //return WebPopupMenuProxyWin::create(&fWebView, page);
-    return nullptr;
+    return WebPopupMenuProxyHaiku::create(fWebView, page);
 }
 
 #if ENABLE(CONTEXT_MENUS)
