@@ -31,6 +31,7 @@
 #include "WebDataListSuggestionsDropdown.h"
 #include "WebViewBase.h"
 #include "../../haiku/WebPopupMenuProxyHaiku.h"
+#include "../../haiku/WebContextMenuProxyHaiku.h"
 
 #include "WebCore/Region.h"
 
@@ -193,10 +194,9 @@ RefPtr<WebPopupMenuProxy> PageClientImpl::createPopupMenuProxy(WebPageProxy& pag
 }
 
 #if ENABLE(CONTEXT_MENUS)
-Ref<WebContextMenuProxy> PageClientImpl::createContextMenuProxy(WebPageProxy& page, FrameInfoData&&, ContextMenuContextData&& context, const UserData& userData)
+Ref<WebContextMenuProxy> PageClientImpl::createContextMenuProxy(WebPageProxy& page, FrameInfoData&& frameInfo, ContextMenuContextData&& context, const UserData& userData)
 {
-    notImplemented();
-    //return WebContextMenuProxyWin::create(page, WTFMove(context), userData);
+    return WebContextMenuProxyHaiku::create(fWebView, page, WTF::move(frameInfo), WTF::move(context), userData);
 }
 #endif
 
