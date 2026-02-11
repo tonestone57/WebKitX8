@@ -134,6 +134,9 @@ private:
     bool m_isBackingStoreDiscardable { true };
     bool m_inForceUpdate { false };
     std::unique_ptr<BackingStore> m_backingStore;
+#if PLATFORM(HAIKU)
+    Lock m_backingStoreLock;
+#endif
     RunLoop::Timer m_discardBackingStoreTimer;
 #endif
     std::unique_ptr<DrawingMonitor> m_drawingMonitor;

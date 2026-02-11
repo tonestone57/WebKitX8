@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2007 Apple Inc.  All rights reserved.
  * Copyright (C) 2007 Ryan Leavengood <leavengood@gmail.com>
+ * Copyright (C) 2009 Stephan Aßmus <superstippi@gmx.de>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,72 +30,117 @@
 
 #include "Document.h"
 #include "DocumentFragment.h"
-#include "NotImplemented.h"
+#include <WebCore/NotImplemented.h>
 
+#include <Entry.h>
+#include <Message.h>
+#include <Path.h>
+#include <String.h>
+#include <wtf/text/CString.h>
 
 namespace WebCore {
 
 bool DragData::canSmartReplace() const
 {
-    notImplemented();
     return false;
 }
 
 bool DragData::containsColor() const
 {
-    notImplemented();
-    return false;
+    return m_platformDragData && m_platformDragData->HasData("RGBColor", B_RGB_COLOR_TYPE);
 }
 
 bool DragData::containsFiles() const
 {
-    notImplemented();
-    return false;
+    return m_platformDragData && m_platformDragData->HasRef("refs");
 }
 
 unsigned DragData::numberOfFiles() const
 {
+    if (!m_platformDragData)
+        return 0;
+
+    type_code type;
+    int32 count;
+    if (m_platformDragData->GetInfo("refs", &type, &count) == B_OK)
+        return count;
+
     return 0;
 }
 
 Vector<String> DragData::asFilenames() const
 {
-    notImplemented();
-	return {};
+    Vector<String> filenames;
+    if (!m_platformDragData)
+        return filenames;
+
+    entry_ref ref;
+    for (int32 i = 0; m_platformDragData->FindRef("refs", i, &ref) == B_OK; i++) {
+        BEntry entry(&ref, true);
+        if (entry.InitCheck() == B_OK) {
+            BPath path;
+            if (entry.GetPath(&path) == B_OK)
+                filenames.append(String::fromUTF8(path.Path()));
+        }
+    }
+    return filenames;
 }
 
 bool DragData::containsPlainText() const
 {
-    notImplemented();
-    return false;
+    return m_platformDragData && m_platformDragData->HasData("text/plain", B_MIME_TYPE);
 }
 
 String DragData::asPlainText() const
 {
-    notImplemented();
+    if (!m_platformDragData)
+        return String();
+
+    const char* text;
+    ssize_t length;
+    if (m_platformDragData->FindData("text/plain", B_MIME_TYPE, (const void**)&text, &length) == B_OK)
+        return String::fromUTF8(std::span<const char>(text, length));
+
     return String();
 }
 
 Color DragData::asColor() const
 {
-    notImplemented();
+    if (!m_platformDragData)
+        return Color();
+
+    const rgb_color* color;
+    ssize_t length;
+    if (m_platformDragData->FindData("RGBColor", B_RGB_COLOR_TYPE, (const void**)&color, &length) == B_OK)
+        return Color(SRGBA<uint8_t> { color->red, color->green, color->blue, color->alpha });
+
     return Color();
 }
 
 bool DragData::containsCompatibleContent(WebCore::DragData::DraggingPurpose) const
 {
-    return containsColor() || containsURL() || containsPlainText();
+    return containsColor() || containsURL() || containsPlainText() || containsFiles();
 }
 
 bool DragData::containsURL(FilenameConversionPolicy) const
 {
-    notImplemented();
-    return false;
+    return m_platformDragData && m_platformDragData->HasData("text/url", B_MIME_TYPE);
 }
 
-String DragData::asURL(FilenameConversionPolicy, String*) const
+String DragData::asURL(FilenameConversionPolicy, String* title) const
 {
-    notImplemented();
+    if (!m_platformDragData)
+        return String();
+
+    if (title)
+        *title = String();
+
+    const char* url;
+    ssize_t length;
+    if (m_platformDragData->FindData("text/url", B_MIME_TYPE, (const void**)&url, &length) == B_OK)
+        return String::fromUTF8(std::span<const char>(url, length));
+
+    // Fallback to text/plain if it looks like a URL?
     return String();
 }
 
@@ -103,6 +149,4 @@ bool DragData::shouldMatchStyleOnDrop() const
     return false;
 }
 
-
 } // namespace WebCore
-

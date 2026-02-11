@@ -91,18 +91,31 @@ String MIMETypeRegistry::mimeTypeForExtension(const StringView ext)
 
 String MIMETypeRegistry::preferredExtensionForMIMEType(const String& type)
 {
-	BMimeType mimeType(type.utf8().data());
-	BMessage storage;
-	mimeType.GetFileExtensions(&storage);
-	const char* extension = storage.FindString("extensions");
+    BMimeType mimeType(type.utf8().data());
+    BMessage storage;
+    if (mimeType.GetFileExtensions(&storage) != B_OK)
+        return String();
 
-	return String::fromUTF8(extension);
+    const char* extension;
+    if (storage.FindString("extensions", 0, &extension) == B_OK)
+        return String::fromUTF8(extension);
+
+    return String();
 }
 
-Vector<String> MIMETypeRegistry::extensionsForMIMEType(const String&)
+Vector<String> MIMETypeRegistry::extensionsForMIMEType(const String& type)
 {
-    ASSERT_NOT_IMPLEMENTED_YET();
-    return { };
+    BMimeType mimeType(type.utf8().data());
+    BMessage storage;
+    if (mimeType.GetFileExtensions(&storage) != B_OK)
+        return { };
+
+    Vector<String> extensions;
+    const char* extension;
+    for (int32 i = 0; storage.FindString("extensions", i, &extension) == B_OK; i++)
+        extensions.append(String::fromUTF8(extension));
+
+    return extensions;
 }
 
 bool MIMETypeRegistry::isApplicationPluginMIMEType(const String&)
@@ -111,4 +124,3 @@ bool MIMETypeRegistry::isApplicationPluginMIMEType(const String&)
 }
 
 } // namespace WebCore
-

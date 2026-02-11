@@ -73,9 +73,7 @@ void ProcessLauncher::launchProcess()
         nullptr
     };
 
-    char* envp[] = {
-        nullptr
-    };
+    extern char **environ;
 
     posix_spawn_file_actions_t file_actions;
     posix_spawn_file_actions_init(&file_actions);
@@ -84,7 +82,7 @@ void ProcessLauncher::launchProcess()
         // CLOEXEC is set on it.
     posix_spawn_file_actions_destroy(&file_actions);
 
-    int status = posix_spawn(&m_processID, executablePath, &file_actions, NULL, argv, envp);
+    int status = posix_spawn(&m_processID, executablePath, &file_actions, NULL, argv, environ);
 
     if (status != 0)
         LOG(Process, "failed to start process %s, error %s", executablePath.String(), strerror(status));

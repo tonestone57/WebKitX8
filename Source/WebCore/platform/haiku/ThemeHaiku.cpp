@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2023 Sony Interactive Entertainment Inc.
+ * Copyright (C) 2024 Haiku, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,7 +32,8 @@
 #include "GraphicsContext.h"
 
 #include <ControlLook.h>
-#include <private/interface/DefaultColors.h>
+#include <View.h>
+#include <InterfaceDefs.h>
 
 #include <wtf/NeverDestroyed.h>
 
@@ -39,8 +41,6 @@ namespace WebCore {
 
 static const double focusRingOpacity = 0.8; // Keep in sync with focusRingOpacity in RenderThemeHaiku.
 static const unsigned focusLineWidth = 2;
-static const unsigned arrowSize = 16;
-
 
 Theme& Theme::singleton()
 {
@@ -102,31 +102,27 @@ void ThemeHaiku::paintFocus(GraphicsContext& graphicsContext, const Vector<Float
 
 void ThemeHaiku::paintArrow(GraphicsContext& graphicsContext, const FloatRect& rect, ArrowDirection direction, bool useDarkAppearance)
 {
-	rgb_color base = colorForValue(B_CONTROL_BACKGROUND_COLOR, useDarkAppearance);
-		
-	BRect r(rect);
+    rgb_color base = colorForValue(B_CONTROL_BACKGROUND_COLOR, useDarkAppearance);
 
-	switch (direction) {
-	case ArrowDirection::Down:
-		be_control_look-> DrawArrowShape(graphicsContext.platformContext(), r, graphicsContext.platformContext()->Bounds(), base, 1);
-		break;
-	case ArrowDirection::Up:
-		be_control_look-> DrawArrowShape(graphicsContext.platformContext(), r, graphicsContext.platformContext()->Bounds(), base, 0);
-			break;
-	}
+    BRect r(rect);
+    BView* view = (BView*)graphicsContext.platformContext();
+
+    if (!view)
+        return;
+
+    switch (direction) {
+    case ArrowDirection::Down:
+        be_control_look->DrawArrowShape(view, r, r, base, 1);
+        break;
+    case ArrowDirection::Up:
+        be_control_look->DrawArrowShape(view, r, r, base, 0);
+        break;
+    }
 }
 
 rgb_color ThemeHaiku::colorForValue(color_which colorConstant, bool useDarkAppearance)
 {
-		rgb_color systemColor = ui_color(B_DOCUMENT_BACKGROUND_COLOR);
-		if (useDarkAppearance) {
-				if (systemColor.Brightness() > 127) // system is in light mode, but we need a dark color
-						return BPrivate::GetSystemColor(colorConstant, true);
-		} else {
-				if (systemColor.Brightness() < 127) // system is in dark mode but we need a light color
-						return BPrivate::GetSystemColor(colorConstant, false);
-		}
-		return ui_color(colorConstant);
+    return ui_color(colorConstant);
 }
 
 } // namespace WebCore

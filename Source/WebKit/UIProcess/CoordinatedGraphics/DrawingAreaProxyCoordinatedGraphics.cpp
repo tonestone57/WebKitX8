@@ -85,6 +85,10 @@ void DrawingAreaProxyCoordinatedGraphics::paint(PlatformPaintContextPtr cr, cons
     if (isInAcceleratedCompositingMode())
         return;
 
+#if PLATFORM(HAIKU)
+    Locker locker { m_backingStoreLock };
+#endif
+
     if (!m_backingStore && !forceUpdateIfNeeded())
         return;
 
@@ -126,6 +130,10 @@ void DrawingAreaProxyCoordinatedGraphics::incorporateUpdate(UpdateInfo&& updateI
 
     if (updateInfo.updateRectBounds.isEmpty())
         return;
+
+#if PLATFORM(HAIKU)
+    Locker locker { m_backingStoreLock };
+#endif
 
     if (!m_backingStore || m_backingStore->size() != updateInfo.viewSize || m_backingStore->deviceScaleFactor() != updateInfo.deviceScaleFactor)
         m_backingStore = makeUnique<BackingStore>(updateInfo.viewSize, updateInfo.deviceScaleFactor);
@@ -315,6 +323,9 @@ void DrawingAreaProxyCoordinatedGraphics::didUpdateGeometry()
 #if !PLATFORM(WPE)
 void DrawingAreaProxyCoordinatedGraphics::discardBackingStoreSoon()
 {
+#if PLATFORM(HAIKU)
+    Locker locker { m_backingStoreLock };
+#endif
     if (!m_backingStore || !m_isBackingStoreDiscardable || m_discardBackingStoreTimer.isActive())
         return;
 
@@ -327,6 +338,9 @@ void DrawingAreaProxyCoordinatedGraphics::discardBackingStoreSoon()
 
 void DrawingAreaProxyCoordinatedGraphics::discardBackingStore()
 {
+#if PLATFORM(HAIKU)
+    Locker locker { m_backingStoreLock };
+#endif
     if (!m_backingStore)
         return;
 

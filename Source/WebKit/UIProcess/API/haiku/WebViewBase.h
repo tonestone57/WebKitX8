@@ -60,6 +60,10 @@ public:
     virtual void FrameResized(float, float);
     virtual void Draw(BRect);
     virtual void MakeFocus(bool focused);
+
+    void setCursor(const WebCore::Cursor&);
+    void setToolTip(const char*);
+
 private:
     WebViewBase(const char*, BRect, BWindow*, const API::PageConfiguration&);
 
