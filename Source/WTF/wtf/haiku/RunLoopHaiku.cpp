@@ -29,6 +29,7 @@
 #include <Application.h>
 #include <Handler.h>
 #include <Looper.h>
+#include <MessageQueue.h>
 #include <MessageRunner.h>
 #include <OS.h>
 #include <stdio.h>
@@ -39,9 +40,16 @@ namespace WTF {
 class LoopHandler: public BHandler
 {
     public:
-        LoopHandler()
+        LoopHandler(RunLoop& runLoop)
             : BHandler("RunLoop")
+            , m_runLoop(runLoop)
         {
+        }
+
+        ~LoopHandler()
+        {
+            if (m_runLoop.m_handler == this)
+                m_runLoop.m_handler = nullptr;
         }
 
         void MessageReceived(BMessage* message) override
@@ -57,11 +65,14 @@ class LoopHandler: public BHandler
                 BHandler::MessageReceived(message);
             }
         }
+
+    private:
+        RunLoop& m_runLoop;
 };
 
 RunLoop::RunLoop()
     : m_looper(nullptr)
-    , m_handler(new LoopHandler)
+    , m_handler(new LoopHandler(*this))
 {
     // Find the looper that we should attach our handler to.
     BLooper* looper;
@@ -100,7 +111,8 @@ RunLoop::RunLoop()
 RunLoop::~RunLoop()
 {
     stop();
-    delete m_handler;
+    if (m_handler)
+        delete m_handler;
 }
 
 void RunLoop::run()
@@ -113,16 +125,25 @@ void RunLoop::run()
         // We created this looper, so we are responsible for running it.
         // BLooper::Loop() blocks until the looper is quit.
         currentSingleton().m_looper->Loop();
-    } else {
-        // If we didn't create the looper (m_looper is null), it means we attached
-        // to an existing BLooper (likely BApplication on the main thread).
-        // In this case, that existing looper is responsible for driving the event loop.
-        // We should not block here.
+    } else if (be_app && find_thread(NULL) == be_app->Thread()) {
+        // If we are attached to BApplication, ensuring it runs is necessary for blocking behavior
+        // expected by WebKit main function.
+        // BApplication::Run() blocks until Quit is called.
+        // We only call this if we are on the main thread and be_app exists.
+        // If be_app is already running (e.g. nested call), calling Run() again is an error on Haiku.
+        // However, standard BApplication usage implies Run() is called once.
+        // Since we don't know if it's running, we assume we need to start it if we are asked to run().
+        // If it is already running, this might throw/debugger, but in that case we shouldn't be here
+        // unless called from within the loop (which is rare for RunLoop::run()).
+        be_app->Run();
     }
 }
 
 void RunLoop::stop()
 {
+    if (!m_handler)
+        return;
+
     if (!m_handler->LockLooper())
         return;
 
@@ -138,7 +159,7 @@ void RunLoop::stop()
 
 void RunLoop::wakeUp()
 {
-    if (m_handler->Looper())
+    if (m_handler && m_handler->Looper())
         m_handler->Looper()->PostMessage('loop', m_handler);
 }
 
@@ -184,13 +205,16 @@ void RunLoop::TimerBase::start(Seconds nextFireInterval, bool repeat)
 
     bigtime_t interval = (bigtime_t)nextFireInterval.microseconds();
 
-    m_messageRunner = new BMessageRunner(m_runLoop->m_handler,
-        message, interval, repeat ? -1 : 1);
+    if (m_runLoop->m_handler) {
+        m_messageRunner = new BMessageRunner(m_runLoop->m_handler,
+            message, interval, repeat ? -1 : 1);
 
-    if (m_messageRunner->InitCheck() != B_OK) {
-        delete m_messageRunner;
-        m_messageRunner = nullptr;
+        if (m_messageRunner->InitCheck() != B_OK) {
+            delete m_messageRunner;
+            m_messageRunner = nullptr;
+        }
     }
+    delete message;
 }
 
 bool RunLoop::TimerBase::isActive() const
@@ -214,7 +238,17 @@ Seconds RunLoop::TimerBase::secondsUntilFire() const
 RunLoop::CycleResult RunLoop::cycle(RunLoopMode)
 {
     RunLoop::currentSingleton().performWork();
-    return CycleResult::Continue;
+
+    if (RunLoop::currentSingleton().m_handler) {
+        BLooper* looper = RunLoop::currentSingleton().m_handler->Looper();
+        if (looper) {
+            BMessageQueue* queue = looper->MessageQueue();
+            if (queue && !queue->IsEmpty())
+                return CycleResult::Continue;
+        }
+    }
+
+    return CycleResult::Stop;
 }
 
 } // namespace WTF
