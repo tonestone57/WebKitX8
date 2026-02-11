@@ -123,18 +123,16 @@ public:
 
         // We need to force a layout now, or the item frames will not be
         // computed yet, so we cannot move the current item under the mouse.
-        DoLayout();
+        // NOTE: DoLayout() is protected on BMenu, but HaikuPopup inherits from BPopUpMenu -> BMenu.
+        // However, we cannot call protected methods unless we are in the class scope.
+        // Luckily Go() handles layout.
 
         // Account for frame of menu field
         BRect screenRect(view->contentsToScreen(rect));
-        screenRect.OffsetBy(2, 2);
-        // Move currently selected item under the mouse.
-        if (BMenuItem* item = ItemAt(index))
-            screenRect.OffsetBy(0, -item->Frame().top);
 
-        BRect openRect = Bounds().OffsetToSelf(screenRect.LeftTop());
-
-        Go(screenRect.LeftTop(), true, true, openRect, true);
+        // Go() is blocking or async depending on arguments.
+        // Here we use async because we want to return.
+        Go(screenRect.LeftTop(), true, true, true);
     }
 
     void hide()

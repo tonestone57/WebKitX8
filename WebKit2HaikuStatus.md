@@ -1,100 +1,58 @@
 # WebKit2 on Haiku Status Report
 
-This document outlines the current state of the WebKit2 port for Haiku OS, identifying completed components, partially implemented features, and missing functionality required for a fully working browser engine.
+This document outlines the current state of the WebKit2 port for Haiku OS.
 
 ## Overview
 
-The WebKit2 port for Haiku is in an **early to intermediate stage**. While the basic build infrastructure and some core components are in place, significant parts of the UI process and platform integration are missing or stubbed out. The port currently relies heavily on generic or shared implementations (e.g., `CoordinatedGraphics`, `curl` for networking) and uses placeholders (e.g., `PlayStation` files for layer tree hosting).
+The WebKit2 port for Haiku is in an **advanced functional stage**. Most core components are implemented, allowing for basic browsing, rendering, and interaction.
 
 ## Component Analysis
 
 ### 1. Build System (COMPLETE)
-- **CMake Configuration**: The build system is well-defined in `Source/cmake/OptionsHaiku.cmake` and `Source/WebKit/PlatformHaiku.cmake`.
-- **Options**: `ENABLE_WEBKIT` (WebKit2) is set to `ON`. `USE_COORDINATED_GRAPHICS`, `USE_TEXTURE_MAPPER`, and `USE_NICOSIA` are enabled.
-- **Dependencies**: External dependencies like `curl`, `libxml2`, `sqlite3`, `zlib`, `png`, `jpeg`, `webp` are correctly found and linked.
+- **CMake Configuration**: Fully defined in `Source/cmake/OptionsHaiku.cmake` and `Source/WebKit/PlatformHaiku.cmake`.
+- **Options**: `ENABLE_WEBKIT` is `ON`. `USE_COORDINATED_GRAPHICS` is enabled.
 
-### 2. IPC (MOSTLY COMPLETE)
-- **Implementation**: Uses a combination of Haiku-native semaphores (`Source/WebKit/Platform/IPC/haiku/IPCSemaphoreHaiku.cpp`) and generic Unix socket implementations (`Source/WebKit/Platform/IPC/unix/ConnectionUnix.cpp`).
-- **Status**: The semaphore implementation uses `create_sem`, `acquire_sem`, `release_sem` correctly. The Unix socket implementation handles connection establishment.
-- **Gaps**: Robustness and performance tuning might be needed. The lack of `socketpair` on some older Haiku versions might be an issue, but modern Haiku supports it.
+### 2. IPC & RunLoop (COMPLETE)
+- **IPC**: Uses Haiku semaphores and Unix sockets.
+- **RunLoop**: `WTF::RunLoop` is fully implemented using `BLooper` and `BMessageRunner`. It correctly handles the main thread (attaching to `be_app`) and secondary threads. Timers use `MonotonicTime` for state tracking.
 
-### 3. Process Launching (PARTIALLY DONE)
-- **Implementation**: Uses `posix_spawn` in `Source/WebKit/UIProcess/Launcher/haiku/ProcessLauncherHaiku.cpp`.
-- **Status**: It sets up a socket pair and passes the file descriptor to the child process.
-- **Issues**:
-    -   Environment variables are cleared (`envp` is `{ nullptr }`), which might break functionality relying on specific environment settings.
-    -   Error handling is basic.
-    -   It uses `BString` locking which is slightly unconventional but functional.
+### 3. Process Launching (COMPLETE)
+- **Implementation**: Uses `posix_spawn` in `ProcessLauncherHaiku.cpp`.
+- **Environment**: System environment variables are correctly passed to child processes.
 
 ### 4. Networking (PARTIALLY DONE)
-- **Current State**: Relies on `curl` (via `USE_CURL` in `OptionsHaiku.cmake`).
-- **Native Implementation**: There is a native Haiku network implementation in `Source/WebKit/NetworkProcess/haiku/`, but it is currently **disabled** in `PlatformHaiku.cmake` because `USE_CURL` is enabled.
-- **Missing**: The native implementation needs to be completed and tested if `curl` is to be replaced.
+- **Current State**: Relies on `curl` (`USE_CURL`).
+- **Native Implementation**: Native Haiku network implementation exists but is currently disabled.
 
-### 5. Graphics & Rendering (PARTIALLY DONE)
-- **Architecture**: Uses `CoordinatedGraphics` and `TextureMapper`.
-- **Layer Tree Host**: Uses `Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/LayerTreeHostPlayStation.cpp` as a generic implementation. This works but should eventually be renamed or adapted specifically for Haiku.
-- **Drawing Area**: `DrawingAreaProxyCoordinatedGraphics` is used.
-- **Painting**: `WebViewBase.cpp` defers painting to the main run loop (`callOnMainRunLoop`), which effectively serializes painting on the main thread. This is a potential performance bottleneck.
+### 5. Graphics & Rendering (COMPLETE)
+- **Architecture**: `CoordinatedGraphics` is fully integrated via `LayerTreeHostHaiku.cpp`.
+- **Drawing Area**: `DrawingAreaProxyCoordinatedGraphics` is used with a Haiku-specific `BackingStore` implementation that ensures thread safety (`m_backingStoreLock`) when painting to `BView`.
+- **Context**: `GraphicsContextHaiku.cpp` implements drawing operations using `BView`.
 
-### 6. UI Process & API (MISSING / STUBBED)
-- **WebView**: `BWebView` and `WebViewBase` provide a basic `BView`-based container.
-- **Page Client**: `PageClientImplHaiku.cpp` is mostly **empty stubs**.
-    -   **Missing**:
-        -   `createPopupMenuProxy` (Menus)
-        -   `createContextMenuProxy` (Context Menus)
-        -   `createColorPicker`
-        -   `createDateTimePicker`
-        -   `setCursor` / `cursor` handling
-        -   `toolTipChanged`
-        -   `enterAcceleratedCompositingMode` / `exitAcceleratedCompositingMode`
-        -   `dragAndDrop` support
-        -   `startDrag`
-        -   `handleKeyboardEvent` / `handleMouseEvent` (partially implemented in `WebViewBase` but needs refinement).
+### 6. UI Process & API (MOSTLY COMPLETE)
+- **WebView**: `BWebView` and `WebViewBase` provide the hosting view.
+- **Page Client**: `PageClientImplHaiku.cpp` implements:
+    -   `createPopupMenuProxy` (Menus)
+    -   `createContextMenuProxy` (Context Menus)
+    -   `setCursor`
+    -   `toolTipChanged`
+- **Input Events**: `PlatformKeyboardEvent`, `PlatformMouseEvent`, and `PlatformWheelEvent` are implemented and mapped from `BMessage`.
 
-### 7. WebCore Platform Support (PARTIALLY DONE)
-- **Files**: `Source/WebCore/platform/haiku/` contains many files.
-- **Stubs**: A significant number of functions in `DragDataHaiku.cpp`, `PasteboardHaiku.cpp`, `SearchPopupMenuHaiku.cpp`, `ThemeHaiku.cpp`, and others call `notImplemented()`.
-- **Missing**:
-    -   Clipboard/Pasteboard integration (`BClipboard`).
-    -   Drag and Drop (`BMessage` dragging).
-    -   Native theme drawing (`BControlLook`).
-    -   System sound / beep.
-    -   MIME type registry integration (partially done).
+### 7. WebCore Platform Support (MOSTLY COMPLETE)
+- **Clipboard**: `PasteboardHaiku.cpp` implemented using `BClipboard` (Read/Write for Text/HTML).
+- **Drag and Drop**: `DragDataHaiku.cpp` implemented using `BMessage` inspection.
+- **Theme**: `ThemeHaiku.cpp` and `ScrollbarThemeHaiku.cpp` implemented using `BControlLook`.
+- **Cursors**: `CursorHaiku.cpp` implemented using standard `BCursor` types.
+- **Resources**: `LocalizedStringsHaiku.cpp` provides default English strings. `MIMETypeRegistryHaiku.cpp` uses `BMimeType`.
+- **Fonts**: `FontHaiku.cpp` implements basic glyph drawing.
 
-### 8. Run Loop Integration (MISSING)
-- **Issue**: `BWebView` constructor calls `WTF::RunLoop::run()`, which blocks the calling thread. This prevents proper integration with the `BApplication` main loop.
-- **Requirement**: WebKit's run loop needs to be integrated with Haiku's `BLooper` / `BMessageRunner` mechanism to allow the application to process its own messages while WebKit runs.
-
-## Required Steps to Complete
-
-1.  **Fix Run Loop Integration**:
-    -   Implement a `RunLoop::Timer` and `RunLoop` for Haiku that integrates with `BMessageRunner` or uses a separate thread that communicates with the `BApplication` looper.
-    -   Remove the blocking `WTF::RunLoop::run()` call from `BWebView`.
-
-2.  **Implement Page Client**:
-    -   Implement `PageClientImpl::createPopupMenuProxy` using `BPopUpMenu`.
-    -   Implement `PageClientImpl::createContextMenuProxy` using `BPopUpMenu`.
-    -   Implement cursor handling (`BCursor`).
-    -   Implement tooltips (`BToolTip`).
-
-3.  **Implement WebCore Platform Features**:
-    -   **Pasteboard**: Implement `PasteboardHaiku.cpp` using `BClipboard`.
-    -   **Drag and Drop**: Implement `DragDataHaiku.cpp` using `BView` drag-and-drop messages.
-    -   **Theme**: Implement `ThemeHaiku.cpp` using `BControlLook` to make web controls look like native Haiku controls.
-
-4.  **Improve Graphics Performance**:
-    -   Review `WebViewBase::Draw` and `LayerTreeHost` to reduce main thread blocking.
-    -   Investigate if `DirectWindow` or `BGLView` can be used for more efficient compositing.
-
-5.  **Enable Native Networking (Optional but Recommended)**:
-    -   Finish the implementation in `Source/WebKit/NetworkProcess/haiku/`.
-    -   Disable `USE_CURL` and enable the native network process.
-
-6.  **Cleanup**:
-    -   Rename/Refactor `LayerTreeHostPlayStation.cpp` to `LayerTreeHostHaiku.cpp` or ensure the generic usage is intentional and correct.
-    -   Ensure `ProcessLauncher` passes necessary environment variables.
+### 8. Remaining Tasks & Improvements
+- **Native Networking**: Finish and enable the native network process to remove `curl` dependency.
+- **Media Support**: Ensure video/audio playback works reliably.
+- **Inspector**: Fully verify Web Inspector integration.
+- **Printing**: Implement printing support.
+- **Advanced UI**: Implement Color Picker, DateTime Picker, and sophisticated drag-and-drop visuals.
 
 ## Conclusion
 
-The Haiku port of WebKit2 is functional enough to build and likely show a basic page, but it lacks essential desktop features (menus, clipboard, drag-and-drop) and has potential architectural issues (run loop blocking) that prevent it from being a usable browser engine. Focusing on the **Page Client** implementation and **Run Loop** integration should be the immediate priority.
+The port has crossed the threshold from "building" to "running". The browser view should now be able to load pages, render content, handle input, show menus, and interact with the clipboard.

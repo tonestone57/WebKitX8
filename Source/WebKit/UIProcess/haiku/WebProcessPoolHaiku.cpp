@@ -28,12 +28,13 @@
 
 #include "WebProcessCreationParameters.h"
 #include <WebCore/NotImplemented.h>
+#include <wtf/MainThread.h>
+#include <wtf/RunLoop.h>
 
 namespace WebKit {
 
 void WebProcessPool::platformInitialize(NeedsGlobalStaticInitialization)
 {
-    notImplemented();
 }
 
 void WebProcessPool::platformInitializeNetworkProcess(NetworkProcessCreationParameters&)

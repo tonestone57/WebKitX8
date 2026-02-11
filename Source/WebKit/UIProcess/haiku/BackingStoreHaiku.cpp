@@ -30,12 +30,14 @@
 #include "config.h"
 #include "BackingStore.h"
 
-#if USE(HAIKU)
+#if USE(COORDINATED_GRAPHICS)
 
 #include "UpdateInfo.h"
 
-#include "WebCore/IntRect.h"
-#include "WebCore/ShareableBitmap.h"
+#include <WebCore/GraphicsContext.h>
+#include <WebCore/IntRect.h>
+#include <WebCore/PlatformDisplay.h>
+#include <WebCore/ShareableBitmap.h>
 #include <Rect.h>
 
 namespace WebKit {
@@ -46,7 +48,7 @@ using namespace WebCore;
 BackingStore::BackingStore(const WebCore::IntSize& size, float deviceScaleFactor)
     : m_size(size)
     , m_deviceScaleFactor(deviceScaleFactor)
-    , m_bitmap(BRect(0, 0, size.width() * deviceScaleFactor, size.height() * deviceScaleFactor), B_RGBA32, true)
+    , m_bitmap(BRect(0, 0, size.width() * deviceScaleFactor - 1, size.height() * deviceScaleFactor - 1), B_RGBA32, true)
     , m_view(m_bitmap.Bounds(), "BackingStore", 0, 0)
 {
     m_bitmap.AddChild(&m_view);
@@ -64,11 +66,8 @@ void BackingStore::paint(BView* into, const WebCore::IntRect& rect)
     into->SetDrawingMode(B_OP_COPY);
     into->DrawBitmap(&m_bitmap, rect, rect);
     into->PopState();
-    // TODO: Would SetViewBitmap work instead? We probably would only need
-    // to call it once from the WebView. Is it faster?
 }
 
-#if USE(COORDINATED_GRAPHICS) || USE(TEXTURE_MAPPER)
 void BackingStore::incorporateUpdate(UpdateInfo&& updateInfo)
 {
     // Take the changes given in updateInfo and incorporate them into our
@@ -77,34 +76,34 @@ void BackingStore::incorporateUpdate(UpdateInfo&& updateInfo)
     // This implementation is adapted from BackingStoreCairo.
 
     ASSERT(m_size == updateInfo.viewSize);
-    if (!updateInfo.bitmapHandle) {
-        // There are no updates
+
+    scroll(updateInfo.scrollRect, updateInfo.scrollOffset);
+
+    if (!updateInfo.bitmapHandle)
         return;
-    }
 
     auto bitmapData = ShareableBitmap::create(std::move(*updateInfo.bitmapHandle));
     if (!bitmapData)
         return;
     auto bitmap = bitmapData->createPlatformImage();
 
-#if ASSERT_ENABLED
-    IntSize updateSize = updateInfo.updateRectBounds.size();
-    updateSize.scale(m_deviceScaleFactor);
-    ASSERT(bitmapData->size() == updateSize);
-#endif
-
-    scroll(updateInfo.scrollRect, updateInfo.scrollOffset);
-
     IntPoint updateRectLocation = updateInfo.updateRectBounds.location();
-    m_view.LockLooper();
-    for (const auto& updateRect : updateInfo.updateRects) {
-        IntRect srcRect = updateRect;
-        srcRect.move(-updateRectLocation.x(), -updateRectLocation.y());
-        m_view.DrawBitmap(bitmap.get(), srcRect, updateRect);
+
+    if (m_bitmap.Lock()) {
+        m_view.PushState();
+        for (const auto& updateRect : updateInfo.updateRects) {
+            IntRect srcRect = updateRect;
+            srcRect.move(-updateRectLocation.x(), -updateRectLocation.y());
+            // DrawBitmap draws from source to destination.
+            // srcRect is in the coordinate system of the 'bitmap' (the update tile).
+            // updateRect is in the coordinate system of 'm_view' (the backing store).
+            m_view.DrawBitmap(bitmap.get(), srcRect, updateRect);
+        }
+        m_view.Sync();
+        m_view.PopState();
+        m_bitmap.Unlock();
     }
-    m_view.UnlockLooper();
 }
-#endif
 
 void BackingStore::scroll(const WebCore::IntRect& scrollRect, const WebCore::IntSize& scrollOffset)
 {
@@ -131,11 +130,13 @@ void BackingStore::scroll(const WebCore::IntRect& scrollRect, const WebCore::Int
     IntRect sourceRect = targetRect;
     sourceRect.move(-scrollOffset);
 
-    m_view.LockLooper();
-    m_view.CopyBits(sourceRect, targetRect);
-    m_view.UnlockLooper();
+    if (m_bitmap.Lock()) {
+        m_view.CopyBits(sourceRect, targetRect);
+        m_view.Sync();
+        m_bitmap.Unlock();
+    }
 }
 
 } // namespace WebKit
 
-#endif // USE(SKIA)
+#endif // USE(COORDINATED_GRAPHICS)

@@ -33,6 +33,12 @@
 
 namespace WebCore {
 
+Cursor::Cursor(const PlatformCursor& c)
+    : m_type(Type::Custom)
+    , m_platformCursor(new BCursor(c))
+{
+}
+
 void Cursor::ensurePlatformCursor() const
 {
     if (m_platformCursor)
