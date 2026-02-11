@@ -102,9 +102,13 @@ RunLoop::RunLoop()
         }
     }
 
-    looper->LockLooper();
-    looper->AddHandler(m_handler);
-    looper->UnlockLooper();
+    if (looper->IsLocked()) {
+        looper->AddHandler(m_handler);
+    } else {
+        looper->LockLooper();
+        looper->AddHandler(m_handler);
+        looper->UnlockLooper();
+    }
 }
 
 RunLoop::~RunLoop()
@@ -120,8 +124,21 @@ void RunLoop::run()
     currentSingleton().wakeUp();
 
     if (currentSingleton().m_looper) {
-        // We need to run the looper we created.
+        // We created this looper, so we are responsible for running it.
+        // BLooper::Loop() blocks until the looper is quit.
         currentSingleton().m_looper->Loop();
+    } else {
+        // If we didn't create the looper (m_looper is null), it means we attached
+        // to an existing BLooper (likely BApplication on the main thread).
+        // In this case, that existing looper is responsible for driving the event loop.
+        // We should not block here, as doing so might prevent the main loop from running
+        // if this is called on the main thread.
+        // BApplication::Run() is typically called by the application entry point.
+
+        // Ensure we don't accidentally block the main thread if BApplication is driving it.
+        if (be_app && find_thread(NULL) == be_app->Thread()) {
+             return;
+        }
     }
 }
 
@@ -221,7 +238,13 @@ RunLoop::CycleResult RunLoop::cycle(RunLoopMode)
 
 Seconds RunLoop::TimerBase::secondsUntilFire() const
 {
-    // FIXME implement
+    if (m_messageRunner) {
+        bigtime_t interval = 0;
+        int32 count = 0;
+        status_t ret = m_messageRunner->GetInfo(&interval, &count);
+        if (ret == B_OK)
+             return Seconds::fromMicroseconds(interval);
+    }
     return 0_s;
 }
 }
