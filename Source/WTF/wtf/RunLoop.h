@@ -201,6 +201,9 @@ public:
         BMessageRunner* m_messageRunner;
         void timerFired();
         friend class LoopHandler;
+        bool m_isRepeating { false };
+        MonotonicTime m_nextFireDate;
+        Seconds m_interval { 0_s };
 #elif USE(GENERIC_EVENT_LOOP)
         bool isActiveWithLock() const WTF_REQUIRES_LOCK(m_runLoop->m_loopLock);
         void stopWithLock() WTF_REQUIRES_LOCK(m_runLoop->m_loopLock);
