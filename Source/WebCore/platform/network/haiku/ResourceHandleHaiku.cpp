@@ -170,12 +170,10 @@ void ResourceHandle::platformSetDefersLoading(bool defers)
 // TODO move to SynchronousLoaderClientHaiku.cpp
 void SynchronousLoaderClient::didReceiveAuthenticationChallenge(ResourceHandle*, const AuthenticationChallenge&)
 {
-    notImplemented();
 }
 
 ResourceError SynchronousLoaderClient::platformBadResponseError()
 {
-    notImplemented();
     return ResourceError();
 }
 

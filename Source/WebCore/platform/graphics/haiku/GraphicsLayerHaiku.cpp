@@ -54,12 +54,10 @@ GraphicsLayerHaiku::~GraphicsLayerHaiku()
 
 void GraphicsLayerHaiku::setNeedsDisplay()
 {
-    notImplemented();
 }
 
 void GraphicsLayerHaiku::setNeedsDisplayInRect(const FloatRect&, ShouldClipToLayer)
 {
-    notImplemented();
 }
 
 Ref<GraphicsLayer> GraphicsLayer::create(GraphicsLayerFactory* factory, GraphicsLayerClient& client, Type type)

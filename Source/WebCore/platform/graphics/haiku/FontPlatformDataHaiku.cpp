@@ -214,7 +214,6 @@ FontPlatformData::SetFallBackStandardFont(const BString& font)
 RefPtr<SharedBuffer> FontPlatformData::openTypeTable(uint32_t table) const
 {
 	UNUSED_PARAM(table);
-	notImplemented();
 	return nullptr;
 }
 

@@ -53,7 +53,6 @@ void setCookieStoragePrivateBrowsingEnabled(bool)
 
 void startObservingCookieChanges(NetworkStorageSession& storageSession, WTF::Function<void ()>&& callback)
 {
-    notImplemented();
 }
 
 void stopObservingCookieChanges(NetworkStorageSession& storageSession)

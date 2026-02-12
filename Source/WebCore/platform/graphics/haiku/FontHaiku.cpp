@@ -101,7 +101,6 @@ void FontCascade::drawGlyphs(GraphicsContext& graphicsContext, const Font& font,
 
 Path Font::platformPathForGlyph(Glyph glyph) const
 {
-	notImplemented();
 	UNUSED_PARAM(glyph);
 	
 	return Path();

@@ -143,23 +143,22 @@ void NetworkStorageSession::deleteCookie(const URL& url, const String& cookie, W
 #if TRACE_COOKIE_JAR
 	printf("CookieJar: delete cookie for %s (NOT IMPLEMENTED)\n", url.string().utf8().data());
 #endif
-	notImplemented();
 }
 
-void NetworkStorageSession::deleteAllCookies(WTF::CompletionHandler<void()>&&)
+void NetworkStorageSession::deleteAllCookies(WTF::CompletionHandler<void()>&& completionHandler)
 {
-    notImplemented();
+    completionHandler();
 }
 
-void NetworkStorageSession::deleteAllCookiesModifiedSince(WallTime since, WTF::CompletionHandler<void()>&&)
+void NetworkStorageSession::deleteAllCookiesModifiedSince(WallTime since, WTF::CompletionHandler<void()>&& completionHandler)
 {
-    notImplemented();
+    completionHandler();
 }
 
 void NetworkStorageSession::deleteCookiesForHostnames(const Vector<String>& cookieHostNames,
-    WebCore::IncludeHttpOnlyCookies, WebCore::ScriptWrittenCookiesOnly, WTF::CompletionHandler<void()>&&)
+    WebCore::IncludeHttpOnlyCookies, WebCore::ScriptWrittenCookiesOnly, WTF::CompletionHandler<void()>&& completionHandler)
 {
-    notImplemented();
+    completionHandler();
 }
 
 Vector<Cookie> NetworkStorageSession::getAllCookies()
@@ -170,7 +169,6 @@ Vector<Cookie> NetworkStorageSession::getAllCookies()
 
 void NetworkStorageSession::getHostnamesWithCookies(HashSet<String>& hostnames)
 {
-    notImplemented();
 }
 
 Vector<Cookie> NetworkStorageSession::getCookies(const URL&)
@@ -192,7 +190,6 @@ bool NetworkStorageSession::getRawCookies(const URL& firstParty,
 #if TRACE_COOKIE_JAR
 	printf("CookieJar: get raw cookies for %s (NOT IMPLEMENTED)\n", url.string().utf8().data());
 #endif
-	notImplemented();
 
     rawCookies.clear();
     return false; // return true when implemented

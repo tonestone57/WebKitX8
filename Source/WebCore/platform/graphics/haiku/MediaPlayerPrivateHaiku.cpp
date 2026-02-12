@@ -242,7 +242,6 @@ bool MediaPlayerPrivate::hasVideo() const
 
 void MediaPlayerPrivate::setPageIsVisible(bool)
 {
-    notImplemented();
 }
 
 WTF::MediaTime MediaPlayerPrivate::duration() const
@@ -281,7 +280,6 @@ void MediaPlayerPrivate::seekToTarget(const SeekTarget& time)
 
 bool MediaPlayerPrivate::seeking() const
 {
-    notImplemented();
     return false;
 }
 
@@ -309,7 +307,6 @@ MediaPlayer::ReadyState MediaPlayerPrivate::readyState() const
 
 PlatformTimeRanges& MediaPlayerPrivate::buffered() const
 {
-    notImplemented();
     static PlatformTimeRanges ranges;
     return ranges;
 }

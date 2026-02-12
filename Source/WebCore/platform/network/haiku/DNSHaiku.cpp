@@ -33,22 +33,18 @@ namespace WebCore {
 
 void DNSResolveQueueHaiku::updateIsUsingProxy()
 {
-    notImplemented();
 }
 
 void DNSResolveQueueHaiku::platformResolve(const String& /* hostname */)
 {
-    notImplemented();
 }
 
 void DNSResolveQueueHaiku::resolve(const String& /* hostname */, uint64_t /* identifier */, DNSCompletionHandler&& /* completionHandler */)
 {
-    notImplemented();
 }
 
 void DNSResolveQueueHaiku::stopResolve(uint64_t /* identifier */)
 {
-    notImplemented();
 }
 
 }

@@ -45,7 +45,6 @@ bool NativeImage::hasAlpha() const
 
 DestinationColorSpace NativeImage::colorSpace() const
 {
-    notImplemented();
     return DestinationColorSpace::SRGB();
 }
 

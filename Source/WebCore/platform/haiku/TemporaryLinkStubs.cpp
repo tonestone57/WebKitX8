@@ -39,7 +39,6 @@
 
 Vector<char> loadResourceIntoArray(const char*)
 {
-    notImplemented();
     return Vector<char>();
 }
 
