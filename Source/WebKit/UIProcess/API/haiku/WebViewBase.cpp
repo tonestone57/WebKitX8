@@ -33,6 +33,7 @@
 #include "NativeWebWheelEvent.h"
 
 #include "PageClientImplHaiku.h"
+#include "PageUIClientHaiku.h"
 #include "PageLoadState.h"
 #include "WebPageGroup.h"
 #include "WebProcessPool.h"
@@ -61,6 +62,7 @@ WebViewBase::WebViewBase(const char* name, BRect rect, BWindow* parentWindow,
 
     WebProcessPool& processPool = config->processPool();
     fPage = processPool.createWebPage(*fPageClient, std::move(config));
+    fPage->setUIClient(makeUnique<PageUIClientHaiku>(*this));
     fPage->initializeWebPage(Site(aboutBlankURL()), {}, {});
 
     if (fPage->drawingArea()) {

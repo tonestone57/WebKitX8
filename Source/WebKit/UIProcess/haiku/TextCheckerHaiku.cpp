@@ -28,14 +28,100 @@
 
 #include "TextCheckerState.h"
 #include <WebCore/NotImplemented.h>
+#include <wtf/OptionSet.h>
 
 namespace WebKit {
 using namespace WebCore;
 
-TextCheckerState& checkerState()
+OptionSet<TextCheckerState> TextChecker::state()
 {
-    static TextCheckerState textCheckerState;
-    return textCheckerState;
+    return { };
+}
+
+bool TextChecker::isContinuousSpellCheckingAllowed()
+{
+    return false;
+}
+
+bool TextChecker::setContinuousSpellCheckingEnabled(bool)
+{
+    return false;
+}
+
+void TextChecker::setGrammarCheckingEnabled(bool)
+{
+}
+
+void TextChecker::continuousSpellCheckingEnabledStateChanged(bool)
+{
+}
+
+void TextChecker::grammarCheckingEnabledStateChanged(bool)
+{
+}
+
+SpellDocumentTag TextChecker::uniqueSpellDocumentTag(WebPageProxy*)
+{
+    return 0;
+}
+
+void TextChecker::closeSpellDocumentWithTag(SpellDocumentTag)
+{
+}
+
+void TextChecker::checkSpellingOfString(SpellDocumentTag, StringView, int32_t& misspellingLocation, int32_t& misspellingLength)
+{
+    misspellingLocation = -1;
+    misspellingLength = 0;
+}
+
+void TextChecker::checkGrammarOfString(SpellDocumentTag, StringView, Vector<WebCore::GrammarDetail>&, int32_t& badGrammarLocation, int32_t& badGrammarLength)
+{
+    badGrammarLocation = -1;
+    badGrammarLength = 0;
+}
+
+bool TextChecker::spellingUIIsShowing()
+{
+    return false;
+}
+
+void TextChecker::toggleSpellingUIIsShowing()
+{
+}
+
+void TextChecker::updateSpellingUIWithMisspelledWord(SpellDocumentTag, const String&)
+{
+}
+
+void TextChecker::updateSpellingUIWithGrammarString(SpellDocumentTag, const String&, const WebCore::GrammarDetail&)
+{
+}
+
+void TextChecker::getGuessesForWord(SpellDocumentTag, const String&, const String&, int32_t, Vector<String>&, bool)
+{
+}
+
+void TextChecker::learnWord(SpellDocumentTag, const String&)
+{
+}
+
+void TextChecker::ignoreWord(SpellDocumentTag, const String&)
+{
+}
+
+void TextChecker::requestCheckingOfString(Ref<TextCheckerCompletion>&& completion, int32_t)
+{
+    completion->didFinishCheckingText({ });
+}
+
+void TextChecker::setTestingMode(bool)
+{
+}
+
+bool TextChecker::isTestingMode()
+{
+    return false;
 }
 
 #if USE(UNIFIED_TEXT_CHECKING)
