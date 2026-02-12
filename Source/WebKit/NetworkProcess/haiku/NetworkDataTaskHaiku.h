@@ -38,6 +38,7 @@
 
 #include <WebCore/HaikuFormDataStream.h>
 
+#include <DataIO.h>
 #include <Path.h>
 #include <Referenceable.h>
 #include <UrlProtocolAsynchronousListener.h>
@@ -51,6 +52,8 @@ namespace WebCore {
 
 namespace WebKit {
 using namespace WebCore;
+
+class NetworkDataOutput;
 
 class NetworkDataTaskHaiku final : public NetworkDataTask,
     public BUrlProtocolAsynchronousListener
@@ -69,7 +72,14 @@ public:
     }
 
     ~NetworkDataTaskHaiku();
+
+    void didReceiveData(const void* buffer, size_t size);
+
 private:
+    friend class NetworkDataOutput;
+
+    void AuthenticationNeeded(BHttpRequest* request, const WebCore::ResourceResponse& response);
+
     NetworkDataTaskHaiku(NetworkSession&, NetworkDataTaskClient&, const WebCore::ResourceRequest&,
         WebCore::StoredCredentialsPolicy, WebCore::ContentSniffingPolicy,
         WebCore::ContentEncodingSniffingPolicy, bool shouldClearReferrerOnHTTPSToHTTPRedirect,
@@ -99,6 +109,7 @@ private:
     MonotonicTime m_startTime;
     BUrlRequest* m_request;
     BFormDataIO* m_postData;
+    NetworkDataOutput* m_output;
     URL m_baseUrl;
     bool m_responseDataSent;
     bool m_redirected;
