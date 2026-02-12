@@ -107,8 +107,6 @@ void Editor::writeImageToPasteboard(Pasteboard& pasteboard, Element& imageElemen
     pasteboardImage.url.title = title;
     //pasteboardImage.url.markup = createMarkup(imageElement, IncludeNode, nullptr, ResolveAllURLs);
     pasteboard.write(pasteboardImage);
-
-	notImplemented();
 }
 
 void Editor::writeSelectionToPasteboard(Pasteboard& pasteboard)

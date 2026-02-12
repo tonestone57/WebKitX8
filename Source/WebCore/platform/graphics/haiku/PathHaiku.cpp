@@ -378,8 +378,6 @@ void PathHaiku::add(PathArcTo arcTo)
 void PathHaiku::addPath(const PathHaiku&, const AffineTransform&)
 {
     // FIXME: This should probably be very similar to Path::transform.
-    printf("FIXME addPath  notImplemented()");
-    notImplemented();
 }
 
 void PathHaiku::add(PathArc arc)
@@ -536,7 +534,6 @@ void PathHaiku::add(PathCloseSubpath)
 
 void PathHaiku::add(PathEllipse)
 {
-    notImplemented();
 }
 
 
@@ -742,10 +739,6 @@ bool PathHaiku::transform(const AffineTransform& transform)
 FloatRect PathHaiku::strokeBoundingRect(const Function<void(GraphicsContext&)>& applier) const
 {
     // Used by the web inspector to highlight some element
-    if (applier) {
-        notImplemented();
-    }
-
     return m_platformPath.Bounds();
 }
 

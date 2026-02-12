@@ -631,7 +631,6 @@ void GraphicsContextHaiku::drawDotsForDocumentMarker(WebCore::FloatRect const&,
 	WebCore::DocumentMarkerLineStyle)
 {
     HGTRACE(("drawDotsForDocumentMarker: Not Implemented\n"));
-	notImplemented();
 }
 
 /* Used by canvas.clearRect. Must clear the given rectangle with transparent black. */
@@ -667,7 +666,6 @@ void GraphicsContextHaiku::setLineDash(const DashArray& /*dashes*/, float /*dash
 {
     HGTRACE(("setLineDash: Not Implemented\n"));
     // TODO this is used to draw dashed strokes in SVG, but we need app_server support
-    notImplemented();
 }
 
 void GraphicsContextHaiku::setLineJoin(LineJoin lineJoin)

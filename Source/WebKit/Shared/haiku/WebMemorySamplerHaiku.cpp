@@ -149,7 +149,6 @@ WebMemoryStatistics WebMemorySampler::sampleWebKit() const
 
 void WebMemorySampler::sendMemoryPressureEvent()
 {
-    notImplemented();
 }
 
 }

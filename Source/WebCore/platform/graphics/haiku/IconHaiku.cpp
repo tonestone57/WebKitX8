@@ -76,7 +76,6 @@ RefPtr<Icon> Icon::createIconForFiles(const Vector<String>& filenames)
 
 void Icon::paint(GraphicsContext& context, const FloatRect& rect)
 {
-    notImplemented();
 }
 
 } // namespace WebCore

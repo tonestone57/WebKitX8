@@ -150,7 +150,6 @@ void Cursor::ensurePlatformCursor() const
             break;
         case Cursor::Type::Custom:
             which = B_CURSOR_ID_SYSTEM_DEFAULT;
-            notImplemented();
             // TODO create from bitmap.
             break;
     }

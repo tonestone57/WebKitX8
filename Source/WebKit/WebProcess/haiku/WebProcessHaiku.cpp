@@ -70,12 +70,10 @@ void WebProcess::grantAccessToAssetServices(WTF::Vector<WebKit::SandboxExtension
 
 void WebProcess::revokeAccessToAssetServices()
 {
-    notImplemented();
 }
 
 void WebProcess::switchFromStaticFontRegistryToUserFontRegistry(WTF::Vector<WebKit::SandboxExtension::Handle>&&)
 {
-    notImplemented();
 }
 
 }

@@ -97,7 +97,6 @@ private:
 
 void Pasteboard::writeTrustworthyWebURLsPboardType(const PasteboardURL&)
 {
-    notImplemented();
 }
 
 void Pasteboard::writeString(const String& type, const String& data)
@@ -168,7 +167,6 @@ void Pasteboard::writePlainText(const String& text, SmartReplaceOption smartRepl
 
 void WebCore::Pasteboard::write(WebCore::PasteboardImage const&)
 {
-    notImplemented();
 }
 
 void Pasteboard::write(const PasteboardBuffer&)
@@ -241,7 +239,6 @@ Pasteboard::FileContentState Pasteboard::fileContentState()
 
 bool Pasteboard::canSmartReplace()
 {
-    notImplemented();
     return false;
 }
 
@@ -365,7 +362,6 @@ void Pasteboard::clear(const String& type)
 
 String Pasteboard::readOrigin()
 {
-    notImplemented(); // webkit.org/b/177633: [GTK] Move to new Pasteboard API
     return { };
 }
 
@@ -408,7 +404,6 @@ void Pasteboard::clear()
 #if ENABLE(DRAG_SUPPORT)
 void Pasteboard::setDragImage(DragImage, const IntPoint&)
 {
-    notImplemented();
 }
 #endif
 
@@ -452,7 +447,6 @@ void Pasteboard::writeCustomData(const WTF::Vector<PasteboardCustomData>& data)
 
 void Pasteboard::read(WebCore::PasteboardFileReader&, std::optional<unsigned long>)
 {
-	notImplemented();
 }
 
 
