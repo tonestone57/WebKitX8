@@ -276,7 +276,7 @@ public:
         RunLoop::main().dispatch([picker = &m_picker]() {
             picker->didEndChooser();
         });
-        return true;
+        return false;
     }
 
 private:
