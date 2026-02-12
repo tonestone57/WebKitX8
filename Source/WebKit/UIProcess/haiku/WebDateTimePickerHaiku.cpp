@@ -163,7 +163,7 @@ public:
             BString currentValue(params.currentValue.utf8().data());
             format.Parse(currentValue, B_SHORT_TIME_FORMAT, initialTime);
 
-            for (int i = 0; i <= 24; i++) {
+            for (int i = 0; i < 24; i++) {
                 BString label;
                 label << i;
                 m_hourMenu->AddItem(new BMenuItem(label, NULL));
@@ -172,7 +172,7 @@ public:
             if (BMenuItem* item = m_hourMenu->ItemAt(initialTime.Hour()))
                 item->SetMarked(true);
 
-            for (int i = 0; i <= 60; i++) {
+            for (int i = 0; i < 60; i++) {
                 BString label;
                 label << i;
                 m_minuteMenu->AddItem(new BMenuItem(label, NULL));
