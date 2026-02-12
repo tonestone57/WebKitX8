@@ -113,6 +113,9 @@ public:
     BView* m_painter;
     BBitmap* m_fillBitmap;
     pattern m_strokeStyle;
+
+    DashArray m_dashArray;
+    float m_dashOffset { 0 };
 };
 
 };

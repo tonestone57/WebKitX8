@@ -120,6 +120,7 @@ Vector<String> MIMETypeRegistry::extensionsForMIMEType(const String& type)
 
 bool MIMETypeRegistry::isApplicationPluginMIMEType(const String&)
 {
+    // Haiku does not support NPAPI plugins.
     return false;
 }
 

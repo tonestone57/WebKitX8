@@ -41,7 +41,9 @@
 
 #include <support/Locker.h>
 #include <app/Clipboard.h>
+#include <Entry.h>
 #include <Message.h>
+#include <Path.h>
 #include <String.h>
 #include <wtf/text/CString.h>
 
@@ -236,14 +238,26 @@ void Pasteboard::write(const Color&)
 
 Pasteboard::FileContentState Pasteboard::fileContentState()
 {
-    notImplemented();
+    AutoClipboardLocker locker(be_clipboard);
+    if (!locker.isLocked())
+        return FileContentState::NoFileOrImageData;
+
+    BMessage* data = be_clipboard->Data();
+    if (!data)
+        return FileContentState::NoFileOrImageData;
+
+    if (data->HasRef("refs"))
+        return FileContentState::MayContainFilePaths;
+
+    if (data->HasData("image/bitmap", B_MIME_TYPE) || data->HasData("image/png", B_MIME_TYPE) || data->HasData("image/jpeg", B_MIME_TYPE))
+        return FileContentState::MayContainImage;
+
     return FileContentState::NoFileOrImageData;
 }
 
 bool Pasteboard::canSmartReplace()
 {
-    notImplemented();
-    return false;
+    return true;
 }
 
 
@@ -366,7 +380,6 @@ void Pasteboard::clear(const String& type)
 
 String Pasteboard::readOrigin()
 {
-    notImplemented(); // webkit.org/b/177633: [GTK] Move to new Pasteboard API
     return { };
 }
 
@@ -409,7 +422,6 @@ void Pasteboard::clear()
 #if ENABLE(DRAG_SUPPORT)
 void Pasteboard::setDragImage(DragImage, const IntPoint&)
 {
-    notImplemented();
 }
 #endif
 
@@ -451,11 +463,27 @@ void Pasteboard::writeCustomData(const WTF::Vector<PasteboardCustomData>& data)
 	}
 }
 
-void Pasteboard::read(WebCore::PasteboardFileReader&, std::optional<unsigned long>)
+void Pasteboard::read(WebCore::PasteboardFileReader& reader, std::optional<unsigned long>)
 {
-	notImplemented();
+    AutoClipboardLocker locker(be_clipboard);
+    if (!locker.isLocked())
+        return;
+
+    BMessage* data = be_clipboard->Data();
+    if (!data)
+        return;
+
+    entry_ref ref;
+    for (int32 i = 0; data->FindRef("refs", i, &ref) == B_OK; i++) {
+        BEntry entry(&ref, true);
+        if (entry.InitCheck() == B_OK) {
+            BPath path;
+            if (entry.GetPath(&path) == B_OK) {
+                reader.readFilename(String::fromUTF8(path.Path()));
+            }
+        }
+    }
 }
 
 
 } // namespace WebCore
-

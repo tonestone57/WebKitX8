@@ -42,7 +42,7 @@ namespace WebCore {
 
 bool DragData::canSmartReplace() const
 {
-    return false;
+    return true;
 }
 
 bool DragData::containsColor() const
@@ -146,7 +146,7 @@ String DragData::asURL(FilenameConversionPolicy, String* title) const
 
 bool DragData::shouldMatchStyleOnDrop() const
 {
-    return false;
+    return true;
 }
 
 } // namespace WebCore

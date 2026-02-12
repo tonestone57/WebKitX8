@@ -43,14 +43,12 @@ namespace WebCore {
 
 int screenHorizontalDPI(Widget*)
 {
-    notImplemented();
-    return 0;
+    return 72;
 }
 
 int screenVerticalDPI(Widget*)
 {
-    notImplemented();
-    return 0;
+    return 72;
 }
 
 bool screenHasInvertedColors()
@@ -93,8 +91,18 @@ int screenDepth(Widget*)
 
 int screenDepthPerComponent(Widget*)
 {
-    notImplemented();
-    return 8;
+    BScreen screen(B_MAIN_SCREEN_ID);
+    switch (screen.ColorSpace()) {
+        case B_RGBA32:
+        case B_RGB32:
+        case B_RGB24:
+            return 8;
+        case B_RGB16:
+        case B_RGB15:
+            return 5;
+        default:
+            return 8;
+    }
 }
 
 bool screenIsMonochrome(Widget*)
@@ -110,4 +118,3 @@ DestinationColorSpace screenColorSpace(Widget*)
 }
 
 } // namespace WebCore
-

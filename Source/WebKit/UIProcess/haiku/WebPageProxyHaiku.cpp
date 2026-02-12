@@ -32,6 +32,12 @@
 
 #include <sys/utsname.h>
 
+#include <Directory.h>
+#include <File.h>
+#include <FindDirectory.h>
+#include <Message.h>
+#include <Path.h>
+
 namespace WebKit {
 
 void WebPageProxy::platformInitialize()
@@ -50,12 +56,52 @@ String WebPageProxy::standardUserAgent(const String& applicationNameForUserAgent
 
 void WebPageProxy::saveRecentSearches(IPC::Connection&, const String& name, const Vector<WebCore::RecentSearch>& searchItems)
 {
-    notImplemented();
+    BPath path;
+    if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) != B_OK)
+        return;
+    path.Append("WebKit");
+    create_directory(path.Path(), 0755);
+    path.Append("RecentSearches");
+
+    BMessage message;
+    BFile file(path.Path(), B_READ_WRITE | B_CREATE_FILE);
+    if (file.InitCheck() == B_OK)
+        message.Unflatten(&file);
+
+    BMessage searches;
+    for (const auto& item : searchItems) {
+        searches.AddString("items", item.string.utf8().data());
+    }
+
+    message.RemoveName(name.utf8().data());
+    message.AddMessage(name.utf8().data(), &searches);
+
+    file.Seek(0, SEEK_SET);
+    file.SetSize(0);
+    message.Flatten(&file);
 }
 
-void WebPageProxy::loadRecentSearches(IPC::Connection&, const String& name, CompletionHandler<void(Vector<WebCore::RecentSearch>&&)>&&)
+void WebPageProxy::loadRecentSearches(IPC::Connection&, const String& name, CompletionHandler<void(Vector<WebCore::RecentSearch>&&)>&& completionHandler)
 {
-    notImplemented();
+    Vector<WebCore::RecentSearch> items;
+    BPath path;
+    if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK) {
+        path.Append("WebKit/RecentSearches");
+        BFile file(path.Path(), B_READ_ONLY);
+        BMessage message;
+        if (file.InitCheck() == B_OK && message.Unflatten(&file) == B_OK) {
+            BMessage searches;
+            if (message.FindMessage(name.utf8().data(), &searches) == B_OK) {
+                const char* item;
+                for (int32 i = 0; searches.FindString("items", i, &item) == B_OK; i++) {
+                     WebCore::RecentSearch search;
+                     search.string = String::fromUTF8(item);
+                     items.append(search);
+                }
+            }
+        }
+    }
+    completionHandler(WTFMove(items));
 }
 
 void WebPageProxy::didUpdateEditorState(const EditorState&, const EditorState&)
