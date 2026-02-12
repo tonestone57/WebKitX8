@@ -27,6 +27,7 @@
 #include "RemoteWebInspectorUIProxy.h"
 
 #include "APIPageConfiguration.h"
+#include "PageClientImplHaiku.h"
 #include "WebViewBase.h"
 #include "WebPageProxy.h"
 #include <WebCore/CertificateInfo.h>
@@ -87,13 +88,12 @@ void RemoteWebInspectorUIProxy::platformResetState()
 void RemoteWebInspectorUIProxy::platformBringToFront()
 {
     if (m_inspectorPage) {
-        // Accessing the view/window from the page proxy might be indirect.
-        // Assuming we can find the window somehow or track it.
-        // For now, this is a best effort stub or requires storing the window pointer.
-        // But m_inspectorPage is a WebPageProxy.
-        // We don't easily have access to the BWindow created in platformCreateFrontendPageAndWindow
-        // unless we store it.
-        // For now, we leave it as is, or we could add a member to track the window.
+        if (auto* client = static_cast<PageClientImpl*>(&m_inspectorPage->pageClient())) {
+            if (auto* view = client->viewWidget()) {
+                if (auto* window = view->Window())
+                    window->Activate();
+            }
+        }
     }
 }
 
@@ -149,7 +149,8 @@ void RemoteWebInspectorUIProxy::platformStartWindowDrag()
 
 void RemoteWebInspectorUIProxy::platformOpenURLExternally(const String& url)
 {
-    const char* argv[] = { url.utf8().data(), nullptr };
+    CString urlString = url.utf8();
+    const char* argv[] = { urlString.data(), nullptr };
     be_roster->Launch("text/html", 1, const_cast<char**>(argv));
 }
 

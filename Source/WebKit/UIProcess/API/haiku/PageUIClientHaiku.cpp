@@ -75,8 +75,11 @@ void PageUIClientHaiku::printFrame(WebPageProxy& page, WebFrameProxy& frame, con
 
             if (BWindow* window = m_webView.Window()) {
                 if (window->Lock()) {
+                    float oldScale = m_webView.Scale();
+                    m_webView.SetScale(scale);
                     // Draw the portion of the view corresponding to the current page
                     job.DrawView(&m_webView, pageRect, printableRect.LeftTop());
+                    m_webView.SetScale(oldScale);
                     window->Unlock();
                 }
             }
