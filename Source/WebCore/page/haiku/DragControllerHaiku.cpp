@@ -34,6 +34,7 @@
 #include "Pasteboard.h"
 
 #include <InterfaceDefs.h>
+#include <Cursor.h>
 
 
 namespace WebCore {
@@ -79,6 +80,31 @@ void DragController::cleanupAfterSystemDrag()
 void DragController::declareAndWriteDragImage(DataTransfer& /*clipboard*/, Element&, const URL&, const String& /*label*/)
 {
     notImplemented();
+}
+
+void DragController::updateDragCursor(const DragData&, DragOperation operation)
+{
+    BCursor* cursor = nullptr;
+    switch (operation) {
+    case DragOperation::Copy:
+        cursor = new BCursor(B_CURSOR_ID_COPY);
+        break;
+    case DragOperation::None:
+        cursor = new BCursor(B_CURSOR_ID_NO_DROP);
+        break;
+    default:
+        // Use system default for Move/Link/etc or if custom cursors aren't ready
+        // Haiku doesn't have distinct standard cursors for all operations exposed yet via ID
+        break;
+    }
+
+    if (cursor) {
+        be_app->SetCursor(cursor);
+        delete cursor;
+    } else {
+        // Fallback or reset
+        be_app->SetCursor(B_CURSOR_SYSTEM_DEFAULT);
+    }
 }
 
 } // namespace WebCore

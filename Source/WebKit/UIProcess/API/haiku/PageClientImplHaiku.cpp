@@ -32,9 +32,12 @@
 #include "WebViewBase.h"
 #include "../../haiku/WebContextMenuProxyHaiku.h"
 #include "../../haiku/WebPopupMenuProxyHaiku.h"
+#include "../../haiku/WebColorPickerHaiku.h"
+#include "../../haiku/WebDateTimePickerHaiku.h"
 
 #include "WebCore/Region.h"
 
+#include <PrintJob.h>
 #include <View.h>
 #include <Window.h>
 
@@ -200,10 +203,10 @@ Ref<WebContextMenuProxy> PageClientImpl::createContextMenuProxy(WebPageProxy& pa
 }
 #endif
 
-RefPtr<WebColorPicker> PageClientImpl::createColorPicker(WebPageProxy&, const WebCore::Color& intialColor,
-    const WebCore::IntRect&, WebKit::ColorControlSupportsAlpha, Vector<WebCore::Color>&&)
+RefPtr<WebColorPicker> PageClientImpl::createColorPicker(WebPageProxy& page, const WebCore::Color& intialColor,
+    const WebCore::IntRect& rect, WebKit::ColorControlSupportsAlpha, Vector<WebCore::Color>&&)
 {
-    return nullptr;
+    return WebColorPickerHaiku::create(page, intialColor, rect);
 }
 
 WTF::RefPtr<WebKit::WebDataListSuggestionsDropdown> PageClientImpl::createDataListSuggestionsDropdown(WebKit::WebPageProxy&)
@@ -291,6 +294,29 @@ void PageClientImpl::didFirstVisuallyNonEmptyLayoutForMainFrame()
     notImplemented();
 }
 
+void PageClientImpl::printFrame(WebFrameProxy&)
+{
+    if (fWebView.LockLooper()) {
+        BPrintJob printJob("WebKit Page");
+        if (printJob.ConfigJob() == B_OK) {
+            printJob.BeginJob();
+            BRect printableRect = printJob.PrintableRect();
+            int32 firstPage = printJob.FirstPage();
+            int32 lastPage = printJob.LastPage();
+
+            // This is a simplified implementation that prints the current view content.
+            // Ideally, we should ask WebCore to layout for printing.
+
+            for (int32 page = firstPage; page <= lastPage; ++page) {
+                printJob.DrawView(&fWebView, printableRect, BPoint(0, 0));
+                printJob.SpoolPage();
+            }
+            printJob.CommitJob();
+        }
+        fWebView.UnlockLooper();
+    }
+}
+
 void PageClientImpl::didFinishNavigation(API::Navigation*)
 {
 }
@@ -336,8 +362,7 @@ WebViewBase* PageClientImpl::viewWidget()
 
 RefPtr<WebDateTimePicker> PageClientImpl::createDateTimePicker(WebPageProxy& page)
 {
-    //return WebDateTimePickerHaiku::create(page);
-    return nullptr;
+    return WebDateTimePickerHaiku::create(page);
 }
 
 #if ENABLE(FULLSCREEN_API)

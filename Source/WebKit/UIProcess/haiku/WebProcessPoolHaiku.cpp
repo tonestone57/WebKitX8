@@ -31,10 +31,31 @@
 #include <wtf/MainThread.h>
 #include <wtf/RunLoop.h>
 
+#include <OS.h>
+
 namespace WebKit {
 
 void WebProcessPool::platformInitialize(NeedsGlobalStaticInitialization)
 {
+    // Check memory status periodically
+    static bool memoryPressureHandlerInitialized = false;
+    if (!memoryPressureHandlerInitialized) {
+        memoryPressureHandlerInitialized = true;
+
+        RunLoop::main().dispatchRepeating([] {
+            system_info info;
+            if (get_system_info(&info) == B_OK) {
+                // If free memory is less than 5% or 64MB (assuming pages are 4KB), trigger low memory warning.
+                // Haiku pages are usually 4096 bytes.
+                uint64_t freeMemory = (uint64_t)info.free_memory * B_PAGE_SIZE;
+                uint64_t totalMemory = (uint64_t)info.max_pages * B_PAGE_SIZE;
+
+                if (freeMemory < 64 * 1024 * 1024 || (totalMemory > 0 && (double)freeMemory / totalMemory < 0.05)) {
+                    WebProcessPool::sendMemoryPressureEvent(true);
+                }
+            }
+        }, 10_s);
+    }
 }
 
 void WebProcessPool::platformInitializeNetworkProcess(NetworkProcessCreationParameters&)
