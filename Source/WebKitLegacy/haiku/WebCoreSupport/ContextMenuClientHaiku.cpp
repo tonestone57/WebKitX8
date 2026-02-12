@@ -80,23 +80,19 @@ void ContextMenuClientHaiku::searchWithGoogle(const LocalFrame* frame)
 
 void ContextMenuClientHaiku::lookUpInDictionary(LocalFrame*)
 {
-    notImplemented();
 }
 
 void ContextMenuClientHaiku::speak(const String&)
 {
-    notImplemented();
 }
 
 bool ContextMenuClientHaiku::isSpeaking() const
 {
-    notImplemented();
     return false;
 }
 
 void ContextMenuClientHaiku::stopSpeaking()
 {
-    notImplemented();
 }
 
 } // namespace WebCore

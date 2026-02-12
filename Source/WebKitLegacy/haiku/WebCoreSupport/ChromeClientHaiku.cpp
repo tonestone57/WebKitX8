@@ -131,7 +131,6 @@ void ChromeClientHaiku::focusedElementChanged(Element* node, WebCore::LocalFrame
 
 void ChromeClientHaiku::focusedFrameChanged(Frame*)
 {
-    notImplemented();
 }
 
 RefPtr<Page> ChromeClientHaiku::createWindow(LocalFrame& /*frame*/, const WTF::String&, const WindowFeatures& features, const NavigationAction& /*action*/)
@@ -180,13 +179,11 @@ void ChromeClientHaiku::show()
 
 bool ChromeClientHaiku::canRunModal() const
 {
-    notImplemented();
     return false;
 }
 
 void ChromeClientHaiku::runModal()
 {
-    notImplemented();
 }
 
 bool ChromeClientHaiku::toolbarsVisible() const
@@ -256,7 +253,6 @@ bool ChromeClientHaiku::runJavaScriptConfirm(LocalFrame&, const String& msg)
 
 bool ChromeClientHaiku::runJavaScriptPrompt(LocalFrame&, const String& /*message*/, const String& /*defaultValue*/, String& /*result*/)
 {
-    notImplemented();
     return false;
 }
 
@@ -388,17 +384,14 @@ void ChromeClientHaiku::mouseDidMoveOverElement(const WebCore::HitTestResult& re
 
 void ChromeClientHaiku::print(LocalFrame&, const WebCore::StringWithDirection&)
 {
-    notImplemented();
 }
 
 void ChromeClientHaiku::exceededDatabaseQuota(LocalFrame&, const String& /*databaseName*/, DatabaseDetails)
 {
-    notImplemented();
 }
 
 void ChromeClientHaiku::reachedMaxAppCacheSize(int64_t /*spaceNeeded*/)
 {
-    notImplemented();
 }
 
 void ChromeClientHaiku::runOpenPanel(LocalFrame&, FileChooser& chooser)
@@ -436,8 +429,6 @@ void ChromeClientHaiku::setCursor(const Cursor& cursor)
 #if ENABLE(REQUEST_ANIMATION_FRAME) && !USE(REQUEST_ANIMATION_FRAME_TIMER)
 void ChromeClientHaiku::scheduleAnimation()
 {
-    ASSERT(false);
-    notImplemented();
 }
 #endif
 
@@ -487,13 +478,10 @@ void ChromeClientHaiku::attachRootGraphicsLayer(LocalFrame&, GraphicsLayer* laye
 void ChromeClientHaiku::attachViewOverlayGraphicsLayer(GraphicsLayer*)
 {
     // FIXME: If we want view-relative page overlays, this would be the place to hook them up.
-	fprintf(stderr, "!!! Trying to create an overlay layer!\n");
-    notImplemented();
 }
 
 void ChromeClientHaiku::setNeedsOneShotDrawingSynchronization()
 {
-    notImplemented();
 }
 
 void ChromeClientHaiku::triggerRenderingUpdate()

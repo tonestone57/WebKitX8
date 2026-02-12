@@ -57,7 +57,7 @@ Cursor::Cursor(Image* image, const IntPoint& hotSpot)
 {
     if (image) {
         // FIXME: Implement creating a BCursor from an Image*
-        notImplemented();
+        // Need to convert Image* to BBitmap*
     }
 }
 

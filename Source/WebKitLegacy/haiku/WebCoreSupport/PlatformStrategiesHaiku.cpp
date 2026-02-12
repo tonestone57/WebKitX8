@@ -57,8 +57,7 @@ LoaderStrategy* PlatformStrategiesHaiku::createLoaderStrategy()
 
 PasteboardStrategy* PlatformStrategiesHaiku::createPasteboardStrategy()
 {
-    notImplemented();
-    return 0;
+    return nullptr;
 }
 
 class WebBlobRegistry final : public BlobRegistry {

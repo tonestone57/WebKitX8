@@ -77,8 +77,9 @@ BPrivate::Network::BUrlContext* FrameNetworkingContextHaiku::context()
 
 uint64_t FrameNetworkingContextHaiku::initiatingPageID() const
 {
-    notImplemented();
-    return 0;
+    if (!frame() || !frame()->page())
+        return 0;
+    return frame()->page()->mainFrame().pageID().toUInt64();
 }
 
 

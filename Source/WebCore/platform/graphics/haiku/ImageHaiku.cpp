@@ -55,7 +55,6 @@ RefPtr<Image> Image::loadPlatformResource(const char* name)
 {
     // TODO: We could implement resource loading from the app resources/executable.
     // For now, return null.
-    notImplemented();
     return nullptr;
 }
 
