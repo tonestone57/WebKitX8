@@ -91,6 +91,8 @@ private:
     bool CertificateVerificationFailed(BUrlRequest* caller, BCertificate& certificate, const char* message) override;
     void DebugMessage(BUrlRequest* caller,BUrlProtocolDebugMessage type,const char* text) override;
 
+    void AuthenticationNeeded(BHttpRequest* request, const WebCore::ResourceResponse& response);
+
     WebCore::ResourceResponse m_response;
     WebCore::ResourceRequest m_currentRequest;
     WebCore::NetworkLoadMetrics m_networkLoadMetrics;

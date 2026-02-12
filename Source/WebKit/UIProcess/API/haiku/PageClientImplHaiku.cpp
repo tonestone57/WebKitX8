@@ -36,7 +36,6 @@
 #include "../../haiku/WebPopupMenuProxyHaiku.h"
 
 #include "WebCore/Region.h"
-#include "WebCore/NotImplemented.h"
 
 #include <Application.h>
 #include <View.h>

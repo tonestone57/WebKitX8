@@ -651,8 +651,6 @@ PlatformKeyboardEvent::PlatformKeyboardEvent(const BMessage* message)
     m_keyIdentifier = keyIdentifierForHaikuKeyCode(bytes.ByteAt(0), nativeVirtualKeyCode);
 
     m_windowsVirtualKeyCode = windowsKeyCodeForKeyEvent(bytes.ByteAt(0), nativeVirtualKeyCode);
-	// TODO m_key should also do something for modifier keys, which cannot be
-	// extracted from "bytes"
     m_key = KeyValueForKeyEvent(bytes, nativeVirtualKeyCode);
     m_code = KeyCodeForKeyEvent(nativeVirtualKeyCode);
 

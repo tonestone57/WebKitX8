@@ -29,7 +29,6 @@
 #include "LogInitialization.h"
 #include "WebProcessCreationParameters.h"
 #include <WebCore/LogInitialization.h>
-#include <WebCore/NotImplemented.h>
 #include <WebCore/PlatformDisplayHaiku.h>
 #include <wtf/Language.h>
 #include <wtf/LogInitialization.h>

@@ -36,7 +36,9 @@
 #include <Alert.h>
 #include <Entry.h>
 #include <File.h>
+#include <FindDirectory.h>
 #include <Message.h>
+#include <Path.h>
 #include <Rect.h>
 #include <Roster.h>
 #include <Window.h>
@@ -82,7 +84,14 @@ void RemoteWebInspectorUIProxy::platformCloseFrontendPageAndWindow()
 
 void RemoteWebInspectorUIProxy::platformResetState()
 {
-    // TODO: Reset any persisted state if necessary.
+    BPath path;
+    if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) != B_OK)
+        return;
+    path.Append("WebKit/WebInspector");
+
+    BEntry entry(path.Path());
+    if (entry.Exists())
+        entry.Remove();
 }
 
 void RemoteWebInspectorUIProxy::platformBringToFront()

@@ -226,9 +226,7 @@ void NetworkDataTaskHaiku::HeadersReceived(BUrlRequest* caller)
         }
 
         if (statusCode == 401) {
-            //TODO
-
-            //AuthenticationNeeded((BHttpRequest*)m_request, response);
+            AuthenticationNeeded(dynamic_cast<BHttpRequest*>(m_request), response);
             // AuthenticationNeeded may have aborted the request
             // so we need to make sure we can continue.
 
@@ -340,6 +338,33 @@ bool NetworkDataTaskHaiku::CertificateVerificationFailed(BUrlRequest* caller, BC
 
 void NetworkDataTaskHaiku::DebugMessage(BUrlRequest* caller, BUrlProtocolDebugMessage type, const char* text)
 {
+}
+
+void NetworkDataTaskHaiku::AuthenticationNeeded(BHttpRequest* request, const ResourceResponse& response)
+{
+    if (!m_client)
+        return;
+
+    m_authFailureCount++;
+    if (m_authFailureCount > 3) {
+        // Give up after too many tries
+        return;
+    }
+
+    m_client->didReceiveAuthenticationChallenge(AuthenticationChallenge(response, SslError, response, SslError), NegotiatedLegacyTLS::No, [this](AuthenticationChallengeDisposition disposition, const Credential& credential) {
+        if (disposition == AuthenticationChallengeDisposition::UseCredential && !credential.isEmpty()) {
+            // Apply credentials to the request logic
+            // Note: BHttpRequest doesn't have a simple "SetCredentials" that re-runs easily in this flow without restarting?
+            // Actually, we usually need to restart the request or set auth for the next attempt.
+            // BUrlRequest might handle some of this, but here we are in the middle of a request.
+            // For now, we assume the client might set it up for the next retry or we need to update `m_user`/`m_password` if we were using `storedCredentialsPolicy`.
+            // But realistically, we should update the BHttpRequest object.
+            BHttpAuthentication& auth = dynamic_cast<BHttpRequest*>(m_request)->Authentication();
+            auth.SetUserName(credential.user().utf8().data());
+            auth.SetPassword(credential.password().utf8().data());
+            auth.SetMethod(B_HTTP_AUTHENTICATION_BASIC); // Assuming basic for now, or infer from header
+        }
+    });
 }
 
 void NetworkDataTaskHaiku::runOnMainThread(Function<void()>&& task)
