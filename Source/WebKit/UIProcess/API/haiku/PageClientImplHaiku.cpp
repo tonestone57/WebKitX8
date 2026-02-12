@@ -30,7 +30,9 @@
 #include "WebColorPicker.h"
 #include "WebDataListSuggestionsDropdown.h"
 #include "WebViewBase.h"
+#include "../../haiku/WebColorPickerHaiku.h"
 #include "../../haiku/WebContextMenuProxyHaiku.h"
+#include "../../haiku/WebDateTimePickerHaiku.h"
 #include "../../haiku/WebPopupMenuProxyHaiku.h"
 
 #include "WebCore/Region.h"
@@ -200,10 +202,10 @@ Ref<WebContextMenuProxy> PageClientImpl::createContextMenuProxy(WebPageProxy& pa
 }
 #endif
 
-RefPtr<WebColorPicker> PageClientImpl::createColorPicker(WebPageProxy&, const WebCore::Color& intialColor,
+RefPtr<WebColorPicker> PageClientImpl::createColorPicker(WebPageProxy& page, const WebCore::Color& initialColor,
     const WebCore::IntRect&, WebKit::ColorControlSupportsAlpha, Vector<WebCore::Color>&&)
 {
-    return nullptr;
+    return WebColorPickerHaiku::create(page, initialColor);
 }
 
 WTF::RefPtr<WebKit::WebDataListSuggestionsDropdown> PageClientImpl::createDataListSuggestionsDropdown(WebKit::WebPageProxy&)
@@ -336,8 +338,7 @@ WebViewBase* PageClientImpl::viewWidget()
 
 RefPtr<WebDateTimePicker> PageClientImpl::createDateTimePicker(WebPageProxy& page)
 {
-    //return WebDateTimePickerHaiku::create(page);
-    return nullptr;
+    return WebDateTimePickerHaiku::create(page);
 }
 
 #if ENABLE(FULLSCREEN_API)

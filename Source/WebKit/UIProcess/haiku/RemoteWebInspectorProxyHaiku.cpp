@@ -24,8 +24,101 @@
  */
 
 #include "config.h"
-#include "RemoteWebInspectorProxy.h"
+#include "RemoteWebInspectorUIProxy.h"
+
+#include "APIPageConfiguration.h"
+#include "WebViewBase.h"
+#include "WebPageProxy.h"
+#include <WebCore/CertificateInfo.h>
+#include <WebCore/InspectorFrontendClient.h>
+#include <WebCore/NotImplemented.h>
+
+#include <Window.h>
+#include <Rect.h>
 
 namespace WebKit {
 
+class InspectorWindow : public BWindow {
+public:
+    InspectorWindow(BRect frame)
+        : BWindow(frame, "Web Inspector", B_TITLED_WINDOW, B_ASYNCHRONOUS_CONTROLS | B_QUIT_ON_WINDOW_CLOSE)
+    {
+    }
 };
+
+WebPageProxy* RemoteWebInspectorUIProxy::platformCreateFrontendPageAndWindow()
+{
+    BRect rect(100, 100, 900, 700);
+    InspectorWindow* window = new InspectorWindow(rect);
+
+    Ref<API::PageConfiguration> configuration = API::PageConfiguration::create();
+    auto webView = WebViewBase::create("InspectorView", window->Bounds(), window, configuration.get());
+    auto* page = webView->page();
+    window->AddChild(webView.leakRef());
+    window->Show();
+
+    return page;
+}
+
+void RemoteWebInspectorUIProxy::platformCloseFrontendPageAndWindow()
+{
+    if (m_inspectorPage)
+        m_inspectorPage->close();
+}
+
+void RemoteWebInspectorUIProxy::platformResetState()
+{
+    notImplemented();
+}
+
+void RemoteWebInspectorUIProxy::platformBringToFront()
+{
+    notImplemented();
+}
+
+void RemoteWebInspectorUIProxy::platformSave(Vector<WebCore::InspectorFrontendClient::SaveData>&&, bool forceSaveAs)
+{
+    notImplemented();
+}
+
+void RemoteWebInspectorUIProxy::platformLoad(const String& path, CompletionHandler<void(const String&)>&& completionHandler)
+{
+    completionHandler(String());
+}
+
+void RemoteWebInspectorUIProxy::platformPickColorFromScreen(CompletionHandler<void(const std::optional<WebCore::Color>&)>&& completionHandler)
+{
+    completionHandler(std::nullopt);
+}
+
+void RemoteWebInspectorUIProxy::platformSetSheetRect(const WebCore::FloatRect&)
+{
+    notImplemented();
+}
+
+void RemoteWebInspectorUIProxy::platformSetForcedAppearance(WebCore::InspectorFrontendClient::Appearance)
+{
+    notImplemented();
+}
+
+void RemoteWebInspectorUIProxy::platformStartWindowDrag()
+{
+    notImplemented();
+}
+
+void RemoteWebInspectorUIProxy::platformOpenURLExternally(const String& url)
+{
+    notImplemented();
+}
+
+void RemoteWebInspectorUIProxy::platformRevealFileExternally(const String& path)
+{
+    notImplemented();
+}
+
+void RemoteWebInspectorUIProxy::platformShowCertificate(const WebCore::CertificateInfo&)
+{
+    notImplemented();
+}
+
+} // namespace WebKit
