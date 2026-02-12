@@ -226,12 +226,11 @@ bool NetworkStorageSession::getRawCookies(const URL& firstParty,
             String::fromUTF8(c->Value()),
             String::fromUTF8(c->Domain()),
             String::fromUTF8(c->Path()),
-            // Times are tricky, BNetworkCookie uses time_t usually?
-            // Assuming 0 for now as safe default if unknown
-            0, 0, 0,
+            // BNetworkCookie times are time_t
+            (double)c->CreationTime(), (double)c->ExpirationDate(), (double)c->LastAccessTime(),
             c->HttpOnly(),
             c->Secure(),
-            false // session
+            c->ExpirationDate() == 0 // session if no expiration
         ));
     }
 
