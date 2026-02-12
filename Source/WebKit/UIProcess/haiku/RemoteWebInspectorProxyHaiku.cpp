@@ -24,8 +24,81 @@
  */
 
 #include "config.h"
-#include "RemoteWebInspectorProxy.h"
+#include "RemoteWebInspectorUIProxy.h"
+
+#include <WebCore/CertificateInfo.h>
+#include <WebCore/FloatRect.h>
+#include <WebCore/NotImplemented.h>
 
 namespace WebKit {
+using namespace WebCore;
 
-};
+WebPageProxy* RemoteWebInspectorUIProxy::platformCreateFrontendPageAndWindow()
+{
+    notImplemented();
+    return nullptr;
+}
+
+void RemoteWebInspectorUIProxy::platformCloseFrontendPageAndWindow()
+{
+    notImplemented();
+}
+
+void RemoteWebInspectorUIProxy::platformResetState()
+{
+    notImplemented();
+}
+
+void RemoteWebInspectorUIProxy::platformBringToFront()
+{
+    notImplemented();
+}
+
+void RemoteWebInspectorUIProxy::platformSave(Vector<InspectorFrontendClient::SaveData>&&, bool)
+{
+    notImplemented();
+}
+
+void RemoteWebInspectorUIProxy::platformLoad(const String&, CompletionHandler<void(const String&)>&& completionHandler)
+{
+    notImplemented();
+    completionHandler(String());
+}
+
+void RemoteWebInspectorUIProxy::platformPickColorFromScreen(CompletionHandler<void(const std::optional<Color>&)>&& completionHandler)
+{
+    notImplemented();
+    completionHandler(std::nullopt);
+}
+
+void RemoteWebInspectorUIProxy::platformSetSheetRect(const FloatRect&)
+{
+    notImplemented();
+}
+
+void RemoteWebInspectorUIProxy::platformSetForcedAppearance(InspectorFrontendClient::Appearance)
+{
+    notImplemented();
+}
+
+void RemoteWebInspectorUIProxy::platformStartWindowDrag()
+{
+    notImplemented();
+}
+
+void RemoteWebInspectorUIProxy::platformOpenURLExternally(const String&)
+{
+    notImplemented();
+}
+
+void RemoteWebInspectorUIProxy::platformRevealFileExternally(const String&)
+{
+    notImplemented();
+}
+
+void RemoteWebInspectorUIProxy::platformShowCertificate(const CertificateInfo&)
+{
+    notImplemented();
+}
+
+} // namespace WebKit

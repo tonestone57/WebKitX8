@@ -28,6 +28,7 @@
 
 #include "TextCheckerState.h"
 #include <WebCore/NotImplemented.h>
+#include <WebCore/TextCheckerEnchant.h>
 
 namespace WebKit {
 using namespace WebCore;
@@ -36,6 +37,52 @@ TextCheckerState& checkerState()
 {
     static TextCheckerState textCheckerState;
     return textCheckerState;
+}
+
+void TextChecker::checkSpellingOfString(SpellDocumentTag, StringView text, int32_t& misspellingLocation, int32_t& misspellingLength)
+{
+    TextCheckerEnchant::singleton().checkSpellingOfString(text.toStringWithoutCopying(), misspellingLocation, misspellingLength);
+}
+
+void TextChecker::checkGrammarOfString(SpellDocumentTag, StringView, Vector<WebCore::GrammarDetail>&, int32_t&, int32_t&)
+{
+    // Grammar checking is not supported by Enchant
+}
+
+bool TextChecker::isContinuousSpellCheckingAllowed()
+{
+    return true;
+}
+
+void TextChecker::setContinuousSpellCheckingEnabled(bool enabled)
+{
+    checkerState().isContinuousSpellCheckingEnabled = enabled;
+}
+
+void TextChecker::setGrammarCheckingEnabled(bool)
+{
+    // Not supported
+}
+
+void TextChecker::getGuessesForWord(SpellDocumentTag, const String& word, const String&, int32_t, Vector<String>& guesses, bool)
+{
+    guesses = TextCheckerEnchant::singleton().getGuessesForWord(word);
+}
+
+void TextChecker::learnWord(SpellDocumentTag, const String& word)
+{
+    TextCheckerEnchant::singleton().learnWord(word);
+}
+
+void TextChecker::ignoreWord(SpellDocumentTag, const String& word)
+{
+    TextCheckerEnchant::singleton().ignoreWord(word);
+}
+
+void TextChecker::requestCheckingOfString(Ref<TextCheckerCompletion>&& completion, int32_t insertionPoint)
+{
+    // FIXME: Implement background checking
+    notImplemented();
 }
 
 #if USE(UNIFIED_TEXT_CHECKING)
