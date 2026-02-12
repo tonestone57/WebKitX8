@@ -140,6 +140,7 @@ void NetworkStorageSession::setCookie(const Cookie& cookie)
     newCookie->SetExpiration(cookie.expires.value_or(0)); // Convert to time_t if needed, or 0 for session?
     // BNetworkCookie handles session vs persistent automatically based on expiration.
 
+    // AddCookie takes ownership of the cookie object.
     platformSession().GetCookieJar().AddCookie(newCookie);
 }
 

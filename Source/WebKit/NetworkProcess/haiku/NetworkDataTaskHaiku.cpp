@@ -378,14 +378,23 @@ void NetworkDataTaskHaiku::AuthenticationNeeded(BHttpRequest* request, const Res
         return;
     }
 
-    // This is a simplified implementation. Proper auth handling requires creating an AuthenticationChallenge
-    // and handling the disposition.
-    // Since we don't have all the headers logic here for challenges, we will just log for now or leave it
-    // for a more complete implementation later as indicated by the TODOs in the original code.
-    // However, to satisfy the requirement, we should try to do something.
+    String headerValue = response.httpHeaderField(HTTPHeaderName::WWWAuthenticate);
+    if (headerValue.isEmpty())
+        headerValue = response.httpHeaderField(HTTPHeaderName::ProxyAuthenticate);
 
-    // For now, we'll just stop to prevent loops if we can't handle it.
-    // cancel();
+    if (headerValue.isEmpty()) {
+        // No authentication header found, cannot proceed.
+        return;
+    }
+
+    // FIXME: Parse the WWW-Authenticate header to construct a proper core AuthenticationChallenge.
+    // This requires mapping the authentication scheme (Basic, Digest, etc.) and realm.
+    // For now, we rely on the client to potentially retry or handle this via other mechanisms,
+    // but the loop protection above prevents infinite requests.
+
+    // Ideally, we would do:
+    // AuthenticationChallenge challenge(response, ..., m_user, m_password);
+    // m_client->didReceiveChallenge(WTFMove(challenge), ...);
 }
 
 void NetworkDataTaskHaiku::DebugMessage(BUrlRequest* caller, BUrlProtocolDebugMessage type, const char* text)
