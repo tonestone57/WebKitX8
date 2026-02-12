@@ -136,6 +136,7 @@ list(APPEND WebKit_LIBRARIES
     ${OPENGL_LIBRARIES}
     ${PNG_LIBRARIES}
     ${SQLITE_LIBRARIES}
+    shared
     -Wl,--whole-archive WTF -Wl,--no-whole-archive
 )
 
