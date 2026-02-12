@@ -52,7 +52,7 @@ public:
 
     void Draw(BRect updateRect) {
         FillRect(updateRect);
-        // TODO should we add a border?
+        StrokeRect(Bounds());
     }
 };
 

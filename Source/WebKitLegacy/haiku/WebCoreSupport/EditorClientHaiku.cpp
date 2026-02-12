@@ -413,13 +413,8 @@ bool EditorClientHaiku::handleEditingKeyboardEvent(KeyboardEvent* event,
     if (!frame || !frame->document())
         return false;
 
-    // TODO be more specific when filtering events here. Some of the keys are
-    // relevant only when there is a range-selection (shift+arrows to edit it),
-    // but others are only relevant when there is an edition going on
-    // (backspace, delete). We should check these different cases depending on
-    // the key, and decide to swallow the event (return true) or not, in which
-    // case the BWebFrame code can handle it for scrolling or other keyboard
-    // shortcuts.
+    // We filter events based on whether there's a selection or if editing is possible.
+    // Some keys are only relevant with range selections (shift+arrows), others during editing.
     if (!frame->selection().isRange() && !frame->editor().canEdit())
         return false;
 

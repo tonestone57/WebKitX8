@@ -39,6 +39,7 @@
 #include <WebCore/Page.h>
 #include <WebCore/TextRun.h>
 #include <WebCore/Timer.h>
+#include <WebCore/WindowsKeyboardCodes.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/StringConcatenateNumbers.h>
 
@@ -420,13 +421,21 @@ void FullscreenVideoController::draw()
 
 void FullscreenVideoController::onChar(int c)
 {
-	// TODO exit if escape is pressed
-	// TODO play/pause if space is pressed
+    if (c == ' ') {
+        togglePlay();
+        return;
+    }
+    if (c == 0x1b) { // Escape
+        exitFullscreen();
+        return;
+    }
 }
 
 void FullscreenVideoController::onKeyDown(int virtualKey)
 {
-	// TODO exit if escape is pressed
+    if (virtualKey == VK_ESCAPE) {
+        exitFullscreen();
+    }
 }
 
 void FullscreenVideoController::timerFired()

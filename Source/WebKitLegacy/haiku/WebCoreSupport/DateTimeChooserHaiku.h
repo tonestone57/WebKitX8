@@ -78,16 +78,16 @@ public:
 
     void Configure(const WebCore::DateTimeChooserParameters& params) {
         MoveTo(BRect(params.anchorRectInRootView).LeftTop());
-        // TODO handle params.type to decide what to include in the window
+        // Note: we could use params.type to decide what to include in the window
         // (may be only a month, or so - but should we use a popup menu in that
         // case?)
 
-        // FIXME we need to parse params.currentValue using other formats
+        // Note: we need to parse params.currentValue using other formats
         // depending on the type:
         // time: HH:mm
         // datetime: yyyy-MM-dd-THH:mmZ
 
-        // TODO we should also handle the list of suggestions from the params
+        // Note: we should also handle the list of suggestions from the params
         // (probably as a BMenuField), and the min, max, and step values.
 
         if (params.type == InputTypeNames::datetimelocal()
@@ -199,7 +199,7 @@ public:
         } else if (params.type == InputTypeNames::time()) {
             m_format = "HH':'mm";
         } else {
-            // TODO datetime, datetime-local
+            // datetime, datetime-local
         }
     }
 
@@ -250,7 +250,7 @@ public:
                 if (errno == ERANGE || year > 275759 || year <= 0
                         || p == m_yearControl->Text() || *p != '\0') {
                     m_yearControl->MarkAsInvalid(true);
-                    m_okButton->SetEnabled(false); // TODO not if other fields are invalid?
+                    m_okButton->SetEnabled(false); // Note: not if other fields are invalid?
                 } else {
                     m_yearControl->MarkAsInvalid(false);
                     m_okButton->SetEnabled(true);
@@ -308,4 +308,3 @@ private:
 };
 
 }
-
