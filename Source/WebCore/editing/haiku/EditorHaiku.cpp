@@ -36,6 +36,7 @@
 #include "HTMLInputElement.h"
 #include "HTMLObjectElement.h"
 #include "HTMLParserIdioms.h"
+#include "LocalFrame.h"
 #include "NotImplemented.h"
 #include "Pasteboard.h"
 #include "RenderImage.h"
@@ -107,8 +108,6 @@ void Editor::writeImageToPasteboard(Pasteboard& pasteboard, Element& imageElemen
     pasteboardImage.url.title = title;
     //pasteboardImage.url.markup = createMarkup(imageElement, IncludeNode, nullptr, ResolveAllURLs);
     pasteboard.write(pasteboardImage);
-
-	notImplemented();
 }
 
 void Editor::writeSelectionToPasteboard(Pasteboard& pasteboard)
@@ -120,8 +119,10 @@ void Editor::writeSelectionToPasteboard(Pasteboard& pasteboard)
     pasteboard.write(pasteboardContent);
 }
 
-RefPtr<DocumentFragment> Editor::webContentFromPasteboard(Pasteboard&, const SimpleRange&, bool /*allowPlainText*/, bool& /*chosePlainText*/)
+RefPtr<DocumentFragment> Editor::webContentFromPasteboard(Pasteboard& pasteboard, const SimpleRange& range, bool allowPlainText, bool& chosePlainText)
 {
+    if (auto* frame = document().frame())
+        return pasteboard.documentFragment(*frame, range, allowPlainText, chosePlainText);
     return nullptr;
 }
 
@@ -134,4 +135,3 @@ void Editor::platformPasteFont()
 }
 
 } // namespace WebCore
-

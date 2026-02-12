@@ -337,76 +337,70 @@ bool EditorClientHaiku::shouldEraseMarkersAfterChangeSelection(TextCheckingType)
 
 void EditorClientHaiku::ignoreWordInSpellDocument(const String&)
 {
-    notImplemented();
 }
 
 void EditorClientHaiku::learnWord(const String&)
 {
-    notImplemented();
 }
 
-void EditorClientHaiku::checkSpellingOfString(StringView, int*, int*)
+void EditorClientHaiku::checkSpellingOfString(StringView, int* misspellingLocation, int* misspellingLength)
 {
-    notImplemented();
+    if (misspellingLocation)
+        *misspellingLocation = -1;
+    if (misspellingLength)
+        *misspellingLength = 0;
 }
 
 #if 0
 String EditorClientHaiku::getAutoCorrectSuggestionForMisspelledWord(const String& /*misspelledWord*/)
 {
-    notImplemented();
     return String();
 }
 #endif
 
-void EditorClientHaiku::checkGrammarOfString(StringView, Vector<GrammarDetail>&, int*, int*)
+void EditorClientHaiku::checkGrammarOfString(StringView, Vector<GrammarDetail>&, int* badGrammarPhraseLocation, int* badGrammarPhraseLength)
 {
-    notImplemented();
+    if (badGrammarPhraseLocation)
+        *badGrammarPhraseLocation = -1;
+    if (badGrammarPhraseLength)
+        *badGrammarPhraseLength = 0;
 }
 
 void EditorClientHaiku::getGuessesForWord(const String&, const String&, const WebCore::VisibleSelection&, Vector<String>&)
 {
-    notImplemented();
 }
 
 void EditorClientHaiku::requestCheckingOfString(TextCheckingRequest&, const WebCore::VisibleSelection&)
 {
-    notImplemented();
 }
 
-void EditorClientHaiku::requestExtendedCheckingOfString(TextCheckingRequest&, const VisibleSelection& currentSelection)
+void EditorClientHaiku::requestExtendedCheckingOfString(TextCheckingRequest&, const VisibleSelection&)
 {
-    notImplemented();
 }
 
 void EditorClientHaiku::updateSpellingUIWithGrammarString(const String&, const GrammarDetail&)
 {
-    notImplemented();
 }
 
 void EditorClientHaiku::updateSpellingUIWithMisspelledWord(const String&)
 {
-    notImplemented();
 }
 
 void EditorClientHaiku::showSpellingUI(bool)
 {
-    notImplemented();
 }
 
 bool EditorClientHaiku::spellingUIIsShowing()
 {
-    notImplemented();
     return false;
 }
 
 void EditorClientHaiku::setInputMethodState(Element*)
 {
-    notImplemented();
 }
 
 bool EditorClientHaiku::performTwoStepDrop(DocumentFragment&, const SimpleRange& destination, bool isMove)
 {
-	notImplemented();
 	return false;
 }
 
@@ -603,4 +597,3 @@ void EditorClientHaiku::dispatchMessage(BMessage& message)
 }
 
 } // namespace WebCore
-

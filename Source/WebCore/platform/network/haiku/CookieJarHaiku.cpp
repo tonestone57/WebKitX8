@@ -46,14 +46,10 @@ namespace WebCore {
 
 void setCookieStoragePrivateBrowsingEnabled(bool)
 {
-#if TRACE_COOKIE_JAR
-	printf("CookieJar: private browsing (NOT IMPLEMENTED)\n");
-#endif
 }
 
 void startObservingCookieChanges(NetworkStorageSession& storageSession, WTF::Function<void ()>&& callback)
 {
-    notImplemented();
 }
 
 void stopObservingCookieChanges(NetworkStorageSession& storageSession)
@@ -61,4 +57,3 @@ void stopObservingCookieChanges(NetworkStorageSession& storageSession)
 }
 
 } // namespace WebCore
-
