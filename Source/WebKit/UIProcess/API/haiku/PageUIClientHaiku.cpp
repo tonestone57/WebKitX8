@@ -51,6 +51,9 @@ void PageUIClientHaiku::printFrame(WebPageProxy& page, WebFrameProxy& frame, con
     if (job.ConfigJob() == B_OK) {
         job.BeginJob();
 
+        // TODO: This currently only prints the visible viewport of the WebView.
+        // Full-page printing requires coordination with the WebProcess to generate
+        // a PDF or render the full document content, which is not yet implemented.
         BRect printableRect = job.PrintableRect();
         BRect viewRect = m_webView.Bounds();
 

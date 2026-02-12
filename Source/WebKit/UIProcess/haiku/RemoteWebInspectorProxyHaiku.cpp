@@ -31,7 +31,6 @@
 #include "WebPageProxy.h"
 #include <WebCore/CertificateInfo.h>
 #include <WebCore/InspectorFrontendClient.h>
-#include <WebCore/NotImplemented.h>
 
 #include <Alert.h>
 #include <Entry.h>
