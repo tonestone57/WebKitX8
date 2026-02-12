@@ -97,9 +97,9 @@ private:
     bool m_isLocked;
 };
 
-void Pasteboard::writeTrustworthyWebURLsPboardType(const PasteboardURL&)
+void Pasteboard::writeTrustworthyWebURLsPboardType(const PasteboardURL& url)
 {
-    notImplemented();
+    write(url);
 }
 
 void Pasteboard::writeString(const String& type, const String& data)
@@ -168,9 +168,9 @@ void Pasteboard::writePlainText(const String& text, SmartReplaceOption smartRepl
 }
 
 
-void WebCore::Pasteboard::write(WebCore::PasteboardImage const&)
+void WebCore::Pasteboard::write(WebCore::PasteboardImage const& image)
 {
-    notImplemented();
+    // FIXME: Write bitmap data to clipboard
 }
 
 void Pasteboard::write(const PasteboardBuffer&)

@@ -33,22 +33,20 @@ namespace WebCore {
 
 void DNSResolveQueueHaiku::updateIsUsingProxy()
 {
-    notImplemented();
 }
 
 void DNSResolveQueueHaiku::platformResolve(const String& /* hostname */)
 {
-    notImplemented();
 }
 
-void DNSResolveQueueHaiku::resolve(const String& /* hostname */, uint64_t /* identifier */, DNSCompletionHandler&& /* completionHandler */)
+void DNSResolveQueueHaiku::resolve(const String& /* hostname */, uint64_t /* identifier */, DNSCompletionHandler&& completionHandler)
 {
-    notImplemented();
+    // FIXME: Implement async DNS resolution
+    completionHandler(DNSCompletionHandler::Result::UnknownError, { });
 }
 
 void DNSResolveQueueHaiku::stopResolve(uint64_t /* identifier */)
 {
-    notImplemented();
 }
 
 }

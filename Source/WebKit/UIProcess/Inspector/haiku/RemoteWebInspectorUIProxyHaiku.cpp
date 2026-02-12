@@ -34,70 +34,63 @@ namespace WebKit {
 
 WebPageProxy* RemoteWebInspectorUIProxy::platformCreateFrontendPageAndWindow()
 {
-    notImplemented();
+    // FIXME: Implement creation of inspector window
     return nullptr;
 }
 
 void RemoteWebInspectorUIProxy::platformResetState()
 {
-    notImplemented();
 }
 
 void RemoteWebInspectorUIProxy::platformBringToFront()
 {
-    notImplemented();
+    // FIXME: Bring inspector window to front
 }
 
 void RemoteWebInspectorUIProxy::platformSave(Vector<WebCore::InspectorFrontendClient::SaveData>&&, bool /* forceSaveAs */)
 {
-    notImplemented();
+    // FIXME: Implement save dialog
 }
 
 void RemoteWebInspectorUIProxy::platformLoad(const String&, CompletionHandler<void(const String&)>&& completionHandler)
 {
     completionHandler(nullString());
-    notImplemented();
 }
 
 void RemoteWebInspectorUIProxy::platformPickColorFromScreen(CompletionHandler<void(const std::optional<WebCore::Color>&)>&& completionHandler)
 {
     completionHandler({ });
-    notImplemented();
 }
 
 void RemoteWebInspectorUIProxy::platformSetSheetRect(const FloatRect&)
 {
-    notImplemented();
 }
 
 void RemoteWebInspectorUIProxy::platformSetForcedAppearance(InspectorFrontendClient::Appearance)
 {
-    notImplemented();
 }
 
 void RemoteWebInspectorUIProxy::platformStartWindowDrag()
 {
-    notImplemented();
 }
 
 void RemoteWebInspectorUIProxy::platformOpenURLExternally(const String&)
 {
-    notImplemented();
+    // FIXME: BWorkspace::Launch
 }
 
 void RemoteWebInspectorUIProxy::platformRevealFileExternally(const String&)
 {
-    notImplemented();
+    // FIXME: BWorkspace::Launch
 }
 
 void RemoteWebInspectorUIProxy::platformShowCertificate(const CertificateInfo&)
 {
-    notImplemented();
 }
 
 void RemoteWebInspectorUIProxy::platformCloseFrontendPageAndWindow()
 {
-    notImplemented();
+    // FIXME: Close window
 }
 
 } // namespace WebKit

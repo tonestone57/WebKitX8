@@ -39,7 +39,6 @@ using namespace WebCore;
 NetworkSessionHaiku::NetworkSessionHaiku(NetworkProcess& networkProcess, const NetworkSessionCreationParameters& parameters)
     : NetworkSession(networkProcess, parameters)
 {
-    notImplemented();
 }
 
 NetworkSessionHaiku::~NetworkSessionHaiku()

@@ -33,9 +33,10 @@ using namespace WebCore;
 
 namespace WebKit {
 
-void WebCookieManager::platformSetHTTPCookieAcceptPolicy(HTTPCookieAcceptPolicy policy, CompletionHandler<void()>&&)
+void WebCookieManager::platformSetHTTPCookieAcceptPolicy(HTTPCookieAcceptPolicy policy, CompletionHandler<void()>&& completionHandler)
 {
-    notImplemented();
+    // FIXME: Update BNetworkCookieJar policy
+    completionHandler();
 }
 
 }
