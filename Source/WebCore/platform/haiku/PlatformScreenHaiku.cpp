@@ -43,12 +43,12 @@ namespace WebCore {
 
 int screenHorizontalDPI(Widget*)
 {
-    return 72;
+    return 96;
 }
 
 int screenVerticalDPI(Widget*)
 {
-    return 72;
+    return 96;
 }
 
 bool screenHasInvertedColors()
@@ -59,8 +59,11 @@ bool screenHasInvertedColors()
 FloatRect screenRect(Widget*)
 {
     BScreen screen;
-    // FIXME: We assume this screen is valid
-    return FloatRect(screen.Frame());
+    if (screen.IsValid()) {
+        BRect frame = screen.Frame();
+        return FloatRect(frame.left, frame.top, frame.Width() + 1, frame.Height() + 1);
+    }
+    return FloatRect(0, 0, 1920, 1080);
 }
 
 FloatRect screenAvailableRect(Widget* widget)
@@ -77,21 +80,36 @@ bool screenSupportsExtendedColor(Widget*)
 
 int screenDepth(Widget*)
 {
-    BScreen screen;
-    // FIXME: We assume this screen is valid
-    color_space cs = screen.ColorSpace();
+    BScreen screen(B_MAIN_SCREEN_ID);
+    if (!screen.IsValid())
+        return 24;
 
-    size_t pixelChunk, rowAlignment, pixelsPerChunk;
-    if (get_pixel_size_for(cs, &pixelChunk, &rowAlignment, &pixelsPerChunk) == B_OK)
-        // FIXME: Not sure if this is right
-        return pixelChunk * 8;
-
-    return 8;
+    switch (screen.ColorSpace()) {
+        case B_RGBA32:
+        case B_RGB32:
+        case B_RGB24:
+            return 24;
+        case B_RGB16:
+        case B_RGB15:
+        case B_RGBA15:
+            return 16;
+        case B_CMAP8:
+            return 8;
+        case B_GRAY8:
+            return 8;
+        case B_GRAY1:
+            return 1;
+        default:
+            return 24;
+    }
 }
 
 int screenDepthPerComponent(Widget*)
 {
     BScreen screen(B_MAIN_SCREEN_ID);
+    if (!screen.IsValid())
+        return 8;
+
     switch (screen.ColorSpace()) {
         case B_RGBA32:
         case B_RGB32:
@@ -99,6 +117,7 @@ int screenDepthPerComponent(Widget*)
             return 8;
         case B_RGB16:
         case B_RGB15:
+        case B_RGBA15:
             return 5;
         default:
             return 8;
@@ -107,9 +126,10 @@ int screenDepthPerComponent(Widget*)
 
 bool screenIsMonochrome(Widget*)
 {
-    BScreen screen;
-    // FIXME: We assume this screen is valid
-    return screen.ColorSpace() == B_MONOCHROME_1_BIT;
+    BScreen screen(B_MAIN_SCREEN_ID);
+    if (!screen.IsValid())
+        return false;
+    return screen.ColorSpace() == B_GRAY1 || screen.ColorSpace() == B_MONOCHROME_1_BIT;
 }
 
 DestinationColorSpace screenColorSpace(Widget*)

@@ -36,9 +36,12 @@
 #include "../../haiku/WebPopupMenuProxyHaiku.h"
 
 #include "WebCore/Region.h"
+#include "WebCore/NotImplemented.h"
 
+#include <Application.h>
 #include <View.h>
 #include <Window.h>
+#include <stdio.h>
 
 #if USE(COORDINATED_GRAPHICS) || USE(TEXTURE_MAPPER)
 #include "DrawingAreaProxyCoordinatedGraphics.h"
@@ -70,57 +73,74 @@ void PageClientImpl::setViewNeedsDisplay(const WebCore::Region& region)
     }
 }
 
-void PageClientImpl::requestScroll(const WebCore::FloatPoint&, const WebCore::IntPoint&, WebCore::ScrollIsAnimated)
+void PageClientImpl::requestScroll(const WebCore::FloatPoint& scrollPosition, const WebCore::IntPoint&, WebCore::ScrollIsAnimated)
 {
-    notImplemented();
+    if (fWebView.LockLooper()) {
+        fWebView.ScrollTo(scrollPosition.x(), scrollPosition.y());
+        fWebView.UnlockLooper();
+    }
 }
 
 WebCore::FloatPoint PageClientImpl::viewScrollPosition()
 {
-    notImplemented();
+    if (fWebView.LockLooper()) {
+        BRect bounds = fWebView.Bounds();
+        fWebView.UnlockLooper();
+        return FloatPoint(bounds.left, bounds.top);
+    }
     return { };
 }
 
 WebCore::IntSize PageClientImpl::viewSize()
 {
-    fWebView.Window()->Lock();
-    BRect rect = fWebView.Frame();
-    fWebView.Window()->Unlock();
-    return IntSize(rect.right - rect.left, rect.bottom - rect.top);
+    if (fWebView.LockLooper()) {
+        BRect rect = fWebView.Bounds();
+        fWebView.UnlockLooper();
+        return IntSize(rect.IntegerWidth() + 1, rect.IntegerHeight() + 1);
+    }
+    return { };
 }
 
 bool PageClientImpl::isViewWindowActive()
 {
-    //return fWebView.isWindowActive();
+    if (BWindow* window = fWebView.Window())
+        return window->IsActive();
     return false;
 }
 
 bool PageClientImpl::isViewFocused()
 {
-    //return fWebView.isFocused();
+    if (fWebView.LockLooper()) {
+        bool focused = fWebView.IsFocus();
+        fWebView.UnlockLooper();
+        return focused;
+    }
     return false;
 }
 
 bool PageClientImpl::isActiveViewVisible()
 {
-    //return fWebView.isVisible();
+    if (fWebView.LockLooper()) {
+        bool visible = !fWebView.IsHidden();
+        fWebView.UnlockLooper();
+        return visible;
+    }
     return true;
 }
 
 bool PageClientImpl::isViewInWindow()
 {
-    //return fWebView.isInWindow();
-    return false;
+    return fWebView.Window() != nullptr;
 }
 
-void PageClientImpl::PageClientImpl::processDidExit()
+void PageClientImpl::processDidExit()
 {
-    notImplemented();
+    fprintf(stderr, "PageClientImpl::processDidExit\n");
 }
 
 void PageClientImpl::didRelaunchProcess()
 {
-    notImplemented();
+    fprintf(stderr, "PageClientImpl::didRelaunchProcess\n");
 }
 
 void PageClientImpl::toolTipChanged(const String&, const String& newToolTip)
@@ -133,9 +153,10 @@ void PageClientImpl::setCursor(const WebCore::Cursor& cursor)
     fWebView.setCursor(cursor);
 }
 
-void PageClientImpl::setCursorHiddenUntilMouseMoves(bool /* hiddenUntilMouseMoves */)
+void PageClientImpl::setCursorHiddenUntilMouseMoves(bool hiddenUntilMouseMoves)
 {
-    notImplemented();
+    if (hiddenUntilMouseMoves)
+        be_app->ObscureCursor();
 }
 
 void PageClientImpl::registerEditCommand(Ref<WebEditCommandProxy>&& command, UndoOrRedo undoOrRedo)
@@ -160,34 +181,61 @@ void PageClientImpl::executeUndoRedo(UndoOrRedo undoOrRedo)
 
 FloatRect PageClientImpl::convertToDeviceSpace(const FloatRect& viewRect)
 {
-    notImplemented();
+    if (fWebView.LockLooper()) {
+        BRect rect(viewRect);
+        fWebView.ConvertToScreen(&rect);
+        fWebView.UnlockLooper();
+        return rect;
+    }
     return viewRect;
 }
 
 FloatRect PageClientImpl::convertToUserSpace(const FloatRect& viewRect)
 {
-    notImplemented();
+    if (fWebView.LockLooper()) {
+        BRect rect(viewRect);
+        fWebView.ConvertFromScreen(&rect);
+        fWebView.UnlockLooper();
+        return rect;
+    }
     return viewRect;
 }
 
 IntPoint PageClientImpl::screenToRootView(const IntPoint& point)
 {
-    return IntPoint();
+    if (fWebView.LockLooper()) {
+        BPoint p(point);
+        fWebView.ConvertFromScreen(&p);
+        fWebView.UnlockLooper();
+        return IntPoint(p);
+    }
+    return point;
 }
 
 IntRect PageClientImpl::rootViewToScreen(const IntRect& rect)
 {
+    if (fWebView.LockLooper()) {
+        BRect r(rect);
+        fWebView.ConvertToScreen(&r);
+        fWebView.UnlockLooper();
+        return IntRect(r);
+    }
     return rect;
 }
 
 IntPoint PageClientImpl::rootViewToScreen(const IntPoint& point)
 {
+    if (fWebView.LockLooper()) {
+        BPoint p(point);
+        fWebView.ConvertToScreen(&p);
+        fWebView.UnlockLooper();
+        return IntPoint(p);
+    }
     return point;
 }
 
 void PageClientImpl::doneWithKeyEvent(const NativeWebKeyboardEvent& event, bool wasEventHandled)
 {
-    notImplemented();
 }
 
 RefPtr<WebPopupMenuProxy> PageClientImpl::createPopupMenuProxy(WebPageProxy& page)
@@ -215,82 +263,66 @@ WTF::RefPtr<WebKit::WebDataListSuggestionsDropdown> PageClientImpl::createDataLi
 
 void PageClientImpl::enterAcceleratedCompositingMode(const LayerTreeContext& layerTreeContext)
 {
-    notImplemented();
 }
 
 void PageClientImpl::exitAcceleratedCompositingMode()
 {
-    notImplemented();
 }
 
 void PageClientImpl::updateAcceleratedCompositingMode(const LayerTreeContext& layerTreeContext)
 {
-    notImplemented();
 }
 
 void PageClientImpl::pageClosed()
 {
-    notImplemented();
 }
 
 void PageClientImpl::preferencesDidChange()
 {
-    notImplemented();
 }
 
 void PageClientImpl::didChangeContentSize(const IntSize& size)
 {
-    notImplemented();
 }
 
 void PageClientImpl::didCommitLoadForMainFrame(const String& /* mimeType */, bool /* useCustomContentProvider */ )
 {
-    notImplemented();
 }
 
 void PageClientImpl::wheelEventWasNotHandledByWebCore(const NativeWebWheelEvent& event)
 {
-    notImplemented();
 }
 
 void PageClientImpl::didFinishLoadingDataForCustomContentProvider(const String&, std::span<const unsigned char>)
 {
-    notImplemented();
 }
 
 void PageClientImpl::navigationGestureDidBegin()
 {
-    notImplemented();
 }
 
 void PageClientImpl::navigationGestureWillEnd(bool, WebBackForwardListItem&)
 {
-    notImplemented();
 }
 
 void PageClientImpl::navigationGestureDidEnd(bool, WebBackForwardListItem&)
 {
-    notImplemented();
 }
 
 void PageClientImpl::navigationGestureDidEnd()
 {
-    notImplemented();
 }
 
 void PageClientImpl::willRecordNavigationSnapshot(WebBackForwardListItem&)
 {
-    notImplemented();
 }
 
 void PageClientImpl::didRemoveNavigationGestureSnapshot()
 {
-    notImplemented();
 }
 
 void PageClientImpl::didFirstVisuallyNonEmptyLayoutForMainFrame()
 {
-    notImplemented();
 }
 
 void PageClientImpl::didFinishNavigation(API::Navigation*)
@@ -303,32 +335,26 @@ void PageClientImpl::didFailNavigation(API::Navigation*)
 
 void PageClientImpl::didSameDocumentNavigationForMainFrame(SameDocumentNavigationType)
 {
-    notImplemented();
 }
 
 void PageClientImpl::didChangeBackgroundColor()
 {
-    notImplemented();
 }
 
 void PageClientImpl::isPlayingAudioWillChange()
 {
-    notImplemented();
 }
 
 void PageClientImpl::isPlayingAudioDidChange()
 {
-    notImplemented();
 }
 
 void PageClientImpl::refView()
 {
-    notImplemented();
 }
 
 void PageClientImpl::derefView()
 {
-    notImplemented();
 }
 
 WebViewBase* PageClientImpl::viewWidget()
@@ -344,7 +370,9 @@ RefPtr<WebDateTimePicker> PageClientImpl::createDateTimePicker(WebPageProxy& pag
 #if ENABLE(FULLSCREEN_API)
 WebFullScreenManagerProxyClient& PageClientImpl::fullScreenManagerProxyClient()
 {
-    //return *this;
+    // FIXME: Implement full screen support
+    RELEASE_ASSERT_NOT_REACHED();
+    return *static_cast<WebFullScreenManagerProxyClient*>(nullptr);
 }
 #endif
 

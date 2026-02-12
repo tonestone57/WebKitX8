@@ -31,6 +31,7 @@
 
 #include "Image.h"
 #include "IntPoint.h"
+#include "NativeImage.h"
 #include <WebCore/NotImplemented.h>
 
 #include <app/Cursor.h>
@@ -56,8 +57,11 @@ Cursor::Cursor(Image* image, const IntPoint& hotSpot)
     , m_cursor(0)
 {
     if (image) {
-        // FIXME: Implement creating a BCursor from an Image*
-        notImplemented();
+        if (auto nativeImage = image->nativeImage()) {
+            if (auto* platformImage = nativeImage->platformImage().get()) {
+                 m_cursor = new BCursor(platformImage, BPoint(hotSpot.x(), hotSpot.y()));
+            }
+        }
     }
 }
 
@@ -114,18 +118,35 @@ void Cursor::ensurePlatformCursor() const
         m_cursor = new BCursor(B_CURSOR_ID_HELP);
         break;
     case Cursor::Type::EastResize:
+        m_cursor = new BCursor(B_CURSOR_ID_RESIZE_EAST);
+        break;
     case Cursor::Type::WestResize:
+        m_cursor = new BCursor(B_CURSOR_ID_RESIZE_WEST);
+        break;
     case Cursor::Type::EastWestResize:
+        m_cursor = new BCursor(B_CURSOR_ID_RESIZE_EAST_WEST);
+        break;
     case Cursor::Type::NorthEastResize:
+        m_cursor = new BCursor(B_CURSOR_ID_RESIZE_NORTH_EAST);
+        break;
     case Cursor::Type::NorthWestResize:
+        m_cursor = new BCursor(B_CURSOR_ID_RESIZE_NORTH_WEST);
+        break;
     case Cursor::Type::SouthEastResize:
+        m_cursor = new BCursor(B_CURSOR_ID_RESIZE_SOUTH_EAST);
+        break;
     case Cursor::Type::SouthWestResize:
+        m_cursor = new BCursor(B_CURSOR_ID_RESIZE_SOUTH_WEST);
+        break;
     case Cursor::Type::NorthSouthResize:
-        // FIXME: Use proper resize cursors
-        m_cursor = new BCursor(B_CURSOR_ID_SYSTEM_DEFAULT);
+        m_cursor = new BCursor(B_CURSOR_ID_RESIZE_NORTH_SOUTH);
         break;
     case Cursor::Type::NorthEastSouthWestResize:
+        m_cursor = new BCursor(B_CURSOR_ID_RESIZE_NORTH_EAST_SOUTH_WEST);
+        break;
     case Cursor::Type::NorthWestSouthEastResize:
+        m_cursor = new BCursor(B_CURSOR_ID_RESIZE_NORTH_WEST_SOUTH_EAST);
+        break;
     case Cursor::Type::ColumnResize:
     case Cursor::Type::RowResize:
         m_cursor = new BCursor(B_CURSOR_ID_SYSTEM_DEFAULT);
@@ -134,18 +155,32 @@ void Cursor::ensurePlatformCursor() const
         m_cursor = new BCursor(B_CURSOR_ID_MOVE);
         break;
     case Cursor::Type::VerticalText:
+        m_cursor = new BCursor(B_CURSOR_ID_I_BEAM); // Fallback
+        break;
     case Cursor::Type::Cell:
     case Cursor::Type::ContextMenu:
     case Cursor::Type::Alias:
     case Cursor::Type::Progress:
     case Cursor::Type::NoDrop:
+        m_cursor = new BCursor(B_CURSOR_ID_NOT_ALLOWED);
+        break;
     case Cursor::Type::Copy:
     case Cursor::Type::None:
     case Cursor::Type::NotAllowed:
+        m_cursor = new BCursor(B_CURSOR_ID_NOT_ALLOWED);
+        break;
     case Cursor::Type::ZoomIn:
+        m_cursor = new BCursor(B_CURSOR_ID_ZOOM_IN);
+        break;
     case Cursor::Type::ZoomOut:
+        m_cursor = new BCursor(B_CURSOR_ID_ZOOM_OUT);
+        break;
     case Cursor::Type::Grab:
+        m_cursor = new BCursor(B_CURSOR_ID_GRAB);
+        break;
     case Cursor::Type::Grabbing:
+        m_cursor = new BCursor(B_CURSOR_ID_GRABBING);
+        break;
     case Cursor::Type::Custom:
         break;
     }
