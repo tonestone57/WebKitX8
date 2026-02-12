@@ -31,25 +31,91 @@
 namespace WebKit {
 namespace NetworkCache {
 
-IOChannel::IOChannel(String&& filePath, Type type, std::optional<WTF::Thread::QOS>)
-    : m_path(filePath)
-    , m_type(type)
+IOChannel::IOChannel(const String& filePath, Type type, std::optional<WorkQueue::QOS>)
 {
-    notImplemented();
+    FileSystem::FileOpenMode openMode = FileSystem::FileOpenMode::Read;
+
+    switch (type) {
+    case Type::Read:
+        openMode = FileSystem::FileOpenMode::Read;
+        break;
+    case Type::Write:
+        openMode = FileSystem::FileOpenMode::ReadWrite;
+        break;
+    case Type::Create:
+        openMode = FileSystem::FileOpenMode::ReadWrite;
+        // Ensure file is created/truncated?
+        // FileSystem::openFile with ReadWrite | Create usually works.
+        // But explicitly deleting might be safer if we want truncation behavior for "Create".
+        FileSystem::deleteFile(filePath);
+        break;
+    }
+
+    m_fileDescriptor = FileSystem::openFile(filePath, openMode);
 }
 
 IOChannel::~IOChannel()
 {
+    if (FileSystem::isHandleValid(m_fileDescriptor))
+        FileSystem::closeFile(m_fileDescriptor);
 }
 
-void IOChannel::read(size_t offset, size_t size, WTF::WorkQueueBase& queue, Function<void(Data&, int error)>&& completionHandler)
+void IOChannel::read(size_t offset, size_t size, Ref<WTF::WorkQueueBase>&& queue, Function<void(Data&&, int error)>&& completionHandler)
 {
-    notImplemented();
+    queue->dispatch([this, protectedThis = Ref { *this }, offset, size, completionHandler = WTFMove(completionHandler)]() mutable {
+        Locker locker { m_lock };
+        if (!FileSystem::isHandleValid(m_fileDescriptor)) {
+            completionHandler(Data(), -1);
+            return;
+        }
+
+        long long current = FileSystem::seekFile(m_fileDescriptor, offset, FileSystem::FileSeekOrigin::Beginning);
+        if (current != (long long)offset) {
+             completionHandler(Data(), -1);
+             return;
+        }
+
+        Vector<uint8_t> buffer;
+        buffer.resize(size);
+        int bytesRead = FileSystem::readFromFile(m_fileDescriptor, buffer.data(), size);
+        if (bytesRead < 0) {
+            completionHandler(Data(), -1);
+            return;
+        }
+        buffer.shrink(bytesRead);
+
+        completionHandler(Data(WTFMove(buffer)), 0);
+    });
 }
 
-void IOChannel::write(size_t offset, const Data& data, WTF::WorkQueueBase& queue, Function<void(int error)>&& completionHandler)
+void IOChannel::write(size_t offset, const Data& data, Ref<WTF::WorkQueueBase>&& queue, Function<void(int error)>&& completionHandler)
 {
-    notImplemented();
+    // Copy data for async write
+    Vector<uint8_t> buffer;
+    auto span = data.span();
+    buffer.append(span);
+
+    queue->dispatch([this, protectedThis = Ref { *this }, offset, buffer = WTFMove(buffer), completionHandler = WTFMove(completionHandler)]() mutable {
+         Locker locker { m_lock };
+         if (!FileSystem::isHandleValid(m_fileDescriptor)) {
+             completionHandler(-1);
+             return;
+         }
+
+         long long current = FileSystem::seekFile(m_fileDescriptor, offset, FileSystem::FileSeekOrigin::Beginning);
+         if (current != (long long)offset) {
+             completionHandler(-1);
+             return;
+         }
+
+         int bytesWritten = FileSystem::writeToFile(m_fileDescriptor, buffer.data(), buffer.size());
+         if (bytesWritten < 0 || (size_t)bytesWritten != buffer.size()) {
+             completionHandler(-1);
+             return;
+         }
+
+         completionHandler(0);
+    });
 }
 
 } // namespace NetworkCache

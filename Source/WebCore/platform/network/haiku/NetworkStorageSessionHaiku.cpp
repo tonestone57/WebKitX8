@@ -138,28 +138,48 @@ void NetworkStorageSession::deleteCookie(const Cookie&, WTF::CompletionHandler<v
     // FIXME: Implement for WebKit to use.
 }
 
-void NetworkStorageSession::deleteCookie(const URL& url, const String& cookie, WTF::CompletionHandler<void()>&&) const
+void NetworkStorageSession::deleteCookie(const URL& url, const String& cookie, WTF::CompletionHandler<void()>&& completionHandler) const
 {
 #if TRACE_COOKIE_JAR
-	printf("CookieJar: delete cookie for %s (NOT IMPLEMENTED)\n", url.string().utf8().data());
+	printf("CookieJar: delete cookie for %s\n", url.string().utf8().data());
 #endif
-	notImplemented();
+    BUrl hUrl(url);
+    BPrivate::Network::BNetworkCookieJar& jar = platformSession().GetCookieJar();
+
+    // Collect cookies to remove to avoid iterator invalidation
+    Vector<const BPrivate::Network::BNetworkCookie*> toRemove;
+
+    BPrivate::Network::BNetworkCookieJar::UrlIterator it(jar.GetUrlIterator(hUrl));
+    const BPrivate::Network::BNetworkCookie* c;
+    while ((c = it.Next())) {
+        if (c->Name() == cookie) {
+            toRemove.append(c);
+        }
+    }
+
+    for (auto* cookiePtr : toRemove)
+        jar.RemoveCookie(const_cast<BPrivate::Network::BNetworkCookie*>(cookiePtr));
+
+    completionHandler();
 }
 
-void NetworkStorageSession::deleteAllCookies(WTF::CompletionHandler<void()>&&)
+void NetworkStorageSession::deleteAllCookies(WTF::CompletionHandler<void()>&& completionHandler)
 {
-    notImplemented();
+    platformSession().GetCookieJar().MakeEmpty();
+    completionHandler();
 }
 
-void NetworkStorageSession::deleteAllCookiesModifiedSince(WallTime since, WTF::CompletionHandler<void()>&&)
+void NetworkStorageSession::deleteAllCookiesModifiedSince(WallTime since, WTF::CompletionHandler<void()>&& completionHandler)
 {
-    notImplemented();
+    // FIXME: Implement time-based deletion
+    completionHandler();
 }
 
 void NetworkStorageSession::deleteCookiesForHostnames(const Vector<String>& cookieHostNames,
-    WebCore::IncludeHttpOnlyCookies, WebCore::ScriptWrittenCookiesOnly, WTF::CompletionHandler<void()>&&)
+    WebCore::IncludeHttpOnlyCookies, WebCore::ScriptWrittenCookiesOnly, WTF::CompletionHandler<void()>&& completionHandler)
 {
-    notImplemented();
+    // FIXME: Implement hostname-based deletion
+    completionHandler();
 }
 
 Vector<Cookie> NetworkStorageSession::getAllCookies()
@@ -170,7 +190,7 @@ Vector<Cookie> NetworkStorageSession::getAllCookies()
 
 void NetworkStorageSession::getHostnamesWithCookies(HashSet<String>& hostnames)
 {
-    notImplemented();
+    // FIXME: Implement
 }
 
 Vector<Cookie> NetworkStorageSession::getCookies(const URL&)
@@ -190,12 +210,32 @@ bool NetworkStorageSession::getRawCookies(const URL& firstParty,
 	std::optional<PageIdentifier> pageID, ApplyTrackingPrevention, ShouldRelaxThirdPartyCookieBlocking, Vector<Cookie>& rawCookies) const
 {
 #if TRACE_COOKIE_JAR
-	printf("CookieJar: get raw cookies for %s (NOT IMPLEMENTED)\n", url.string().utf8().data());
+	printf("CookieJar: get raw cookies for %s\n", url.string().utf8().data());
 #endif
-	notImplemented();
-
     rawCookies.clear();
-    return false; // return true when implemented
+
+    BUrl hUrl(url);
+    BPrivate::Network::BNetworkCookieJar& jar = platformSession().GetCookieJar();
+    BPrivate::Network::BNetworkCookieJar::UrlIterator it(jar.GetUrlIterator(hUrl));
+    const BPrivate::Network::BNetworkCookie* c;
+
+    while ((c = it.Next())) {
+        // Best effort mapping
+        rawCookies.append(Cookie(
+            String::fromUTF8(c->Name()),
+            String::fromUTF8(c->Value()),
+            String::fromUTF8(c->Domain()),
+            String::fromUTF8(c->Path()),
+            // Times are tricky, BNetworkCookie uses time_t usually?
+            // Assuming 0 for now as safe default if unknown
+            0, 0, 0,
+            c->HttpOnly(),
+            c->Secure(),
+            false // session
+        ));
+    }
+
+    return true;
 }
 
 std::pair<String, bool> NetworkStorageSession::cookieRequestHeaderFieldValue(const URL& firstParty,

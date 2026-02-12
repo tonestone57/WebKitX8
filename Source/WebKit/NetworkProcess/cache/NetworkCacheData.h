@@ -74,6 +74,8 @@ public:
     Data(GRefPtr<GBytes>&&, FileSystem::FileHandle&& = { });
 #elif USE(CURL)
     Data(Variant<Vector<uint8_t>, FileSystem::MappedFileData>&&);
+#elif PLATFORM(HAIKU) && !USE(CURL)
+    Data(Variant<Vector<uint8_t>, FileSystem::MappedFileData>&&);
 #endif
     bool isNull() const;
     bool isEmpty() const { return !size(); }
@@ -108,6 +110,9 @@ private:
     Box<FileSystem::FileHandle> m_fileHandle;
 #endif
 #if USE(CURL)
+    Box<Variant<Vector<uint8_t>, FileSystem::MappedFileData>> m_buffer;
+#endif
+#if PLATFORM(HAIKU) && !USE(CURL)
     Box<Variant<Vector<uint8_t>, FileSystem::MappedFileData>> m_buffer;
 #endif
     bool m_isMap { false };
