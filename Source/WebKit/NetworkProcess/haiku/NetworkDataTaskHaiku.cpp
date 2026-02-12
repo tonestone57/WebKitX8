@@ -361,9 +361,9 @@ void NetworkDataTaskHaiku::didReceiveData(const void* buffer, size_t size)
     Vector<uint8_t> dataVector;
     dataVector.append((const uint8_t*)buffer, size);
 
-    runOnMainThread([this, dataVector = WTFMove(dataVector)] {
-        if (m_client)
-            m_client->didReceiveData(SharedBuffer::create(WTFMove(dataVector)));
+    runOnMainThread([protectedThis = Ref { *this }, dataVector = WTFMove(dataVector)] {
+        if (protectedThis->m_client)
+            protectedThis->m_client->didReceiveData(SharedBuffer::create(WTFMove(dataVector)));
     });
 }
 
