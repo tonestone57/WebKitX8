@@ -85,7 +85,7 @@ private:
 
     void ConnectionOpened(BUrlRequest* caller) override;
     void HeadersReceived(BUrlRequest* caller) override;
-    void BytesWritten(BUrlRequest* caller, size_t size) override;
+    void DataReceived(BUrlRequest* caller, const char* data, off_t position, ssize_t size) override;
     void UploadProgress(BUrlRequest* caller, off_t bytesSent, off_t bytesTotal) override;
     void RequestCompleted(BUrlRequest* caller, bool success) override;
     bool CertificateVerificationFailed(BUrlRequest* caller, BCertificate& certificate, const char* message) override;

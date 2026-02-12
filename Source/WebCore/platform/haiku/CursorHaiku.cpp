@@ -32,7 +32,6 @@
 #include "Image.h"
 #include "IntPoint.h"
 #include "NativeImage.h"
-#include <WebCore/NotImplemented.h>
 
 #include <app/Cursor.h>
 #include <interface/Bitmap.h>

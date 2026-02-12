@@ -31,7 +31,6 @@
 #include "config.h"
 #include "LocalizedStrings.h"
 
-#include "NotImplemented.h"
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {

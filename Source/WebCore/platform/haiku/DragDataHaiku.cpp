@@ -30,7 +30,6 @@
 
 #include "Document.h"
 #include "DocumentFragment.h"
-#include <WebCore/NotImplemented.h>
 
 #include <Entry.h>
 #include <Message.h>

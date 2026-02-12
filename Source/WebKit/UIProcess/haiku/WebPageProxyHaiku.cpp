@@ -27,7 +27,6 @@
 #include "WebKitVersion.h"
 #include "WebPageProxy.h"
 
-#include <WebCore/NotImplemented.h>
 #include <WebCore/UserAgent.h>
 
 #include <sys/utsname.h>

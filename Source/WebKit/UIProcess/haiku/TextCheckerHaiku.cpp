@@ -27,7 +27,6 @@
 #include "TextChecker.h"
 
 #include "TextCheckerState.h"
-#include <WebCore/NotImplemented.h>
 #include <wtf/OptionSet.h>
 
 namespace WebKit {

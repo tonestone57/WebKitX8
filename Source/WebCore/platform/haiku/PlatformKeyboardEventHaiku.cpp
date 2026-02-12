@@ -38,7 +38,6 @@
 
 #include "PlatformKeyboardEvent.h"
 
-#include "NotImplemented.h"
 #include "WindowsKeyboardCodes.h"
 #include <InterfaceDefs.h>
 #include <Message.h>
@@ -149,9 +148,9 @@ int PlatformKeyboardEvent::windowsKeyCodeForKeyEvent(char singleByte, int keyCod
         case B_PRINT_KEY:
             return VK_PRINT;
         case B_PAUSE_KEY:
-            return 0; // FIXME
+            return VK_PAUSE;
         case B_SCROLL_KEY:
-            return 0; // FIXME
+            return VK_SCROLL;
         }
         break;
 

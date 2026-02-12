@@ -21,7 +21,6 @@
 #include "config.h"
 #include "SearchPopupMenuHaiku.h"
 
-#include "NotImplemented.h"
 
 #include <Directory.h>
 #include <File.h>

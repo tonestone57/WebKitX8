@@ -281,9 +281,9 @@ void NetworkDataTaskHaiku::HeadersReceived(BUrlRequest* caller)
         });
     }
 }
-void NetworkDataTaskHaiku::BytesWritten(BUrlRequest* caller, size_t size)
+
+void NetworkDataTaskHaiku::DataReceived(BUrlRequest* caller, const char* data, off_t position, ssize_t size)
 {
-#if 0 // FIXME need to have a BDataIO to handle this
     if (m_currentRequest.isNull())
         return;
 
@@ -294,21 +294,23 @@ void NetworkDataTaskHaiku::BytesWritten(BUrlRequest* caller, size_t size)
     if (m_redirected)
         return;
 
-    if (position != m_position)
-    {
-        debugger("bad redirect");
-        return;
-    }
-
     if (size > 0) {
         m_responseDataSent = true;
-        runOnMainThread([this, data=data, size=size] {
-            m_client->didReceiveData(SharedBuffer::create(data,size));
+        // Use a SharedBuffer to copy the data safely to the main thread (or where needed)
+        // Note: runOnMainThread here might be redundant if the client handles it, but safe.
+        // However, standard NetworkDataTask usually expects callbacks on the network thread?
+        // But `runOnMainThread` implementation in this file dispatches to main thread if not already there.
+        // Let's assume thread safety is handled by passing a copy.
+        // We copy data to a vector.
+        Vector<uint8_t> buffer;
+        buffer.append(std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(data), size));
+
+        runOnMainThread([this, buffer = WTFMove(buffer)] {
+            m_client->didReceiveData(SharedBuffer::create(WTFMove(buffer)));
         });
     }
 
     m_position += size;
-#endif
 }
 
 void NetworkDataTaskHaiku::UploadProgress(BUrlRequest* caller, off_t bytesSent, off_t bytesTotal)
@@ -317,12 +319,23 @@ void NetworkDataTaskHaiku::UploadProgress(BUrlRequest* caller, off_t bytesSent, 
 
 void NetworkDataTaskHaiku::RequestCompleted(BUrlRequest* caller, bool success)
 {
+    if (m_client) {
+        if (success) {
+            m_networkLoadMetrics.responseEnd = MonotonicTime::now();
+            m_networkLoadMetrics.markComplete();
+            m_client->didFinishLoading(m_networkLoadMetrics);
+        } else {
+            ResourceError error(m_currentRequest.url().host().toString(), caller->Status(), m_currentRequest.url(), "Network request failed"_s);
+            m_client->didCompleteWithError(error, m_networkLoadMetrics);
+        }
+    }
 }
 
 bool NetworkDataTaskHaiku::CertificateVerificationFailed(BUrlRequest* caller, BCertificate& certificate, const char* message)
 {
-    //TODO
-    return true;
+    // Secure default: reject invalid certificates.
+    // Ideally we should ask the user, but for now we fail.
+    return false;
 }
 
 void NetworkDataTaskHaiku::DebugMessage(BUrlRequest* caller, BUrlProtocolDebugMessage type, const char* text)

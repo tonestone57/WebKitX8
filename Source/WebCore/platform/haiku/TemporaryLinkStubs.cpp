@@ -34,13 +34,31 @@
 #include "config.h"
 
 #include "wtf/URL.h"
-#include "NotImplemented.h"
 #include <InterfaceDefs.h>
+#include <Application.h>
+#include <Roster.h>
+#include <Resources.h>
+#include <File.h>
 
-Vector<char> loadResourceIntoArray(const char*)
+Vector<char> loadResourceIntoArray(const char* name)
 {
-    notImplemented();
-    return Vector<char>();
+    app_info info;
+    if (be_app->GetAppInfo(&info) != B_OK)
+        return Vector<char>();
+
+    BFile file(&info.ref, B_READ_ONLY);
+    if (file.InitCheck() != B_OK)
+        return Vector<char>();
+
+    BResources resources(&file);
+    size_t size;
+    const void* data = resources.LoadResource(B_RAW_TYPE, name, &size);
+    if (!data)
+        return Vector<char>();
+
+    Vector<char> result;
+    result.append(std::span<const char>((const char*)data, size));
+    return result;
 }
 
 namespace WebCore {
