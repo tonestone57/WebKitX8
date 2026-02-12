@@ -37,6 +37,7 @@
 #include <support/Locker.h>
 #include <locale/Collator.h>
 #include <private/shared/CalendarView.h>
+#include <DateFormat.h>
 #include <LocaleRoster.h>
 #include <MenuField.h>
 #include <MenuItem.h>

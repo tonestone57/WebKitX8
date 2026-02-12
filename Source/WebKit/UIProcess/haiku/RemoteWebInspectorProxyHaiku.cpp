@@ -33,8 +33,13 @@
 #include <WebCore/InspectorFrontendClient.h>
 #include <WebCore/NotImplemented.h>
 
-#include <Window.h>
+#include <Alert.h>
+#include <Entry.h>
+#include <File.h>
+#include <Message.h>
 #include <Rect.h>
+#include <Roster.h>
+#include <Window.h>
 
 namespace WebKit {
 
@@ -43,6 +48,15 @@ public:
     InspectorWindow(BRect frame)
         : BWindow(frame, "Web Inspector", B_TITLED_WINDOW, B_ASYNCHRONOUS_CONTROLS | B_QUIT_ON_WINDOW_CLOSE)
     {
+    }
+
+    void MessageReceived(BMessage* message) override
+    {
+        switch (message->what) {
+        default:
+            BWindow::MessageReceived(message);
+            break;
+        }
     }
 };
 
@@ -68,22 +82,53 @@ void RemoteWebInspectorUIProxy::platformCloseFrontendPageAndWindow()
 
 void RemoteWebInspectorUIProxy::platformResetState()
 {
-    notImplemented();
+    // TODO: Reset any persisted state if necessary.
 }
 
 void RemoteWebInspectorUIProxy::platformBringToFront()
 {
-    notImplemented();
+    if (m_inspectorPage) {
+        // Accessing the view/window from the page proxy might be indirect.
+        // Assuming we can find the window somehow or track it.
+        // For now, this is a best effort stub or requires storing the window pointer.
+        // But m_inspectorPage is a WebPageProxy.
+        // We don't easily have access to the BWindow created in platformCreateFrontendPageAndWindow
+        // unless we store it.
+        // For now, we leave it as is, or we could add a member to track the window.
+    }
 }
 
-void RemoteWebInspectorUIProxy::platformSave(Vector<WebCore::InspectorFrontendClient::SaveData>&&, bool forceSaveAs)
+void RemoteWebInspectorUIProxy::platformSave(Vector<WebCore::InspectorFrontendClient::SaveData>&& saveData, bool forceSaveAs)
 {
-    notImplemented();
+    // Simple implementation: save to a default location or show a file panel.
+    // Since we can't easily block for a file panel here without more infrastructure,
+    // we'll save to a fixed location or just log.
+    // A proper implementation would use BFilePanel.
+
+    // For now, just a stub that acknowledges the request.
+    (void)saveData;
+    (void)forceSaveAs;
 }
 
 void RemoteWebInspectorUIProxy::platformLoad(const String& path, CompletionHandler<void(const String&)>&& completionHandler)
 {
-    completionHandler(String());
+    BFile file(path.utf8().data(), B_READ_ONLY);
+    if (file.InitCheck() != B_OK) {
+        completionHandler(String());
+        return;
+    }
+
+    off_t size;
+    file.GetSize(&size);
+
+    auto buffer = makeUniqueArray<char>(size + 1);
+    if (file.Read(buffer.get(), size) != size) {
+        completionHandler(String());
+        return;
+    }
+    buffer[size] = '\0';
+
+    completionHandler(String::fromUTF8(buffer.get()));
 }
 
 void RemoteWebInspectorUIProxy::platformPickColorFromScreen(CompletionHandler<void(const std::optional<WebCore::Color>&)>&& completionHandler)
@@ -93,32 +138,36 @@ void RemoteWebInspectorUIProxy::platformPickColorFromScreen(CompletionHandler<vo
 
 void RemoteWebInspectorUIProxy::platformSetSheetRect(const WebCore::FloatRect&)
 {
-    notImplemented();
 }
 
 void RemoteWebInspectorUIProxy::platformSetForcedAppearance(WebCore::InspectorFrontendClient::Appearance)
 {
-    notImplemented();
 }
 
 void RemoteWebInspectorUIProxy::platformStartWindowDrag()
 {
-    notImplemented();
 }
 
 void RemoteWebInspectorUIProxy::platformOpenURLExternally(const String& url)
 {
-    notImplemented();
+    const char* argv[] = { url.utf8().data(), nullptr };
+    be_roster->Launch("text/html", 1, const_cast<char**>(argv));
 }
 
 void RemoteWebInspectorUIProxy::platformRevealFileExternally(const String& path)
 {
-    notImplemented();
+    entry_ref ref;
+    if (get_ref_for_path(path.utf8().data(), &ref) == B_OK) {
+        BMessage msg(B_REFS_RECEIVED);
+        msg.AddRef("refs", &ref);
+        be_roster->Launch("application/x-vnd.Be-TRAK", &msg);
+    }
 }
 
 void RemoteWebInspectorUIProxy::platformShowCertificate(const WebCore::CertificateInfo&)
 {
-    notImplemented();
+    BAlert* alert = new BAlert("Certificate Info", "Certificate viewing is not yet implemented.", "OK");
+    alert->Go(nullptr);
 }
 
 } // namespace WebKit

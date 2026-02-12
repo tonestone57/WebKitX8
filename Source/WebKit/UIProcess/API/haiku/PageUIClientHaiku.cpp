@@ -30,6 +30,8 @@
 #include <WebCore/FloatSize.h>
 #include <PrintJob.h>
 #include <Rect.h>
+#include <Window.h>
+#include <cmath>
 
 namespace WebKit {
 
@@ -47,7 +49,38 @@ void PageUIClientHaiku::printFrame(WebPageProxy& page, WebFrameProxy& frame, con
     BPrintJob job("WebKit Print Job");
 
     if (job.ConfigJob() == B_OK) {
-        // TODO: Implement actual printing.
+        job.BeginJob();
+
+        BRect printableRect = job.PrintableRect();
+        BRect viewRect = m_webView.Bounds();
+
+        // Simple scaling to fit width
+        float scale = 1.0f;
+        if (viewRect.Width() > printableRect.Width()) {
+            scale = printableRect.Width() / viewRect.Width();
+        }
+
+        // Calculate number of pages needed for height
+        float pageHeightUnscaled = printableRect.Height() / scale;
+        int32 pages = static_cast<int32>(ceil(viewRect.Height() / pageHeightUnscaled));
+        if (pages < 1) pages = 1;
+
+        for (int32 i = 0; i < pages; i++) {
+            BRect pageRect(0, i * pageHeightUnscaled, viewRect.Width(), (i + 1) * pageHeightUnscaled);
+            if (pageRect.bottom > viewRect.Height())
+                pageRect.bottom = viewRect.Height();
+
+            if (BWindow* window = m_webView.Window()) {
+                if (window->Lock()) {
+                    // Draw the portion of the view corresponding to the current page
+                    job.DrawView(&m_webView, pageRect, printableRect.LeftTop());
+                    window->Unlock();
+                }
+            }
+            job.SpoolPage();
+        }
+
+        job.CommitJob();
     }
 
     completionHandler();

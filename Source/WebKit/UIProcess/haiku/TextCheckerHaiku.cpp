@@ -62,7 +62,8 @@ void TextChecker::grammarCheckingEnabledStateChanged(bool)
 
 SpellDocumentTag TextChecker::uniqueSpellDocumentTag(WebPageProxy*)
 {
-    return 0;
+    static SpellDocumentTag tag = 0;
+    return ++tag;
 }
 
 void TextChecker::closeSpellDocumentWithTag(SpellDocumentTag)
