@@ -339,6 +339,10 @@ void PageClientImpl::didSameDocumentNavigationForMainFrame(SameDocumentNavigatio
 
 void PageClientImpl::didChangeBackgroundColor()
 {
+    if (fWebView.LockLooper()) {
+        fWebView.Invalidate();
+        fWebView.UnlockLooper();
+    }
 }
 
 void PageClientImpl::isPlayingAudioWillChange()

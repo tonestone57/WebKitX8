@@ -67,9 +67,12 @@ FloatRect screenRect(Widget*)
 
 FloatRect screenAvailableRect(Widget* widget)
 {
-    // FIXME: We could use the get_deskbar_frame() function
-    // from InterfaceDefs.h to make this smaller
-    return screenRect(widget);
+    BScreen screen;
+    if (screen.IsValid()) {
+        BRect frame = screen.Frame();
+        return FloatRect(frame.left, frame.top, frame.Width() + 1, frame.Height() + 1);
+    }
+    return FloatRect(0, 0, 1920, 1080);
 }
 
 bool screenSupportsExtendedColor(Widget*)
