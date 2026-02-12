@@ -42,14 +42,12 @@ bool WebInspectorUI::canSave()
 
 String WebInspectorUI::localizedStringsURL()
 {
-    notImplemented();
-    return "file:///localizedStrings.js";
+    return "file:///system/data/webkit/inspector/Localizable.strings"_s;
 }
 
 String RemoteWebInspectorUI::localizedStringsURL()
 {
-    notImplemented();
-    return "file:///localizedStrings.js";
+    return "file:///system/data/webkit/inspector/Localizable.strings"_s;
 }
     
 } // namespace WebKit

@@ -165,7 +165,6 @@ bool FrameLoaderClientHaiku::dispatchDidLoadResourceFromMemoryCache(DocumentLoad
                                                                     const ResourceResponse& /*response*/,
                                                                     int /*length*/)
 {
-    notImplemented();
     return false;
 }
 
@@ -213,7 +212,6 @@ bool FrameLoaderClientHaiku::shouldUseCredentialStorage(DocumentLoader*, Resourc
 {
     // TODO disable when in "private browsing" mode or similar, or allow to remember passwords or
     // not per website
-    notImplemented();
     return true;
 }
 
@@ -312,12 +310,10 @@ void FrameLoaderClientHaiku::dispatchDidReceiveResponse(DocumentLoader* loader,
 void FrameLoaderClientHaiku::dispatchDidReceiveContentLength(DocumentLoader* /*loader*/,
                                                              ResourceLoaderIdentifier /*id*/, int /*length*/)
 {
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::dispatchDidFinishLoading(DocumentLoader* /*loader*/, ResourceLoaderIdentifier /*identifier*/)
 {
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::dispatchDidFailLoading(DocumentLoader* loader, ResourceLoaderIdentifier, const ResourceError& error)
@@ -338,17 +334,14 @@ void FrameLoaderClientHaiku::dispatchDidDispatchOnloadEvents()
 
 void FrameLoaderClientHaiku::dispatchDidReceiveServerRedirectForProvisionalLoad()
 {
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::dispatchDidCancelClientRedirect()
 {
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::dispatchWillPerformClientRedirect(const URL&, double /*interval*/, WallTime /*fireDate*/, LockBackForwardList)
 {
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::dispatchDidChangeLocationWithinPage()
@@ -361,22 +354,18 @@ void FrameLoaderClientHaiku::dispatchDidChangeLocationWithinPage()
 
 void FrameLoaderClientHaiku::dispatchDidPushStateWithinPage()
 {
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::dispatchDidReplaceStateWithinPage()
 {
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::dispatchDidPopStateWithinPage()
 {
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::dispatchWillClose()
 {
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::dispatchDidReceiveIcon()
@@ -512,7 +501,6 @@ void FrameLoaderClientHaiku::dispatchDidFinishLoad()
 void FrameLoaderClientHaiku::dispatchWillSubmitForm(FormState&, URL&&, String&&, WTF::CompletionHandler<void()>&& function)
 {
     CALLED();
-    notImplemented();
 	// It seems we can access the form content here, and maybe store it for auto-complete and the like.
     function();
 }
@@ -530,7 +518,6 @@ LocalFrame* FrameLoaderClientHaiku::dispatchCreatePage(const NavigationAction& /
 void FrameLoaderClientHaiku::dispatchShow()
 {
     CALLED();
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::dispatchDecidePolicyForResponse(
@@ -613,19 +600,16 @@ void FrameLoaderClientHaiku::dispatchDecidePolicyForNavigationAction(
 void FrameLoaderClientHaiku::cancelPolicyCheck()
 {
     CALLED();
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::dispatchUnableToImplementPolicy(const ResourceError&)
 {
     CALLED();
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::revertToProvisionalState(DocumentLoader*)
 {
     CALLED();
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::setMainDocumentError(WebCore::DocumentLoader* /*loader*/, const WebCore::ResourceError& error)
@@ -739,13 +723,11 @@ bool FrameLoaderClientHaiku::shouldFallBack(const WebCore::ResourceError& error)
 
 bool FrameLoaderClientHaiku::canHandleRequest(const WebCore::ResourceRequest&) const
 {
-    // notImplemented();
     return true;
 }
 
 bool FrameLoaderClientHaiku::canShowMIMETypeAsHTML(const String& /*MIMEType*/) const
 {
-    notImplemented();
     return false;
 }
 
@@ -777,7 +759,6 @@ bool FrameLoaderClientHaiku::representationExistsForURLScheme(StringView /*URLSc
 
 String FrameLoaderClientHaiku::generatedMIMETypeForURLScheme(StringView /*URLScheme*/) const
 {
-    notImplemented();
     return String();
 }
 
@@ -787,7 +768,6 @@ void FrameLoaderClientHaiku::frameLoadCompleted()
 
 void FrameLoaderClientHaiku::saveViewStateToItem(HistoryItem&)
 {
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::restoreViewState()
@@ -796,17 +776,14 @@ void FrameLoaderClientHaiku::restoreViewState()
     //   "This signal is emitted when the load of \a frame is finished and the application
     //   may now update its state accordingly."
     // Could be this is important for ports which use actual platform widgets.
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::provisionalLoadStarted()
 {
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::didFinishLoad()
 {
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::prepareForDataSourceReplacement()
@@ -934,7 +911,6 @@ RefPtr<Widget> FrameLoaderClientHaiku::createPlugin(HTMLPlugInElement&, const UR
                                                         const Vector<AtomString>&, const String&, bool /*loadManually*/)
 {
     CALLED();
-    notImplemented();
     return nullptr;
 }
 

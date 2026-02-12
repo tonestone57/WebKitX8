@@ -36,12 +36,11 @@ GraphicsContext3D::ImageExtractor::~ImageExtractor() = default;
 
 bool GraphicsContext3D::ImageExtractor::extractImage(bool premultiplyAlpha, bool ignoreGammaAndColorProfile)
 {
-    notImplemented();
+    return false;
 }
 
 void GraphicsContext3D::paintToCanvas(const unsigned char* imagePixels, const IntSize& imageSize, const IntSize& canvasSize, GraphicsContext& context)
 {
-    notImplemented();
 }
 
 } // namespace WebCore

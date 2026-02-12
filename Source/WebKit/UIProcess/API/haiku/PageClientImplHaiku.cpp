@@ -289,47 +289,39 @@ void PageClientImpl::didCommitLoadForMainFrame(const String& /* mimeType */, boo
 
 void PageClientImpl::wheelEventWasNotHandledByWebCore(const NativeWebWheelEvent& event)
 {
-    notImplemented();
+    // Pass back to BView?
 }
 
 void PageClientImpl::didFinishLoadingDataForCustomContentProvider(const String&, std::span<const unsigned char>)
 {
-    notImplemented();
 }
 
 void PageClientImpl::navigationGestureDidBegin()
 {
-    notImplemented();
 }
 
 void PageClientImpl::navigationGestureWillEnd(bool, WebBackForwardListItem&)
 {
-    notImplemented();
 }
 
 void PageClientImpl::navigationGestureDidEnd(bool, WebBackForwardListItem&)
 {
-    notImplemented();
 }
 
 void PageClientImpl::navigationGestureDidEnd()
 {
-    notImplemented();
 }
 
 void PageClientImpl::willRecordNavigationSnapshot(WebBackForwardListItem&)
 {
-    notImplemented();
 }
 
 void PageClientImpl::didRemoveNavigationGestureSnapshot()
 {
-    notImplemented();
 }
 
 void PageClientImpl::didFirstVisuallyNonEmptyLayoutForMainFrame()
 {
-    notImplemented();
 }
 
 void PageClientImpl::didFinishNavigation(API::Navigation*)
@@ -342,12 +334,15 @@ void PageClientImpl::didFailNavigation(API::Navigation*)
 
 void PageClientImpl::didSameDocumentNavigationForMainFrame(SameDocumentNavigationType)
 {
-    notImplemented();
 }
 
 void PageClientImpl::didChangeBackgroundColor()
 {
-    notImplemented();
+    // fWebView.SetViewColor(page->backgroundColor());
+    if (fWebView.LockLooper()) {
+        fWebView.Invalidate();
+        fWebView.UnlockLooper();
+    }
 }
 
 void PageClientImpl::isPlayingAudioWillChange()
@@ -361,12 +356,10 @@ void PageClientImpl::isPlayingAudioDidChange()
 
 void PageClientImpl::refView()
 {
-    notImplemented();
 }
 
 void PageClientImpl::derefView()
 {
-    notImplemented();
 }
 
 WebViewBase* PageClientImpl::viewWidget()
