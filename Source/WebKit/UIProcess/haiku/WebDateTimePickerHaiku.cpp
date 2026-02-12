@@ -29,6 +29,10 @@
 #include "WebPageProxy.h"
 #include <WebCore/InputTypeNames.h>
 #include <wtf/text/CString.h>
+#include <wtf/RunLoop.h>
+
+#include <cstdlib>
+#include <cerrno>
 
 #include <support/Locker.h>
 #include <locale/Collator.h>
@@ -229,7 +233,10 @@ public:
                     str << timeStr;
                 }
 
-                m_picker.didChooseDate(String::fromUTF8(str.String()));
+                String dateString = String::fromUTF8(str.String());
+                RunLoop::main().dispatch([picker = &m_picker, dateString]() {
+                    picker->didChooseDate(dateString);
+                });
                 [[fallthrough]];
             }
             case 'canc':
@@ -266,7 +273,9 @@ public:
     }
 
     bool QuitRequested() override {
-        m_picker.didEndChooser();
+        RunLoop::main().dispatch([picker = &m_picker]() {
+            picker->didEndChooser();
+        });
         return true;
     }
 

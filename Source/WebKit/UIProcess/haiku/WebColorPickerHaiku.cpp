@@ -28,6 +28,7 @@
 
 #include "WebPageProxy.h"
 #include <WebCore/Color.h>
+#include <wtf/RunLoop.h>
 #include <Window.h>
 #include <ColorControl.h>
 #include <Message.h>
@@ -67,7 +68,10 @@ public:
         switch(message->what) {
             case 'chng': {
                 rgb_color rgb = m_colorControl->ValueAsColor();
-                m_picker.didChooseColor(Color(SRGBA<uint8_t> { rgb.red, rgb.green, rgb.blue, rgb.alpha }));
+                Color color(SRGBA<uint8_t> { rgb.red, rgb.green, rgb.blue, rgb.alpha });
+                RunLoop::main().dispatch([picker = &m_picker, color]() {
+                    picker->didChooseColor(color);
+                });
                 break;
             }
             default:
@@ -76,7 +80,9 @@ public:
     }
 
     bool QuitRequested() override {
-        m_picker.didEndChooser();
+        RunLoop::main().dispatch([picker = &m_picker]() {
+            picker->didEndChooser();
+        });
         return true;
     }
 
