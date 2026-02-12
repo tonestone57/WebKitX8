@@ -45,6 +45,8 @@ public:
     void setSelectedColor(const WebCore::Color&) override;
     void showColorPicker(const WebCore::Color&) override;
 
+    void colorChanged(const WebCore::Color&);
+
 private:
     WebColorPickerHaiku(WebPageProxy&, const WebCore::Color&, const WebCore::IntRect&);
 

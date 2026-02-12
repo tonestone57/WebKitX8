@@ -160,16 +160,21 @@ void NetworkStorageSession::deleteCookie(const Cookie& cookie, WTF::CompletionHa
     completionHandler();
 }
 
-void NetworkStorageSession::deleteCookie(const URL& url, const String& cookie, WTF::CompletionHandler<void()>&& completionHandler) const
+void NetworkStorageSession::deleteCookie(const URL& url, const String& cookieName, WTF::CompletionHandler<void()>&& completionHandler) const
 {
 #if TRACE_COOKIE_JAR
-	printf("CookieJar: delete cookie for %s\n", url.string().utf8().data());
+	printf("CookieJar: delete cookie %s for %s\n", cookieName.utf8().data(), url.string().utf8().data());
 #endif
-    // This method usually parses a cookie string to find what to delete, or deletes all cookies matching criteria?
-    // The signature implies deleting a specific cookie identified by string for a URL.
-    // Without robust parsing logic here matching BNetworkCookie, this is hard to implement perfectly.
-    // For now, we can fallback to unimplemented or try to implement if critical.
-	notImplemented();
+    // Iterate over cookies for the URL and remove the one with the matching name.
+    BPrivate::Network::BNetworkCookieJar::UrlIterator it(platformSession().GetCookieJar().GetUrlIterator(BUrl(url)));
+    const BPrivate::Network::BNetworkCookie* c;
+
+    while ((c = it.Next())) {
+        if (String::fromUTF8(c->Name()) == cookieName) {
+            platformSession().GetCookieJar().RemoveCookie(c);
+            break;
+        }
+    }
     completionHandler();
 }
 

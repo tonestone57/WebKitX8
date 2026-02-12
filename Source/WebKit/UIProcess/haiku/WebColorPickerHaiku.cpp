@@ -45,6 +45,20 @@ public:
     {
     }
 
+    void MessageReceived(BMessage* message) override
+    {
+        switch (message->what) {
+        case 'colr': {
+            rgb_color color;
+            if (message->FindColor("color", &color) == B_OK)
+                m_picker->colorChanged(WebCore::Color(color.red, color.green, color.blue, 255));
+            break;
+        }
+        default:
+            BWindow::MessageReceived(message);
+        }
+    }
+
     bool QuitRequested() override
     {
         if (m_picker)
@@ -81,6 +95,12 @@ void WebColorPickerHaiku::endPicker()
 {
     WebColorPicker::endPicker();
     m_window = nullptr; // Window deletes itself on Quit
+}
+
+void WebColorPickerHaiku::colorChanged(const Color& color)
+{
+    if (client())
+        client()->didChooseColor(color);
 }
 
 void WebColorPickerHaiku::setSelectedColor(const Color& color)
