@@ -299,7 +299,7 @@ void NetworkDataTaskHaiku::DataReceived(BUrlRequest* caller, const char* data, o
         Vector<uint8_t> buffer;
         buffer.append((const uint8_t*)data, size);
 
-        runOnMainThread([this, buffer = WTFMove(buffer)]() mutable {
+        runOnMainThread([this, protectedThis = Ref { *this }, buffer = WTFMove(buffer)]() mutable {
             m_client->didReceiveData(SharedBuffer::create(WTFMove(buffer)));
         });
     }
@@ -322,14 +322,14 @@ void NetworkDataTaskHaiku::RequestCompleted(BUrlRequest* caller, bool success)
         m_networkLoadMetrics.responseEnd = MonotonicTime::now();
         m_networkLoadMetrics.markComplete();
 
-        runOnMainThread([this] {
+        runOnMainThread([this, protectedThis = Ref { *this }] {
              m_client->didCompleteWithError(ResourceError(), m_networkLoadMetrics);
         });
     } else {
         ResourceError error("BUrlProtocol", caller->Result().StatusCode(), m_baseUrl, "Request failed");
         m_networkLoadMetrics.responseEnd = MonotonicTime::now();
         m_networkLoadMetrics.markComplete();
-         runOnMainThread([this, error] {
+         runOnMainThread([this, protectedThis = Ref { *this }, error] {
              m_client->didCompleteWithError(error, m_networkLoadMetrics);
         });
     }

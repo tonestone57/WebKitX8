@@ -31,33 +31,30 @@
 #include "InspectorClientHaiku.h"
 
 #include "WebCore/NotImplemented.h"
-
+#include <stdio.h>
 
 namespace WebCore {
 
 void InspectorClientHaiku::inspectedPageDestroyed()
 {
+    fprintf(stderr, "InspectorClientHaiku::inspectedPageDestroyed\n");
 }
 
 Inspector::FrontendChannel* InspectorClientHaiku::openLocalFrontend(WebCore::PageInspectorController*)
 {
-    notImplemented();
-    return NULL;
+    return nullptr;
 }
 
 void InspectorClientHaiku::bringFrontendToFront()
 {
-    notImplemented();
 }
 
 void InspectorClientHaiku::highlight()
 {
-    notImplemented();
 }
 
 void InspectorClientHaiku::hideHighlight()
 {
-    notImplemented();
 }
 
 } // namespace WebCore

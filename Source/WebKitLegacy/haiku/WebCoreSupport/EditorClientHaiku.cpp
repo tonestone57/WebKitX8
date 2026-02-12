@@ -72,35 +72,29 @@ bool EditorClientHaiku::shouldDeleteRange(const std::optional<SimpleRange>& rang
 
 bool EditorClientHaiku::smartInsertDeleteEnabled()
 {
-    notImplemented();
     return false;
 }
 
 bool EditorClientHaiku::isContinuousSpellCheckingEnabled()
 {
-    notImplemented();
     return false;
 }
 
 void EditorClientHaiku::toggleContinuousSpellChecking()
 {
-    notImplemented();
 }
 
 bool EditorClientHaiku::isGrammarCheckingEnabled()
 {
-    notImplemented();
     return false;
 }
 
 void EditorClientHaiku::toggleGrammarChecking()
 {
-    notImplemented();
 }
 
 int EditorClientHaiku::spellCheckerDocumentTag()
 {
-    notImplemented();
     return 0;
 }
 
@@ -169,7 +163,6 @@ bool EditorClientHaiku::shouldApplyStyle(const WebCore::StyleProperties& style,
 
 bool EditorClientHaiku::shouldMoveRangeAfterDelete(const SimpleRange&, const SimpleRange&)
 {
-    notImplemented();
     return true;
 }
 
@@ -214,12 +207,10 @@ void EditorClientHaiku::didEndEditing()
 
 void EditorClientHaiku::didWriteSelectionToPasteboard()
 {
-    notImplemented();
 }
 
 bool EditorClientHaiku::isSelectTrailingWhitespaceEnabled() const
 {
-    notImplemented();
 	return false;
 }
 
@@ -308,7 +299,6 @@ void EditorClientHaiku::handleKeyboardEvent(KeyboardEvent& event)
 
 void EditorClientHaiku::handleInputMethodKeydown(KeyboardEvent&)
 {
-    notImplemented();
 }
 
 void EditorClientHaiku::textFieldDidBeginEditing(Element&)
@@ -330,17 +320,14 @@ bool EditorClientHaiku::doTextFieldCommandFromEvent(Element&, KeyboardEvent*)
 
 void EditorClientHaiku::textWillBeDeletedInTextField(Element&)
 {
-    notImplemented();
 }
 
 void EditorClientHaiku::textDidChangeInTextArea(Element&)
 {
-    notImplemented();
 }
 
 void EditorClientHaiku::overflowScrollPositionChanged()
 {
-    notImplemented();
 }
 
 bool EditorClientHaiku::shouldEraseMarkersAfterChangeSelection(TextCheckingType) const
