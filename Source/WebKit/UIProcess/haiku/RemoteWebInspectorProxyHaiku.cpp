@@ -53,10 +53,11 @@ WebPageProxy* RemoteWebInspectorUIProxy::platformCreateFrontendPageAndWindow()
 
     Ref<API::PageConfiguration> configuration = API::PageConfiguration::create();
     auto webView = WebViewBase::create("InspectorView", window->Bounds(), window, configuration.get());
-    window->AddChild(webView.get());
+    auto* page = webView->page();
+    window->AddChild(webView.leakRef());
     window->Show();
 
-    return webView->page();
+    return page;
 }
 
 void RemoteWebInspectorUIProxy::platformCloseFrontendPageAndWindow()

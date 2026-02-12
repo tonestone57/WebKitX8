@@ -126,7 +126,9 @@ public:
                 format.SetDateFormat(B_LONG_DATE_FORMAT, "yyyy'-'MM");
             } else if (params.type == InputTypeNames::week())
                 format.SetDateFormat(B_LONG_DATE_FORMAT, "yyyy'-W'ww");
-            format.Parse(params.currentValue, B_LONG_DATE_FORMAT, initialDate);
+
+            BString currentValue(params.currentValue.utf8().data());
+            format.Parse(currentValue, B_LONG_DATE_FORMAT, initialDate);
 
             m_calendar->SetDate(initialDate);
 
@@ -153,7 +155,9 @@ public:
             BTimeFormat format;
             BTime initialTime;
             format.SetTimeFormat(B_SHORT_TIME_FORMAT, "HH':'mm");
-            format.Parse(params.currentValue, B_SHORT_TIME_FORMAT, initialTime);
+
+            BString currentValue(params.currentValue.utf8().data());
+            format.Parse(currentValue, B_SHORT_TIME_FORMAT, initialTime);
 
             for (int i = 0; i <= 24; i++) {
                 BString label;
@@ -190,6 +194,8 @@ public:
             m_format = "yyyy'-'MM'-'dd";
         } else if (params.type == InputTypeNames::time()) {
             m_format = "HH':'mm";
+        } else {
+            m_format = "yyyy'-'MM'-'dd'T'"; // datetime or datetime-local
         }
     }
 
@@ -200,19 +206,29 @@ public:
                 BString str;
                 BLanguage language("en");
                 BFormattingConventions conventions("en_US");
+
                 if (m_calendar) {
                     conventions.SetExplicitDateFormat(B_LONG_DATE_FORMAT, m_format);
                     BDateFormat formatter(language, conventions);
                     formatter.Format(str, m_calendar->Date(), B_LONG_DATE_FORMAT);
-                } else {
-                    if (m_hourMenu && m_hourMenu->Superitem()) {
-                        str << m_hourMenu->Superitem()->Label();
-                        if (str.Length() < 2) str.Prepend("0");
-                        str << ':';
-                        if (m_minuteMenu && m_minuteMenu->Superitem())
-                            str << m_minuteMenu->Superitem()->Label();
-                    }
                 }
+
+                if (m_hourMenu && m_hourMenu->Superitem()) {
+                    if (m_calendar) {
+                        // Append time to date string if both exist (datetimelocal)
+                    } else {
+                        // Time only
+                    }
+                    BString timeStr;
+                    timeStr << m_hourMenu->Superitem()->Label();
+                    if (timeStr.Length() < 2) timeStr.Prepend("0");
+                    timeStr << ':';
+                    if (m_minuteMenu && m_minuteMenu->Superitem())
+                        timeStr << m_minuteMenu->Superitem()->Label();
+
+                    str << timeStr;
+                }
+
                 m_picker.didChooseDate(String::fromUTF8(str.String()));
                 [[fallthrough]];
             }
