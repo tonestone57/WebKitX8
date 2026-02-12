@@ -118,7 +118,6 @@ void GraphicsContextHaiku::drawRect(const FloatRect& rect, float borderThickness
     } else
         m_view->FillRect(rect, B_SOLID_LOW);
 
-    // TODO: Support gradients
     strokeRect(rect, borderThickness);
 }
 
@@ -182,7 +181,6 @@ void GraphicsContextHaiku::drawEllipse(const FloatRect& rect)
 {
     HGTRACE(("drawEllipse: [%f:%f] [%f:%f]\n", rect.x(), rect.y(), rect.width(), rect.height()));
     if (m_state.fillBrush().pattern() || m_state.fillBrush().gradient() || fillColor().isVisible()) {
-//        TODO: What's this shadow business?
         if (m_state.fillBrush().pattern())
             notImplemented();
         else if (m_state.fillBrush().gradient()) {
@@ -192,9 +190,10 @@ void GraphicsContextHaiku::drawEllipse(const FloatRect& rect)
             m_view->FillEllipse(rect, B_SOLID_LOW);
     }
 
-    // TODO: Support gradients
-    if (strokeStyle() != WebCore::StrokeStyle::NoStroke && strokeThickness() > 0.0f && strokeColor().isVisible())
+    if (strokeStyle() != WebCore::StrokeStyle::NoStroke && strokeThickness() > 0.0f && strokeColor().isVisible()) {
+        // TODO: Gradient stroke
         m_view->StrokeEllipse(rect, m_strokeStyle);
+    }
 }
 
 void GraphicsContextHaiku::strokeRect(const FloatRect& rect, float width)
@@ -220,9 +219,8 @@ void GraphicsContextHaiku::strokePath(const Path& path)
     if (m_state.strokeBrush().pattern())
         notImplemented();
     else if (m_state.strokeBrush().gradient()) {
-        notImplemented();
-//      BGradient* gradient = m_state.strokeGradient->platformGradient();
-//      m_view->StrokeShape(shape(), *gradient);
+        const BGradient& gradient = m_state.strokeBrush().gradient()->getHaikuGradient();
+        m_view->StrokeShape(path.platformPath(), gradient);
     } else if (strokeColor().isVisible()) {
         m_view->StrokeShape(path.platformPath(), m_strokeStyle);
     }
@@ -288,7 +286,6 @@ void GraphicsContextHaiku::fillRect(const WebCore::FloatRect& r, WebCore::Gradie
         m_view->ClipToRect(r);
     }
     
-    // TODO handle the transform
     m_view->FillRect(r, g.getHaikuGradient());
 }
 
@@ -392,61 +389,6 @@ void GraphicsContextHaiku::fillRectWithRoundedHole(const FloatRect& rect, const 
 
 void GraphicsContextHaiku::fillPath(const Path& path)
 {
-#if 0
-    TextStream ts;
-    ts << "fillPath " << path;
-    HGTRACE(("%s\n", ts.release().ascii().data()));
-    FloatRect rect = path.fastBoundingRect();
-    FloatSize layerSize = getCTM().mapSize(rect.size());
-    FloatRect mappedRect = getCTM().mapRect(rect);
-    HGTRACE(("fillPath: fastBoundingRect = [%f:%f] [%f:%f], mappedRect = [%f %f]\n",
-        rect.x(), rect.y(), rect.width(), rect.height(), mappedRect.x(), mappedRect.y()));
-    BRect pathBounds = BRect(0, 0, rect.width() + 1, rect.height() + 1);
-    BBitmap *pathBitmap = new BBitmap(pathBounds, B_RGBA32, true, false);
-    if(m_painter == nullptr) {
-        m_painter = new BView(pathBounds, "painter", B_FOLLOW_ALL, B_WILL_DRAW);
-    }
-    if(!m_painter->Bounds().Contains(pathBounds)) {
-        m_painter->ResizeTo(pathBounds.Size());
-    }
-    pathBitmap->AddChild(m_painter);
-    pathBitmap->Lock();
-    m_painter->PushState();
-    m_painter->SetFillRule(fillRule() == WindRule::NonZero ? B_NONZERO : B_EVEN_ODD);
-    m_painter->MovePenTo(B_ORIGIN);
-    //m_painter->TranslateBy(-rect.x(), -rect.y());
-    m_painter->SetDrawingMode(B_OP_ALPHA);
-    m_painter->SetBlendingMode(B_PIXEL_ALPHA, B_ALPHA_COMPOSITE);
-    
-    // TODO: renderShadow
-
-    if (m_state.fillBrush().pattern()) {
-        HGTRACE(("fillPath(pattern)\n"));
-        notImplemented();
-    } else if (m_state.fillBrush().gradient()) {
-        HGTRACE(("fillPath(gradient)\n"));
-        const BGradient& gradient = m_state.fillBrush().gradient()->getHaikuGradient();
-        m_painter->FillShape(path.platformPath(), gradient);
-    } else {
-        HGTRACE(("fillPath(else)\n"));
-        m_painter->SetHighColor(m_state.fillBrush().color());
-        m_painter->FillShape(path.platformPath(), B_SOLID_HIGH);
-    }
-    m_painter->PopState();
-    pathBitmap->RemoveChild(m_painter);
-    
-    BlendModeGuard guard(m_view);
-    m_view->SetDrawingMode(B_OP_ALPHA);
-    m_view->SetBlendingMode(B_PIXEL_ALPHA, B_ALPHA_COMPOSITE);
-    getCTM();
-    m_view->PushState();
-    // FIXME: rect has negative coordinates so it writes all over memory
-    m_view->ClipToRect(m_view->Frame());
-    //m_view->DrawBitmap(pathBitmap, B_ORIGIN);
-    m_view->PopState();
-    pathBitmap->Unlock();
-    delete pathBitmap;
-#endif
     HGTRACE(("fillPath: (--todo print values)\n"));
     m_view->SetFillRule(fillRule() == WindRule::NonZero ? B_NONZERO : B_EVEN_ODD);
     m_view->MovePenTo(B_ORIGIN);
@@ -565,16 +507,14 @@ void GraphicsContextHaiku::drawFocusRing(const Path& path, float width, const Co
     if (width <= 0 || !color.isVisible())
         return;
 
-    // GTK forces this to 2, we use 1. A focus ring several pixels thick doesn't
-    // look good.
-    width = 1;
-
+    m_view->PushState();
     m_view->SetHighColor(color);
     m_view->SetPenSize(width);
     m_view->StrokeShape(path.platformPath(), B_SOLID_HIGH);
+    m_view->PopState();
 }
 
-void GraphicsContextHaiku::drawFocusRing(const Vector<FloatRect>& rects, float /*offset*/, float width, const Color& color)
+void GraphicsContextHaiku::drawFocusRing(const Vector<FloatRect>& rects, float offset, float width, const Color& color)
 {
     HGTRACE(("drawFocusRing(rects): (--todo print values)\n"));
     if (width <= 0 || !color.isVisible())
@@ -584,17 +524,16 @@ void GraphicsContextHaiku::drawFocusRing(const Vector<FloatRect>& rects, float /
     if (rectCount <= 0)
         return;
 
-    // GTK forces this to 2, we use 1. A focus ring several pixels thick doesn't
-    // look good.
-    // FIXME this still draws a focus ring that looks not so good on "details"
-    // elements. Maybe we should disable that somewhere.
-    width = 1;
-
+    m_view->PushState();
     m_view->SetHighColor(color);
     m_view->SetPenSize(width);
     // FIXME: maybe we should implement this with BShape?
-    for (unsigned i = 0; i < rectCount; ++i)
-        m_view->StrokeRect(rects[i], B_SOLID_HIGH);
+    for (unsigned i = 0; i < rectCount; ++i) {
+        BRect r = rects[i];
+        r.InsetBy(-offset, -offset);
+        m_view->StrokeRect(r, B_SOLID_HIGH);
+    }
+    m_view->PopState();
 }
 
 void GraphicsContextHaiku::drawLinesForText(const FloatPoint& point,
@@ -627,11 +566,21 @@ void GraphicsContextHaiku::drawLinesForText(const FloatPoint& point,
     m_view->SetPenSize(oldSize);
 }
 
-void GraphicsContextHaiku::drawDotsForDocumentMarker(WebCore::FloatRect const&,
+void GraphicsContextHaiku::drawDotsForDocumentMarker(WebCore::FloatRect const& rect,
 	WebCore::DocumentMarkerLineStyle)
 {
-    HGTRACE(("drawDotsForDocumentMarker: Not Implemented\n"));
-	notImplemented();
+    HGTRACE(("drawDotsForDocumentMarker\n"));
+
+    m_view->PushState();
+    m_view->SetHighColor(strokeColor());
+    m_view->SetPenSize(1.0);
+
+    float y = rect.maxY();
+    for (float x = rect.x(); x < rect.maxX(); x += 2) {
+        m_view->StrokeLine(BPoint(x, y), BPoint(x, y));
+    }
+
+    m_view->PopState();
 }
 
 /* Used by canvas.clearRect. Must clear the given rectangle with transparent black. */
@@ -663,11 +612,11 @@ void GraphicsContextHaiku::setLineCap(LineCap lineCap)
     m_view->SetLineMode(mode, m_view->LineJoinMode(), m_view->LineMiterLimit());
 }
 
-void GraphicsContextHaiku::setLineDash(const DashArray& /*dashes*/, float /*dashOffset*/)
+void GraphicsContextHaiku::setLineDash(const DashArray& dashes, float dashOffset)
 {
-    HGTRACE(("setLineDash: Not Implemented\n"));
-    // TODO this is used to draw dashed strokes in SVG, but we need app_server support
-    notImplemented();
+    HGTRACE(("setLineDash\n"));
+    m_dashArray = dashes;
+    m_dashOffset = dashOffset;
 }
 
 void GraphicsContextHaiku::setLineJoin(LineJoin lineJoin)
@@ -790,7 +739,6 @@ void GraphicsContextHaiku::didUpdateState(GraphicsContextState& state)
                 break;
 			case WebCore::StrokeStyle::DashedStroke:
                 // FIXME: use a better dashed stroke!
-                notImplemented();
                 m_view->SetLowColor(B_TRANSPARENT_COLOR);
                 m_strokeStyle = B_MIXED_COLORS;
                 break;
@@ -977,4 +925,3 @@ void GraphicsContextHaiku::restore(GraphicsContextState::Purpose)
 
 
 } // namespace WebCore
-

@@ -39,12 +39,10 @@ void WebProcessPool::platformInitialize(NeedsGlobalStaticInitialization)
 
 void WebProcessPool::platformInitializeNetworkProcess(NetworkProcessCreationParameters&)
 {
-    notImplemented();
 }
 
-void WebProcessPool::platformInitializeWebProcess(const WebKit::WebProcessProxy&, WebProcessCreationParameters& parameters)
+void WebProcessPool::platformInitializeWebProcess(const WebKit::WebProcessProxy&, WebProcessCreationParameters&)
 {
-    notImplemented();
 }
 
 void WebProcessPool::platformInvalidateContext()

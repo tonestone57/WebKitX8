@@ -29,134 +29,126 @@
 #include "config.h"
 #include "Cursor.h"
 
-#include "NotImplemented.h"
+#include "Image.h"
+#include "IntPoint.h"
+#include <WebCore/NotImplemented.h>
+
+#include <app/Cursor.h>
+#include <interface/Bitmap.h>
+#include <translation/TranslationUtils.h>
+#include <wtf/Assertions.h>
+#include <wtf/text/CString.h>
 
 namespace WebCore {
 
-Cursor::Cursor(const PlatformCursor& c)
-    : m_type(Type::Custom)
-    , m_platformCursor(new BCursor(c))
+Cursor::Cursor(const Cursor& other)
+    : m_type(other.m_type)
+    , m_image(other.m_image)
+    , m_hotSpot(other.m_hotSpot)
+    , m_cursor(other.m_cursor ? new BCursor(*other.m_cursor) : 0)
 {
+}
+
+Cursor::Cursor(Image* image, const IntPoint& hotSpot)
+    : m_type(Cursor::Type::Custom)
+    , m_image(image)
+    , m_hotSpot(hotSpot)
+    , m_cursor(0)
+{
+    if (image) {
+        // FIXME: Implement creating a BCursor from an Image*
+        notImplemented();
+    }
+}
+
+Cursor::Cursor(const String& filename, bool, const IntPoint& hotSpot)
+    : m_type(Cursor::Type::Custom)
+    , m_image(nullptr)
+    , m_hotSpot(hotSpot)
+    , m_cursor(nullptr)
+{
+    BBitmap* bitmap = BTranslationUtils::GetBitmap(filename.utf8().data());
+    if (bitmap) {
+        m_cursor = new BCursor(bitmap, BPoint(hotSpot.x(), hotSpot.y()));
+        delete bitmap;
+    }
+}
+
+Cursor::~Cursor()
+{
+    delete m_cursor;
+}
+
+Cursor& Cursor::operator=(const Cursor& other)
+{
+    m_type = other.m_type;
+    m_image = other.m_image;
+    m_hotSpot = other.m_hotSpot;
+    delete m_cursor;
+    m_cursor = other.m_cursor ? new BCursor(*other.m_cursor) : 0;
+    return *this;
 }
 
 void Cursor::ensurePlatformCursor() const
 {
-    if (m_platformCursor)
+    if (m_cursor)
         return;
 
-    BCursorID which;
-    switch(m_type)
-    {
-        case Cursor::Type::Pointer:
-            which = B_CURSOR_ID_SYSTEM_DEFAULT;
-            break;
-        case Cursor::Type::Hand:
-            which = B_CURSOR_ID_FOLLOW_LINK;
-            break;
-        case Cursor::Type::Cross:
-        case Cursor::Type::Cell:
-            which = B_CURSOR_ID_CROSS_HAIR;
-            break;
-        case Cursor::Type::IBeam:
-            which = B_CURSOR_ID_I_BEAM;
-            break;
-        case Cursor::Type::Help:
-            which = B_CURSOR_ID_HELP;
-            break;
-        case Cursor::Type::EastResize:
-            which = B_CURSOR_ID_RESIZE_EAST;
-            break;
-        case Cursor::Type::NorthResize:
-            which = B_CURSOR_ID_RESIZE_NORTH;
-            break;
-        case Cursor::Type::NorthEastResize:
-            which = B_CURSOR_ID_RESIZE_NORTH_EAST;
-            break;
-        case Cursor::Type::NorthWestResize:
-            which = B_CURSOR_ID_RESIZE_NORTH_WEST;
-            break;
-        case Cursor::Type::SouthResize:
-            which = B_CURSOR_ID_RESIZE_SOUTH;
-            break;
-        case Cursor::Type::SouthEastResize:
-            which = B_CURSOR_ID_RESIZE_SOUTH_EAST;
-            break;
-        case Cursor::Type::SouthWestResize:
-            which = B_CURSOR_ID_RESIZE_SOUTH_WEST;
-            break;
-        case Cursor::Type::WestResize:
-            which = B_CURSOR_ID_RESIZE_WEST;
-            break;
-        case Cursor::Type::NorthSouthResize:
-        case Cursor::Type::RowResize:
-            which = B_CURSOR_ID_RESIZE_NORTH_SOUTH;
-            break;
-        case Cursor::Type::EastWestResize:
-        case Cursor::Type::ColumnResize:
-            which = B_CURSOR_ID_RESIZE_EAST_WEST;
-            break;
-        case Cursor::Type::NorthEastSouthWestResize:
-            which = B_CURSOR_ID_RESIZE_NORTH_EAST_SOUTH_WEST;
-            break;
-        case Cursor::Type::NorthWestSouthEastResize:
-            which = B_CURSOR_ID_RESIZE_NORTH_WEST_SOUTH_EAST;
-            break;
-        case Cursor::Type::MiddlePanning:
-        case Cursor::Type::EastPanning:
-        case Cursor::Type::NorthPanning:
-        case Cursor::Type::NorthEastPanning:
-        case Cursor::Type::NorthWestPanning:
-        case Cursor::Type::SouthPanning:
-        case Cursor::Type::SouthEastPanning:
-        case Cursor::Type::SouthWestPanning:
-        case Cursor::Type::WestPanning:
-        case Cursor::Type::Grabbing:
-            which = B_CURSOR_ID_GRABBING;
-            break;
-        case Cursor::Type::Move:
-            which = B_CURSOR_ID_MOVE;
-            break;
-        case Cursor::Type::VerticalText:
-            which = B_CURSOR_ID_I_BEAM_HORIZONTAL;
-            break;
-        case Cursor::Type::ContextMenu:
-            which = B_CURSOR_ID_CONTEXT_MENU;
-            break;
-        case Cursor::Type::Alias:
-            which = B_CURSOR_ID_CREATE_LINK;
-            break;
-        case Cursor::Type::Wait:
-        case Cursor::Type::Progress:
-            which = B_CURSOR_ID_PROGRESS;
-            break;
-        case Cursor::Type::NoDrop:
-        case Cursor::Type::NotAllowed:
-            which = B_CURSOR_ID_NOT_ALLOWED;
-            break;
-        case Cursor::Type::Copy:
-            which = B_CURSOR_ID_COPY;
-            break;
-        case Cursor::Type::None:
-            which = B_CURSOR_ID_NO_CURSOR;
-            break;
-        case Cursor::Type::ZoomIn:
-            which = B_CURSOR_ID_ZOOM_IN;
-            break;
-        case Cursor::Type::ZoomOut:
-            which = B_CURSOR_ID_ZOOM_OUT;
-            break;
-        case Cursor::Type::Grab:
-            which = B_CURSOR_ID_GRAB;
-            break;
-        case Cursor::Type::Custom:
-            which = B_CURSOR_ID_SYSTEM_DEFAULT;
-            notImplemented();
-            // TODO create from bitmap.
-            break;
+    switch (m_type) {
+    case Cursor::Type::Pointer:
+        m_cursor = new BCursor(B_CURSOR_ID_SYSTEM_DEFAULT);
+        break;
+    case Cursor::Type::Cross:
+        m_cursor = new BCursor(B_CURSOR_ID_CROSS_HAIR);
+        break;
+    case Cursor::Type::Hand:
+        m_cursor = new BCursor(B_CURSOR_ID_FOLLOW_LINK);
+        break;
+    case Cursor::Type::IBeam:
+        m_cursor = new BCursor(B_CURSOR_ID_I_BEAM);
+        break;
+    case Cursor::Type::Wait:
+        m_cursor = new BCursor(B_CURSOR_ID_PROGRESS);
+        break;
+    case Cursor::Type::Help:
+        m_cursor = new BCursor(B_CURSOR_ID_HELP);
+        break;
+    case Cursor::Type::EastResize:
+    case Cursor::Type::WestResize:
+    case Cursor::Type::EastWestResize:
+    case Cursor::Type::NorthEastResize:
+    case Cursor::Type::NorthWestResize:
+    case Cursor::Type::SouthEastResize:
+    case Cursor::Type::SouthWestResize:
+    case Cursor::Type::NorthSouthResize:
+        // FIXME: Use proper resize cursors
+        m_cursor = new BCursor(B_CURSOR_ID_SYSTEM_DEFAULT);
+        break;
+    case Cursor::Type::NorthEastSouthWestResize:
+    case Cursor::Type::NorthWestSouthEastResize:
+    case Cursor::Type::ColumnResize:
+    case Cursor::Type::RowResize:
+        m_cursor = new BCursor(B_CURSOR_ID_SYSTEM_DEFAULT);
+        break;
+    case Cursor::Type::Move:
+        m_cursor = new BCursor(B_CURSOR_ID_MOVE);
+        break;
+    case Cursor::Type::VerticalText:
+    case Cursor::Type::Cell:
+    case Cursor::Type::ContextMenu:
+    case Cursor::Type::Alias:
+    case Cursor::Type::Progress:
+    case Cursor::Type::NoDrop:
+    case Cursor::Type::Copy:
+    case Cursor::Type::None:
+    case Cursor::Type::NotAllowed:
+    case Cursor::Type::ZoomIn:
+    case Cursor::Type::ZoomOut:
+    case Cursor::Type::Grab:
+    case Cursor::Type::Grabbing:
+    case Cursor::Type::Custom:
+        break;
     }
-
-    m_platformCursor = new BCursor(which);
 }
 
 } // namespace WebCore
-

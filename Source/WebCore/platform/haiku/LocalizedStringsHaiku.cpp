@@ -237,10 +237,9 @@ String defaultDetailsSummaryText()
 }
 
 #if ENABLE(VIDEO)
-String localizedMediaTimeDescription(double)
+String localizedMediaTimeDescription(double time)
 {
-    notImplemented();
-    return String();
+    return String::number(time);
 }
 #endif
 

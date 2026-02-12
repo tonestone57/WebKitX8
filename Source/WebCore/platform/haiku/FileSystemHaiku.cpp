@@ -32,6 +32,7 @@
 #include "NotImplemented.h"
 #include <wtf/text/CString.h>
 
+#include <Entry.h>
 #include <FindDirectory.h>
 #include <Path.h>
 
@@ -59,6 +60,35 @@ String homeDirectoryPath()
     return String::fromUTF8(path.Path());
 }
 
+bool deleteFile(const String& path)
+{
+    BEntry entry(path.utf8().data());
+    return entry.Remove() == B_OK;
+}
+
+bool deleteEmptyDirectory(const String& path)
+{
+    BEntry entry(path.utf8().data());
+    return entry.Remove() == B_OK;
+}
+
+long long fileSize(const String& path)
+{
+    BEntry entry(path.utf8().data());
+    off_t size;
+    if (entry.GetSize(&size) == B_OK)
+        return size;
+    return -1;
+}
+
+std::optional<WallTime> fileModificationTime(const String& path)
+{
+    BEntry entry(path.utf8().data());
+    time_t time;
+    if (entry.GetModificationTime(&time) == B_OK)
+        return WallTime::fromRawSeconds(time);
+    return std::nullopt;
+}
+
 } // namespace FileSystem
 } // namespace WebCore
-

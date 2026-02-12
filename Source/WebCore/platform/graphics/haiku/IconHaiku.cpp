@@ -29,12 +29,14 @@
 
 #include <Bitmap.h>
 #include <NodeInfo.h>
+#include <View.h>
 #include <wtf/text/CString.h>
 
 namespace WebCore {
 
 Icon::~Icon()
 {
+    delete (BBitmap*)m_icon;
 }
 
 RefPtr<Icon> Icon::createIconForFiles(const Vector<String>& filenames)
@@ -62,21 +64,20 @@ RefPtr<Icon> Icon::createIconForFiles(const Vector<String>& filenames)
         return nullptr;
     }
 
-    // TODO: We need to wrap BBitmap into a PlatformIcon (which is void*)
-    // For now, let's assume we can store it directly if we had a mechanism.
-    // Since Icon is ref-counted, we would need a wrapper class that owns the BBitmap.
-    // For this stub implementation, we just leak/delete for now or return nullptr to be safe as
-    // we don't have a shared BBitmap refptr wrapper handy in this file context without more infra.
-
-    // Actually, WebCore::Icon usually expects to wrap a platform icon handle.
-    // If we return nullptr, we just don't show an icon.
-    delete iconBitmap;
-    return nullptr;
+    return adoptRef(new Icon((PlatformIcon)iconBitmap));
 }
 
 void Icon::paint(GraphicsContext& context, const FloatRect& rect)
 {
-    notImplemented();
+    if (!m_icon)
+        return;
+
+    BView* view = context.platformContext();
+    view->PushState();
+    view->SetDrawingMode(B_OP_ALPHA);
+    view->SetBlendingMode(B_PIXEL_ALPHA, B_ALPHA_COMPOSITE);
+    view->DrawBitmap((BBitmap*)m_icon, BRect(rect));
+    view->PopState();
 }
 
 } // namespace WebCore

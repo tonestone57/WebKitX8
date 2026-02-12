@@ -23,6 +23,11 @@
 
 #include "NotImplemented.h"
 
+#include <Directory.h>
+#include <File.h>
+#include <FindDirectory.h>
+#include <Message.h>
+#include <Path.h>
 
 namespace WebCore {
 
@@ -33,18 +38,55 @@ SearchPopupMenuHaiku::SearchPopupMenuHaiku(PopupMenuClient* client)
 
 void SearchPopupMenuHaiku::saveRecentSearches(const AtomString& name, const Vector<RecentSearch>& searchItems)
 {
-    notImplemented();
+    BPath path;
+    if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) != B_OK)
+        return;
+    path.Append("WebKit");
+    create_directory(path.Path(), 0755);
+    path.Append("RecentSearches");
+
+    BMessage message;
+    BFile file(path.Path(), B_READ_WRITE | B_CREATE_FILE);
+    if (file.InitCheck() == B_OK)
+        message.Unflatten(&file);
+
+    BMessage searches;
+    for (const auto& item : searchItems) {
+        searches.AddString("items", item.string.utf8().data());
+    }
+
+    message.RemoveName(name.string().utf8().data());
+    message.AddMessage(name.string().utf8().data(), &searches);
+
+    file.Seek(0, SEEK_SET);
+    file.SetSize(0);
+    message.Flatten(&file);
 }
 
 void SearchPopupMenuHaiku::loadRecentSearches(const AtomString& name, Vector<RecentSearch>& searchItems)
 {
-    notImplemented();
+    BPath path;
+    if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK) {
+        path.Append("WebKit/RecentSearches");
+        BFile file(path.Path(), B_READ_ONLY);
+        BMessage message;
+        if (file.InitCheck() == B_OK && message.Unflatten(&file) == B_OK) {
+            BMessage searches;
+            if (message.FindMessage(name.string().utf8().data(), &searches) == B_OK) {
+                const char* item;
+                for (int32 i = 0; searches.FindString("items", i, &item) == B_OK; i++) {
+                     RecentSearch search;
+                     search.string = String::fromUTF8(item);
+                     searchItems.append(search);
+                }
+            }
+        }
+    }
 }
 
 bool SearchPopupMenuHaiku::enabled()
 {
-    notImplemented();
-    return false;
+    return true;
 }
 
 PopupMenu* SearchPopupMenuHaiku::popupMenu()
@@ -53,4 +95,3 @@ PopupMenu* SearchPopupMenuHaiku::popupMenu()
 }
 
 } // namespace WebCore
-
