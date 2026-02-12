@@ -124,6 +124,9 @@ void WebDownloadPrivate::didReceiveResponseAsync(ResourceHandle*, ResourceRespon
         m_progressListener.SendMessage(&message);
     }
 #endif
+#if !USE(CURL)
+    handler();
+#endif
 }
 
 #if USE(CURL)
@@ -156,7 +159,7 @@ void WebDownloadPrivate::didReceiveData(ResourceHandle*, const WebCore::SharedBu
 
     ssize_t bytesWritten = m_file.Write(buffer.data(), buffer.size());
     if (bytesWritten != (ssize_t)buffer.size()) {
-        // FIXME: Report error
+        handleFinished(m_resourceHandle.get(), B_DOWNLOAD_FAILED);
         return;
     }
     m_currentSize += buffer.size();
@@ -177,7 +180,6 @@ void WebDownloadPrivate::didReceiveData(ResourceHandle*, const WebCore::SharedBu
     		m_mimeTypeGuessTries--;
     }
 
-    // FIXME: Report total size update, if m_currentSize greater than previous total size
     BMessage message(B_DOWNLOAD_PROGRESS);
     message.AddFloat("progress", m_currentSize * 100.0 / m_expectedSize);
     message.AddInt64("current size", m_currentSize);
@@ -197,15 +199,11 @@ void WebDownloadPrivate::didFail(ResourceHandle* handle, const ResourceError& /*
 
 void WebDownloadPrivate::wasBlocked(ResourceHandle* handle)
 {
-    // FIXME: Implement this when we have the new frame loader signals
-    // and error handling.
     handleFinished(handle, B_DOWNLOAD_BLOCKED);
 }
 
 void WebDownloadPrivate::cannotShowURL(ResourceHandle* handle)
 {
-    // FIXME: Implement this when we have the new frame loader signals
-    // and error handling.
     handleFinished(handle, B_DOWNLOAD_CANNOT_SHOW_URL);
 }
 #endif
@@ -331,4 +329,3 @@ void WebDownloadPrivate::findAvailableFilename()
 }
 
 } // namespace BPrivate
-

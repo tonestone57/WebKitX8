@@ -104,7 +104,6 @@ void DumpRenderTreeClient::executeCoreCommandByName(const BWebView* view,
 void
 DumpRenderTreeClient::setShouldTrackVisitedLinks(bool)
 {
-    notImplemented();
 }
 
 
@@ -171,19 +170,16 @@ BList DumpRenderTreeClient::frameChildren(BWebFrame* webFrame)
 void
 DumpRenderTreeClient::setValueForUser(OpaqueJSContext const*, OpaqueJSValue const*, WTF::String const&)
 {
-    notImplemented();
 }
 
 void
 DumpRenderTreeClient::setDomainRelaxationForbiddenForURLScheme(bool, WTF::String const&)
 {
-    notImplemented();
 }
 
 void
 DumpRenderTreeClient::setSerializeHTTPLoads(bool)
 {
-    notImplemented();
 }
 
 void
