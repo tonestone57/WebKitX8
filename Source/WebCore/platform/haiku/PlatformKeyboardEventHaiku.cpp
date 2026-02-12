@@ -113,7 +113,6 @@ String PlatformKeyboardEvent::keyIdentifierForHaikuKeyCode(char singleByte, int 
         return ASCIILiteral::fromLiteralUnsafe("U+0009");
     }
 
-    // FIXME will not work for non-ASCII characters
     return makeString("U+"_s, hex(toASCIIUpper(singleByte)));
 }
 
@@ -652,8 +651,6 @@ PlatformKeyboardEvent::PlatformKeyboardEvent(const BMessage* message)
     m_keyIdentifier = keyIdentifierForHaikuKeyCode(bytes.ByteAt(0), nativeVirtualKeyCode);
 
     m_windowsVirtualKeyCode = windowsKeyCodeForKeyEvent(bytes.ByteAt(0), nativeVirtualKeyCode);
-	// TODO m_key should also do something for modifier keys, which cannot be
-	// extracted from "bytes"
     m_key = KeyValueForKeyEvent(bytes, nativeVirtualKeyCode);
     m_code = KeyCodeForKeyEvent(nativeVirtualKeyCode);
 
@@ -710,4 +707,3 @@ OptionSet<WebCore::PlatformEvent::Modifier> PlatformKeyboardEvent::currentStateO
 
 
 } // namespace WebCore
-

@@ -716,7 +716,7 @@ BRect BWebPage::viewBounds()
 void BWebPage::setViewBounds(const BRect& /*bounds*/)
 {
     if (fWebView->LockLooper()) {
-        // TODO: Implement this with layout management, i.e. SetExplicitMinSize() or something...
+        // FIXME: Implement this with layout management, i.e. SetExplicitMinSize() or something...
         fWebView->UnlockLooper();
     }
 }
@@ -844,7 +844,7 @@ void BWebPage::paint(BRect rect, bool immediate)
     BRegion region(rect);
     offscreenView->ConstrainClippingRegion(&region);
 
-    // TODO do not recreate a context everytime this is called, we can preserve
+    // FIXME do not recreate a context everytime this is called, we can preserve
     // it alongside the offscreen view in BWebView?
     WebCore::GraphicsContextHaiku context(offscreenView);
     view->paint(context, IntRect(rect));
@@ -1478,7 +1478,6 @@ void BWebPage::handleResendNotifications(BMessage*)
     // Send loading progress and status text notifications
     setLoadingProgress(fLoadingProgress);
     setDisplayedStatusMessage(fStatusMessage, true);
-    // TODO: Other notifications...
 }
 
 void BWebPage::handleSendEditingCapabilities(BMessage*)

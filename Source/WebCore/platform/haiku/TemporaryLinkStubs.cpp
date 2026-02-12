@@ -36,11 +36,21 @@
 #include "wtf/URL.h"
 #include "NotImplemented.h"
 #include <InterfaceDefs.h>
+#include <Application.h>
+#include <Resources.h>
 
-Vector<char> loadResourceIntoArray(const char*)
+Vector<char> loadResourceIntoArray(const char* resourceName)
 {
-    notImplemented();
-    return Vector<char>();
+    Vector<char> result;
+    if (BApplication::AppResources()) {
+        size_t size;
+        const void* data = BApplication::AppResources()->LoadResource(B_RAW_TYPE, resourceName, &size);
+        if (data) {
+            result.resize(size);
+            memcpy(result.data(), data, size);
+        }
+    }
+    return result;
 }
 
 namespace WebCore {
@@ -52,4 +62,3 @@ float userIdleTime()
 }
 
 } // namespace WebCore
-
