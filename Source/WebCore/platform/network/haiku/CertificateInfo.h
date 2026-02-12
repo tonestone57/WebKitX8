@@ -50,7 +50,7 @@ public:
 
     CertificateInfo isolatedCopy() const;
 
-    std::optional<CertificateSummary> summary() const { notImplemented(); return std::nullopt; }
+    std::optional<CertificateSummary> summary() const { return std::nullopt; }
 
     bool isEmpty() const { return m_certificate != nullptr; }
 
@@ -68,7 +68,7 @@ public:
             return *m_certificate == *other.m_certificate;
     }
 
-    bool containsNonRootSHA1SignedCertificate() const { notImplemented(); return false; }
+    bool containsNonRootSHA1SignedCertificate() const { return false; }
 private:
     const BCertificate* m_certificate;
 };

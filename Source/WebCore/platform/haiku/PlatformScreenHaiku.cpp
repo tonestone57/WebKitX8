@@ -43,14 +43,12 @@ namespace WebCore {
 
 int screenHorizontalDPI(Widget*)
 {
-    notImplemented();
-    return 0;
+    return 72;
 }
 
 int screenVerticalDPI(Widget*)
 {
-    notImplemented();
-    return 0;
+    return 72;
 }
 
 bool screenHasInvertedColors()
@@ -93,7 +91,6 @@ int screenDepth(Widget*)
 
 int screenDepthPerComponent(Widget*)
 {
-    notImplemented();
     return 8;
 }
 

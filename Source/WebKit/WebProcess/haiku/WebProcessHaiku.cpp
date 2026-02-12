@@ -54,7 +54,6 @@ void WebProcess::platformInitializeProcess(const AuxiliaryProcessInitializationP
 
 void WebProcess::platformSetWebsiteDataStoreParameters(WebProcessDataStoreParameters&&)
 {
-    notImplemented();
 }
 
 void WebProcess::platformTerminate()
@@ -63,12 +62,10 @@ void WebProcess::platformTerminate()
 
 void WebProcess::platformSetCacheModel(CacheModel cacheModel)
 {
-    notImplemented();
 }
 
 void WebProcess::grantAccessToAssetServices(WTF::Vector<WebKit::SandboxExtension::Handle>&&)
 {
-    notImplemented();
 }
 
 void WebProcess::revokeAccessToAssetServices()

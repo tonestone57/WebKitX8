@@ -50,12 +50,11 @@ String WebPageProxy::standardUserAgent(const String& applicationNameForUserAgent
 
 void WebPageProxy::saveRecentSearches(IPC::Connection&, const String& name, const Vector<WebCore::RecentSearch>& searchItems)
 {
-    notImplemented();
 }
 
-void WebPageProxy::loadRecentSearches(IPC::Connection&, const String& name, CompletionHandler<void(Vector<WebCore::RecentSearch>&&)>&&)
+void WebPageProxy::loadRecentSearches(IPC::Connection&, const String& name, CompletionHandler<void(Vector<WebCore::RecentSearch>&&)>&& completionHandler)
 {
-    notImplemented();
+    completionHandler({ });
 }
 
 void WebPageProxy::didUpdateEditorState(const EditorState&, const EditorState&)

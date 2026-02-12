@@ -236,7 +236,6 @@ void Pasteboard::write(const Color&)
 
 Pasteboard::FileContentState Pasteboard::fileContentState()
 {
-    notImplemented();
     return FileContentState::NoFileOrImageData;
 }
 
