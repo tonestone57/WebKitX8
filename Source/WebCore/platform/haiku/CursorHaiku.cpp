@@ -146,9 +146,10 @@ void Cursor::ensurePlatformCursor() const
         m_cursor = new BCursor(B_CURSOR_ID_RESIZE_SOUTH);
         break;
     case Cursor::Type::NorthEastSouthWestResize:
+        m_cursor = new BCursor(B_CURSOR_ID_RESIZE_NORTH_EAST_SOUTH_WEST);
+        break;
     case Cursor::Type::NorthWestSouthEastResize:
-        // FIXME: No direct mapping for diagonal double-arrow resize
-        m_cursor = new BCursor(B_CURSOR_ID_SYSTEM_DEFAULT);
+        m_cursor = new BCursor(B_CURSOR_ID_RESIZE_NORTH_WEST_SOUTH_EAST);
         break;
     case Cursor::Type::ColumnResize:
     case Cursor::Type::RowResize:
@@ -158,18 +159,32 @@ void Cursor::ensurePlatformCursor() const
         m_cursor = new BCursor(B_CURSOR_ID_MOVE);
         break;
     case Cursor::Type::VerticalText:
+        m_cursor = new BCursor(B_CURSOR_ID_I_BEAM); // Fallback
+        break;
     case Cursor::Type::Cell:
     case Cursor::Type::ContextMenu:
     case Cursor::Type::Alias:
     case Cursor::Type::Progress:
     case Cursor::Type::NoDrop:
+        m_cursor = new BCursor(B_CURSOR_ID_NOT_ALLOWED);
+        break;
     case Cursor::Type::Copy:
     case Cursor::Type::None:
     case Cursor::Type::NotAllowed:
+        m_cursor = new BCursor(B_CURSOR_ID_NOT_ALLOWED);
+        break;
     case Cursor::Type::ZoomIn:
+        m_cursor = new BCursor(B_CURSOR_ID_ZOOM_IN);
+        break;
     case Cursor::Type::ZoomOut:
+        m_cursor = new BCursor(B_CURSOR_ID_ZOOM_OUT);
+        break;
     case Cursor::Type::Grab:
+        m_cursor = new BCursor(B_CURSOR_ID_GRAB);
+        break;
     case Cursor::Type::Grabbing:
+        m_cursor = new BCursor(B_CURSOR_ID_GRABBING);
+        break;
     case Cursor::Type::Custom:
         break;
     }

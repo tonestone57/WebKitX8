@@ -29,6 +29,7 @@
 #include "TextCheckerState.h"
 #include <WebCore/NotImplemented.h>
 #include <wtf/OptionSet.h>
+#include <WebCore/TextCheckerEnchant.h>
 
 namespace WebKit {
 using namespace WebCore;
@@ -40,12 +41,12 @@ OptionSet<TextCheckerState> TextChecker::state()
 
 bool TextChecker::isContinuousSpellCheckingAllowed()
 {
-    return false;
+    return true;
 }
 
-bool TextChecker::setContinuousSpellCheckingEnabled(bool)
+void TextChecker::setContinuousSpellCheckingEnabled(bool enabled)
 {
-    return false;
+    checkerState().isContinuousSpellCheckingEnabled = enabled;
 }
 
 void TextChecker::setGrammarCheckingEnabled(bool)
@@ -62,23 +63,21 @@ void TextChecker::grammarCheckingEnabledStateChanged(bool)
 
 SpellDocumentTag TextChecker::uniqueSpellDocumentTag(WebPageProxy*)
 {
-    return 0;
+    static SpellDocumentTag tag = 0;
+    return ++tag;
 }
 
 void TextChecker::closeSpellDocumentWithTag(SpellDocumentTag)
 {
 }
 
-void TextChecker::checkSpellingOfString(SpellDocumentTag, StringView, int32_t& misspellingLocation, int32_t& misspellingLength)
+void TextChecker::checkSpellingOfString(SpellDocumentTag, StringView text, int32_t& misspellingLocation, int32_t& misspellingLength)
 {
-    misspellingLocation = -1;
-    misspellingLength = 0;
+    TextCheckerEnchant::singleton().checkSpellingOfString(text.toStringWithoutCopying(), misspellingLocation, misspellingLength);
 }
 
-void TextChecker::checkGrammarOfString(SpellDocumentTag, StringView, Vector<WebCore::GrammarDetail>&, int32_t& badGrammarLocation, int32_t& badGrammarLength)
+void TextChecker::checkGrammarOfString(SpellDocumentTag, StringView, Vector<WebCore::GrammarDetail>&, int32_t&, int32_t&)
 {
-    badGrammarLocation = -1;
-    badGrammarLength = 0;
 }
 
 bool TextChecker::spellingUIIsShowing()
@@ -98,20 +97,25 @@ void TextChecker::updateSpellingUIWithGrammarString(SpellDocumentTag, const Stri
 {
 }
 
-void TextChecker::getGuessesForWord(SpellDocumentTag, const String&, const String&, int32_t, Vector<String>&, bool)
+void TextChecker::getGuessesForWord(SpellDocumentTag, const String& word, const String&, int32_t, Vector<String>& guesses, bool)
 {
+    guesses = TextCheckerEnchant::singleton().getGuessesForWord(word);
 }
 
-void TextChecker::learnWord(SpellDocumentTag, const String&)
+void TextChecker::learnWord(SpellDocumentTag, const String& word)
 {
+    TextCheckerEnchant::singleton().learnWord(word);
 }
 
-void TextChecker::ignoreWord(SpellDocumentTag, const String&)
+void TextChecker::ignoreWord(SpellDocumentTag, const String& word)
 {
+    TextCheckerEnchant::singleton().ignoreWord(word);
 }
 
 void TextChecker::requestCheckingOfString(Ref<TextCheckerCompletion>&& completion, int32_t)
 {
+    // FIXME: Implement background checking
+    notImplemented();
     completion->didFinishCheckingText({ });
 }
 

@@ -28,104 +28,139 @@
 
 #if ENABLE(CONTEXT_MENUS)
 
-#include "APIContextMenuClient.h"
-#include "PageClient.h"
 #include "WebContextMenuItem.h"
+#include "WebContextMenuItemData.h"
 #include "WebPageProxy.h"
-#include <WebCore/IntRect.h>
-#include <wtf/text/WTFString.h>
+#include "WebViewBase.h"
 
+#include <InterfaceDefs.h>
 #include <MenuItem.h>
+#include <Message.h>
 #include <PopUpMenu.h>
+#include <View.h>
 #include <Window.h>
 
 namespace WebKit {
 
-WebContextMenuProxyHaiku::WebContextMenuProxyHaiku(WebPageProxy& page, FrameInfoData&& frameInfo, ContextMenuContextData&& context, const UserData& userData)
+WebContextMenuProxyHaiku::WebContextMenuProxyHaiku(WebViewBase& webView, WebPageProxy& page, FrameInfoData&& frameInfo, ContextMenuContextData&& context, const UserData& userData)
     : WebContextMenuProxy(page, WTF::move(frameInfo), WTF::move(context), userData)
+    , m_webView(webView)
     , m_menu(nullptr)
 {
 }
 
 WebContextMenuProxyHaiku::~WebContextMenuProxyHaiku()
 {
-    if (m_menu)
+    if (m_menu) {
         delete m_menu;
+        m_menu = nullptr;
+    }
 }
 
-static void populateMenuFromData(BMenu* menu, const Vector<WebContextMenuItemData>& items)
+void WebContextMenuProxyHaiku::populateMenu(BMenu* menu, const Vector<WebContextMenuItemData>& items)
 {
-    for (const auto& data : items) {
-        if (data.type() == WebCore::ContextMenuItemType::Separator) {
-             menu->AddSeparatorItem();
-        } else if (data.type() == WebCore::ContextMenuItemType::Submenu) {
-             BMenu* submenu = new BMenu(data.title().utf8().data());
-             populateMenuFromData(submenu, data.submenu());
-             menu->AddItem(submenu);
-        } else {
-             BMessage* msg = new BMessage('cmic');
-             msg->AddPointer("itemData", &data);
-             BMenuItem* menuItem = new BMenuItem(data.title().utf8().data(), msg);
-             menuItem->SetEnabled(data.enabled());
-             menuItem->SetMarked(data.checked());
-             menu->AddItem(menuItem);
+    for (const auto& item : items) {
+        switch (item.type()) {
+            case WebCore::ContextMenuItemType::Separator:
+                menu->AddSeparatorItem();
+                break;
+            case WebCore::ContextMenuItemType::Submenu: {
+                BMenu* submenu = new BMenu(item.title().utf8().data());
+                populateMenu(submenu, item.submenu());
+
+                BMenuItem* menuItem = new BMenuItem(submenu);
+                menuItem->SetEnabled(item.enabled());
+                menu->AddItem(menuItem);
+                break;
+            }
+            case WebCore::ContextMenuItemType::Action:
+            case WebCore::ContextMenuItemType::CheckableAction: {
+                // We store the pointer to the item data in the message.
+                // Since this function runs synchronously during showContextMenuWithItems,
+                // the data will remain valid until the menu closes.
+                // However, Vector reallocation could invalidate pointers if we were storing pointers to elements of a local vector that grows.
+                // But here 'items' is const ref to a vector that is part of the recursion.
+                // Actually, the safest way is to store a unique ID or index in a flat list.
+                // But since showContextMenuWithItems is blocking, we can't easily use a member flat list without clearing it.
+                // Let's use a pointer to the WebContextMenuItemData, but we must ensure it lives long enough.
+                // The root vector is in showContextMenuWithItems. Submenu vectors are inside WebContextMenuItemData.
+                // As long as the root vector lives, all sub-vectors live.
+
+                BMessage* message = new BMessage('cxtm');
+                message->AddPointer("data", &item);
+
+                BMenuItem* menuItem = new BMenuItem(item.title().utf8().data(), message);
+                menuItem->SetEnabled(item.enabled());
+                if (item.checked())
+                    menuItem->SetMarked(true);
+                menu->AddItem(menuItem);
+                break;
+            }
+            default:
+                break;
         }
     }
 }
 
 void WebContextMenuProxyHaiku::showContextMenuWithItems(Vector<Ref<WebContextMenuItem>>&& items)
 {
+    if (m_menu) {
+        delete m_menu;
+        m_menu = nullptr;
+    }
+
     if (items.isEmpty())
         return;
 
-    if (m_menu)
-        delete m_menu;
+    // We need to keep the data alive while the menu runs.
+    // We convert Ref<WebContextMenuItem> to WebContextMenuItemData vector to handle ownership if needed,
+    // but actually WebContextMenuItem holds the data. Ref keeps it alive.
+    // 'items' is passed by rvalue ref, so we own it.
+    // We can just keep 'items' alive in this scope.
 
-    m_menu = new BPopUpMenu("ContextMenu", false, false);
+    // However, populateMenu expects Vector<WebContextMenuItemData>.
+    // We need to extract data from Ref<WebContextMenuItem>.
+    Vector<WebContextMenuItemData> rootItems;
+    for (const auto& item : items)
+        rootItems.append(item->data());
 
-    // Build menu
-    for (const auto& item : items) {
-        const WebContextMenuItemData& data = item->data();
-        if (data.type() == WebCore::ContextMenuItemType::Separator) {
-            m_menu->AddSeparatorItem();
-        } else if (data.type() == WebCore::ContextMenuItemType::Submenu) {
-            BMenu* submenu = new BMenu(data.title().utf8().data());
-            populateMenuFromData(submenu, data.submenu());
-            m_menu->AddItem(submenu);
-        } else {
-             BMessage* msg = new BMessage('cmic');
-             msg->AddPointer("itemData", &data);
-             BMenuItem* menuItem = new BMenuItem(data.title().utf8().data(), msg);
-             menuItem->SetEnabled(data.enabled());
-             menuItem->SetMarked(data.checked());
-             m_menu->AddItem(menuItem);
+    // NOTE: 'rootItems' is a local vector. Pointers to its elements are stable ONLY if it doesn't reallocate.
+    // But 'rootItems' won't reallocate after population.
+    // Submenu items are inside WebContextMenuItemData, which are inside rootItems.
+    // Since WebContextMenuItemData owns its submenus (Vector<WebContextMenuItemData>),
+    // pointers to those inner elements are also stable as long as rootItems is not modified.
+
+    m_menu = new BPopUpMenu("ContextMenu");
+    m_menu->SetRadioMode(false); // Context menus usually don't behave like radio groups unless specified
+
+    populateMenu(m_menu, rootItems);
+
+    if (!m_webView.LockLooper()) return;
+
+    // Haiku rects are left, top, right, bottom (inclusive).
+    WebCore::IntPoint location = m_context.menuLocation();
+    BPoint screenPoint(location.x(), location.y());
+    m_webView.ConvertToScreen(&screenPoint);
+
+    // Offset slightly so mouse is not directly on top of first item?
+    // BPopUpMenu::Go handles placement.
+
+    m_webView.UnlockLooper();
+
+    BMenuItem* selectedItem = m_menu->Go(screenPoint, false, false);
+
+    if (selectedItem) {
+        BMessage* msg = selectedItem->Message();
+        if (msg) {
+            WebContextMenuItemData* itemData;
+            if (msg->FindPointer("data", (void**)&itemData) == B_OK && itemData) {
+                if (page())
+                    page()->contextMenuItemSelected(*itemData, frameInfo());
+            }
         }
     }
 
-    WebCore::IntPoint location = menuLocation();
-    BPoint screenPoint(location.x(), location.y());
-
-    if (page() && page()->pageClient()) {
-        WebCore::IntPoint screenLoc = page()->pageClient()->rootViewToScreen(location);
-        screenPoint.Set(screenLoc.x(), screenLoc.y());
-    }
-
-    BMenuItem* selectedItem = m_menu->Go(screenPoint, false, true);
-
-    if (selectedItem) {
-         BMessage* msg = selectedItem->Message();
-         WebContextMenuItemData* data = nullptr;
-         if (msg && msg->FindPointer("itemData", (void**)&data) == B_OK && data) {
-             page()->contextMenuItemSelected(*data, frameInfo());
-         }
-    }
-
-    // We don't delete m_menu here immediately because it might be needed?
-    // No, BPopUpMenu created with new needs deletion.
-    // But `WebContextMenuProxyHaiku` destructor deletes it.
-    // However, `showContextMenuWithItems` is likely the last thing called on this proxy for this showing.
-    // If we delete it now, `m_menu` becomes invalid.
-
+    // Clean up is handled by destructor or next call, but we can clean up now.
     delete m_menu;
     m_menu = nullptr;
 }

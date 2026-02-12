@@ -226,9 +226,7 @@ void NetworkDataTaskHaiku::HeadersReceived(BUrlRequest* caller)
         }
 
         if (statusCode == 401) {
-            //TODO
-
-            //AuthenticationNeeded((BHttpRequest*)m_request, response);
+            AuthenticationNeeded(dynamic_cast<BHttpRequest*>(m_request), response);
             // AuthenticationNeeded may have aborted the request
             // so we need to make sure we can continue.
 
@@ -318,21 +316,32 @@ void NetworkDataTaskHaiku::UploadProgress(BUrlRequest* caller, off_t bytesSent, 
 
 void NetworkDataTaskHaiku::RequestCompleted(BUrlRequest* caller, bool success)
 {
-    if (success) {
+    if (m_state == State::Canceling || m_state == State::Completed)
+        return;
+
+    m_state = State::Completed;
+
+    if (!success) {
+        ResourceError error(m_baseUrl.host().toString(), caller->Result().StatusCode(), m_baseUrl,
+            String::fromUTF8(caller->Result().StatusText()));
+
         m_networkLoadMetrics.responseEnd = MonotonicTime::now();
         m_networkLoadMetrics.markComplete();
 
-        runOnMainThread([this, protectedThis = Ref { *this }] {
-             m_client->didCompleteWithError(ResourceError(), m_networkLoadMetrics);
+        runOnMainThread([this, protectedThis = Ref { *this }, error] {
+            if (m_client)
+                m_client->didCompleteWithError(error, m_networkLoadMetrics);
         });
-    } else {
-        ResourceError error("BUrlProtocol", caller->Result().StatusCode(), m_baseUrl, "Request failed");
-        m_networkLoadMetrics.responseEnd = MonotonicTime::now();
-        m_networkLoadMetrics.markComplete();
-         runOnMainThread([this, protectedThis = Ref { *this }, error] {
-             m_client->didCompleteWithError(error, m_networkLoadMetrics);
-        });
+        return;
     }
+
+    m_networkLoadMetrics.responseEnd = MonotonicTime::now();
+    m_networkLoadMetrics.markComplete();
+
+    runOnMainThread([this, protectedThis = Ref { *this }] {
+        if (m_client)
+            m_client->didFinishLoading(m_networkLoadMetrics);
+    });
 }
 
 bool NetworkDataTaskHaiku::CertificateVerificationFailed(BUrlRequest* caller, BCertificate& certificate, const char* message)
@@ -342,6 +351,28 @@ bool NetworkDataTaskHaiku::CertificateVerificationFailed(BUrlRequest* caller, BC
 
 void NetworkDataTaskHaiku::DebugMessage(BUrlRequest* caller, BUrlProtocolDebugMessage type, const char* text)
 {
+}
+
+void NetworkDataTaskHaiku::AuthenticationNeeded(BHttpRequest* request, const ResourceResponse& response)
+{
+    if (!m_client)
+        return;
+
+    m_authFailureCount++;
+    if (m_authFailureCount > 3) {
+        // Give up after too many tries
+        return;
+    }
+
+    m_client->didReceiveAuthenticationChallenge(AuthenticationChallenge(response, SslError, response, SslError), NegotiatedLegacyTLS::No, [this](AuthenticationChallengeDisposition disposition, const Credential& credential) {
+        if (disposition == AuthenticationChallengeDisposition::UseCredential && !credential.isEmpty()) {
+            // Apply credentials to the request logic
+            BHttpAuthentication& auth = dynamic_cast<BHttpRequest*>(m_request)->Authentication();
+            auth.SetUserName(credential.user().utf8().data());
+            auth.SetPassword(credential.password().utf8().data());
+            auth.SetMethod(B_HTTP_AUTHENTICATION_BASIC); // Assuming basic for now, or infer from header
+        }
+    });
 }
 
 void NetworkDataTaskHaiku::runOnMainThread(Function<void()>&& task)

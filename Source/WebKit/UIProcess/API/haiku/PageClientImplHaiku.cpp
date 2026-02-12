@@ -235,7 +235,7 @@ RefPtr<WebPopupMenuProxy> PageClientImpl::createPopupMenuProxy(WebPageProxy& pag
 #if ENABLE(CONTEXT_MENUS)
 Ref<WebContextMenuProxy> PageClientImpl::createContextMenuProxy(WebPageProxy& page, FrameInfoData&& frameInfo, ContextMenuContextData&& context, const UserData& userData)
 {
-    return WebContextMenuProxyHaiku::create(page, WTF::move(frameInfo), WTF::move(context), userData);
+    return WebContextMenuProxyHaiku::create(fWebView, page, WTF::move(frameInfo), WTF::move(context), userData);
 }
 #endif
 
@@ -326,6 +326,29 @@ void PageClientImpl::didFirstVisuallyNonEmptyLayoutForMainFrame()
 {
 }
 
+void PageClientImpl::printFrame(WebFrameProxy&)
+{
+    if (fWebView.LockLooper()) {
+        BPrintJob printJob("WebKit Page");
+        if (printJob.ConfigJob() == B_OK) {
+            printJob.BeginJob();
+            BRect printableRect = printJob.PrintableRect();
+            int32 firstPage = printJob.FirstPage();
+            int32 lastPage = printJob.LastPage();
+
+            // This is a simplified implementation that prints the current view content.
+            // Ideally, we should ask WebCore to layout for printing.
+
+            for (int32 page = firstPage; page <= lastPage; ++page) {
+                printJob.DrawView(&fWebView, printableRect, BPoint(0, 0));
+                printJob.SpoolPage();
+            }
+            printJob.CommitJob();
+        }
+        fWebView.UnlockLooper();
+    }
+}
+
 void PageClientImpl::didFinishNavigation(API::Navigation*)
 {
 }
@@ -377,7 +400,9 @@ RefPtr<WebDateTimePicker> PageClientImpl::createDateTimePicker(WebPageProxy& pag
 #if ENABLE(FULLSCREEN_API)
 WebFullScreenManagerProxyClient& PageClientImpl::fullScreenManagerProxyClient()
 {
-    //return *this;
+    // FIXME: Implement full screen support
+    RELEASE_ASSERT_NOT_REACHED();
+    return *static_cast<WebFullScreenManagerProxyClient*>(nullptr);
 }
 #endif
 

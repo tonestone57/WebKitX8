@@ -32,22 +32,27 @@
 
 class BPopUpMenu;
 class BMenu;
+class WebViewBase;
 
 namespace WebKit {
 
 class WebContextMenuProxyHaiku : public WebContextMenuProxy {
 public:
-    static Ref<WebContextMenuProxyHaiku> create(WebPageProxy& page, FrameInfoData&& frameInfo, ContextMenuContextData&& context, const UserData& userData)
+    static Ref<WebContextMenuProxyHaiku> create(WebViewBase& webView, WebPageProxy& page, FrameInfoData&& frameInfo, ContextMenuContextData&& context, const UserData& userData)
     {
-        return adoptRef(*new WebContextMenuProxyHaiku(page, WTF::move(frameInfo), WTF::move(context), userData));
+        return adoptRef(*new WebContextMenuProxyHaiku(webView, page, WTF::move(frameInfo), WTF::move(context), userData));
     }
-    ~WebContextMenuProxyHaiku();
 
-private:
-    WebContextMenuProxyHaiku(WebPageProxy&, FrameInfoData&&, ContextMenuContextData&&, const UserData&);
+    ~WebContextMenuProxyHaiku();
 
     void showContextMenuWithItems(Vector<Ref<WebContextMenuItem>>&&) override;
 
+private:
+    WebContextMenuProxyHaiku(WebViewBase&, WebPageProxy&, FrameInfoData&&, ContextMenuContextData&&, const UserData&);
+
+    void populateMenu(BMenu* menu, const Vector<WebContextMenuItemData>& items);
+
+    WebViewBase& m_webView;
     BPopUpMenu* m_menu;
 };
 

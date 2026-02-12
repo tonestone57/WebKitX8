@@ -30,7 +30,6 @@
 
 #include "Document.h"
 #include "DocumentFragment.h"
-#include <WebCore/NotImplemented.h>
 
 #include <Entry.h>
 #include <Message.h>
@@ -42,7 +41,7 @@ namespace WebCore {
 
 bool DragData::canSmartReplace() const
 {
-    return true;
+    return false;
 }
 
 bool DragData::containsColor() const

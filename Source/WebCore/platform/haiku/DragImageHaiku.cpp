@@ -31,9 +31,6 @@
 #include "FontCascade.h"
 #include "Image.h"
 
-#include "NotImplemented.h"
-
-
 namespace WebCore {
 
 const float DragLabelBorderX = 4;
@@ -50,4 +47,3 @@ const float DragLinkLabelFontsize = 11;
 const float DragLinkUrlFontSize = 10;
 
 } // namespace WebCore
-

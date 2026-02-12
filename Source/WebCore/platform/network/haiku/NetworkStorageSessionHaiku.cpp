@@ -123,49 +123,64 @@ std::pair<String, bool> NetworkStorageSession::cookiesForDOM(const URL& firstPar
     return {String::fromUTF8(result), secure};
 }
 
-void NetworkStorageSession::setCookies(const Vector<Cookie>&, const URL&, const URL&)
+void NetworkStorageSession::setCookies(const Vector<Cookie>& cookies, const URL&, const URL&)
 {
-    // FIXME: Implement for WebKit to use.
+    for (const auto& cookie : cookies)
+        setCookie(cookie);
 }
 
-void NetworkStorageSession::setCookie(const Cookie&)
+void NetworkStorageSession::setCookie(const Cookie& cookie)
 {
-    // FIXME: Implement for WebKit to use.
+    BPrivate::Network::BNetworkCookie* newCookie = new BPrivate::Network::BNetworkCookie(
+        cookie.name, cookie.value, BUrl(cookie.domain));
+
+    newCookie->SetPath(cookie.path);
+    newCookie->SetSecure(cookie.secure);
+    newCookie->SetHttpOnly(cookie.httpOnly);
+    newCookie->SetExpiration(cookie.expires.value_or(0)); // Convert to time_t if needed, or 0 for session?
+    // BNetworkCookie handles session vs persistent automatically based on expiration.
+
+    // AddCookie takes ownership of the cookie object.
+    platformSession().GetCookieJar().AddCookie(newCookie);
 }
 
-void NetworkStorageSession::deleteCookie(const Cookie&, WTF::CompletionHandler<void()>&&)
+void NetworkStorageSession::deleteCookie(const Cookie& cookie, WTF::CompletionHandler<void()>&& completionHandler)
 {
-    // FIXME: Implement for WebKit to use.
-}
-
-void NetworkStorageSession::deleteCookie(const URL& url, const String& cookie, WTF::CompletionHandler<void()>&& completionHandler) const
-{
-#if TRACE_COOKIE_JAR
-	printf("CookieJar: delete cookie for %s\n", url.string().utf8().data());
-#endif
-    BUrl hUrl(url);
-    BPrivate::Network::BNetworkCookieJar& jar = platformSession().GetCookieJar();
-
-    // Collect cookies to remove to avoid iterator invalidation
-    Vector<const BPrivate::Network::BNetworkCookie*> toRemove;
-
-    BPrivate::Network::BNetworkCookieJar::UrlIterator it(jar.GetUrlIterator(hUrl));
+    // We need to find the specific cookie to delete it.
+    // Assuming GetIterator() returns an iterator for all cookies.
+    BPrivate::Network::BNetworkCookieJar::Iterator it(platformSession().GetCookieJar().GetIterator());
     const BPrivate::Network::BNetworkCookie* c;
+
     while ((c = it.Next())) {
-        if (c->Name() == cookie) {
-            toRemove.append(c);
+        if (c->Name() == cookie.name && c->Domain() == cookie.domain && c->Path() == cookie.path) {
+            platformSession().GetCookieJar().RemoveCookie(c);
+            break;
         }
     }
+    completionHandler();
+}
 
-    for (auto* cookiePtr : toRemove)
-        jar.RemoveCookie(const_cast<BPrivate::Network::BNetworkCookie*>(cookiePtr));
+void NetworkStorageSession::deleteCookie(const URL& url, const String& cookieName, WTF::CompletionHandler<void()>&& completionHandler) const
+{
+#if TRACE_COOKIE_JAR
+       printf("CookieJar: delete cookie %s for %s\n", cookieName.utf8().data(), url.string().utf8().data());
+#endif
+    // Iterate over cookies for the URL and remove the one with the matching name.
+    BPrivate::Network::BNetworkCookieJar::UrlIterator it(platformSession().GetCookieJar().GetUrlIterator(BUrl(url)));
+    const BPrivate::Network::BNetworkCookie* c;
 
+    while ((c = it.Next())) {
+        if (String::fromUTF8(c->Name()) == cookieName) {
+            platformSession().GetCookieJar().RemoveCookie(c);
+            break;
+        }
+    }
     completionHandler();
 }
 
 void NetworkStorageSession::deleteAllCookies(WTF::CompletionHandler<void()>&& completionHandler)
 {
-    platformSession().GetCookieJar().MakeEmpty();
+    platformSession().GetCookieJar().Purge(NULL);
     completionHandler();
 }
 
@@ -176,33 +191,94 @@ void NetworkStorageSession::deleteAllCookiesModifiedSince(WallTime since, WTF::C
 }
 
 void NetworkStorageSession::deleteCookiesForHostnames(const Vector<String>& cookieHostNames,
-    WebCore::IncludeHttpOnlyCookies, WebCore::ScriptWrittenCookiesOnly, WTF::CompletionHandler<void()>&& completionHandler)
+    WebCore::IncludeHttpOnlyCookies includeHttpOnly, WebCore::ScriptWrittenCookiesOnly, WTF::CompletionHandler<void()>&& completionHandler)
 {
-    // FIXME: Implement hostname-based deletion
+    BPrivate::Network::BNetworkCookieJar::Iterator it(platformSession().GetCookieJar().GetIterator());
+    const BPrivate::Network::BNetworkCookie* c;
+
+    // We can't safely remove while iterating if the iterator doesn't support it.
+    // So collect cookies to remove first.
+    Vector<const BPrivate::Network::BNetworkCookie*> cookiesToRemove;
+
+    while ((c = it.Next())) {
+        if (cookieHostNames.contains(String::fromUTF8(c->Domain()))) {
+             if (c->HttpOnly() && includeHttpOnly == IncludeHttpOnlyCookies::No)
+                continue;
+            cookiesToRemove.append(c);
+        }
+    }
+
+    for (auto* cookie : cookiesToRemove) {
+        platformSession().GetCookieJar().RemoveCookie(cookie);
+    }
     completionHandler();
 }
 
 Vector<Cookie> NetworkStorageSession::getAllCookies()
 {
-    // FIXME: Implement for WebKit to use.
-    return { };
+    Vector<Cookie> cookies;
+    BPrivate::Network::BNetworkCookieJar::Iterator it(platformSession().GetCookieJar().GetIterator());
+    const BPrivate::Network::BNetworkCookie* c;
+
+    while ((c = it.Next())) {
+        Cookie cookie;
+        cookie.name = String::fromUTF8(c->Name());
+        cookie.value = String::fromUTF8(c->Value());
+        cookie.domain = String::fromUTF8(c->Domain());
+        cookie.path = String::fromUTF8(c->Path());
+        cookie.secure = c->Secure();
+        cookie.httpOnly = c->HttpOnly();
+        cookie.expires = c->Expiration();
+        cookies.append(cookie);
+    }
+    return cookies;
 }
 
 void NetworkStorageSession::getHostnamesWithCookies(HashSet<String>& hostnames)
 {
-    // FIXME: Implement
+    BPrivate::Network::BNetworkCookieJar::Iterator it(platformSession().GetCookieJar().GetIterator());
+    const BPrivate::Network::BNetworkCookie* c;
+
+    while ((c = it.Next())) {
+        hostnames.add(String::fromUTF8(c->Domain()));
+    }
 }
 
-Vector<Cookie> NetworkStorageSession::getCookies(const URL&)
+Vector<Cookie> NetworkStorageSession::getCookies(const URL& url)
 {
-    // FIXME: Implement for WebKit to use.
-    return { };
+    Vector<Cookie> cookies;
+    BUrl hUrl(url);
+    BPrivate::Network::BNetworkCookieJar::UrlIterator it(platformSession().GetCookieJar().GetUrlIterator(hUrl));
+    const BPrivate::Network::BNetworkCookie* c;
+
+    while ((c = it.Next())) {
+        Cookie cookie;
+        cookie.name = String::fromUTF8(c->Name());
+        cookie.value = String::fromUTF8(c->Value());
+        cookie.domain = String::fromUTF8(c->Domain());
+        cookie.path = String::fromUTF8(c->Path());
+        cookie.secure = c->Secure();
+        cookie.httpOnly = c->HttpOnly();
+        cookie.expires = c->Expiration();
+        cookies.append(cookie);
+    }
+    return cookies;
 }
 
-void NetworkStorageSession::hasCookies(const RegistrableDomain&, CompletionHandler<void(bool)>&& completionHandler) const
+void NetworkStorageSession::hasCookies(const RegistrableDomain& domain, CompletionHandler<void(bool)>&& completionHandler) const
 {
-    // FIXME: Implement.
-    completionHandler(false);
+    // BNetworkCookieJar doesn't seem to have a direct "has cookies for domain" check.
+    // We can iterate.
+    BPrivate::Network::BNetworkCookieJar::Iterator it(platformSession().GetCookieJar().GetIterator());
+    const BPrivate::Network::BNetworkCookie* c;
+    bool found = false;
+    while ((c = it.Next())) {
+        if (String::fromUTF8(c->Domain()) == domain.string()) {
+            found = true;
+            break;
+        }
+    }
+    completionHandler(found);
 }
 
 bool NetworkStorageSession::getRawCookies(const URL& firstParty,

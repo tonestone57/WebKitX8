@@ -44,12 +44,12 @@ namespace WebCore {
 
 int screenHorizontalDPI(Widget*)
 {
-    return 72;
+    return 96;
 }
 
 int screenVerticalDPI(Widget*)
 {
-    return 72;
+    return 96;
 }
 
 bool screenHasInvertedColors()

@@ -29,7 +29,6 @@
 #include "config.h"
 #include "wtf/FileSystem.h"
 
-#include "NotImplemented.h"
 #include <wtf/text/CString.h>
 
 #include <Entry.h>
