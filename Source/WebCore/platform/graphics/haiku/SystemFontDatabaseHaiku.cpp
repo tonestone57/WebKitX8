@@ -41,8 +41,7 @@ SystemFontDatabase& SystemFontDatabase::singleton()
 
 auto SystemFontDatabase::platformSystemFontShorthandInfo(FontShorthand fontShorthand) -> SystemFontShorthandInfo
 {
-    notImplemented();
-    return { WebKitFontFamilyNames::standardFamily, 16, normalWeightValue() };
+    return { WebKitFontFamilyNames::standardFamily, 12, normalWeightValue() };
 }
 
 void SystemFontDatabase::platformInvalidate()

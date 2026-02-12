@@ -375,11 +375,11 @@ void PathHaiku::add(PathArcTo arcTo)
     add(PathArc { p, radius, sa, ea, direction });
 }
 
-void PathHaiku::addPath(const PathHaiku&, const AffineTransform&)
+void PathHaiku::addPath(const PathHaiku& other, const AffineTransform& transform)
 {
-    // FIXME: This should probably be very similar to Path::transform.
-    printf("FIXME addPath  notImplemented()");
-    notImplemented();
+    PathHaiku copy = other;
+    copy.transform(transform);
+    m_platformPath.AddShape(copy.platformPath());
 }
 
 void PathHaiku::add(PathArc arc)
@@ -534,9 +534,14 @@ void PathHaiku::add(PathCloseSubpath)
 }
 
 
-void PathHaiku::add(PathEllipse)
+void PathHaiku::add(PathEllipse ellipse)
 {
-    notImplemented();
+    m_platformPath.AddEllipse(BRect(
+        ellipse.center.x() - ellipse.radiusX,
+        ellipse.center.y() - ellipse.radiusY,
+        ellipse.center.x() + ellipse.radiusX,
+        ellipse.center.y() + ellipse.radiusY
+    ));
 }
 
 
@@ -743,7 +748,8 @@ FloatRect PathHaiku::strokeBoundingRect(const Function<void(GraphicsContext&)>& 
 {
     // Used by the web inspector to highlight some element
     if (applier) {
-        notImplemented();
+        // FIXME: Calculate exact stroke bounds
+        // For now, return bounds inflated by a guess or just Bounds()
     }
 
     return m_platformPath.Bounds();

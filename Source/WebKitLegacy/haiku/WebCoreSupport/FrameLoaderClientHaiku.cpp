@@ -165,7 +165,6 @@ bool FrameLoaderClientHaiku::dispatchDidLoadResourceFromMemoryCache(DocumentLoad
                                                                     const ResourceResponse& /*response*/,
                                                                     int /*length*/)
 {
-    notImplemented();
     return false;
 }
 
@@ -173,19 +172,6 @@ void FrameLoaderClientHaiku::assignIdentifierToInitialRequest(ResourceLoaderIden
                                                               DocumentLoader* loader,
                                                               const ResourceRequest& request)
 {
-#if 0
-    WebCore::Page* webPage = m_webFrame->Frame()->page();
-    if (!webPage)
-        return;
-
-    bool pageIsProvisionallyLoading = false;
-    if (FrameLoader* frameLoader = loader ? loader->frameLoader() : nullptr)
-        pageIsProvisionallyLoading = frameLoader->provisionalDocumentLoader() == loader;
-
-    webPage->injectedBundleResourceLoadClient().didInitiateLoadForResource(*webPage, m_webFrame, identifier, request, pageIsProvisionallyLoading);
-
-    webPage->addResourceRequest(identifier, request);
-#endif
 }
 
 void FrameLoaderClientHaiku::dispatchWillSendRequest(DocumentLoader* /*loader*/, ResourceLoaderIdentifier /*identifier*/,
@@ -200,9 +186,7 @@ void FrameLoaderClientHaiku::dispatchWillSendRequest(DocumentLoader* /*loader*/,
     // is kept, so that if this is a main resource load it's still considered as such.
     auto requester = request.requester();
     auto appInitiatedValue = request.isAppInitiated();
-#if 0
-    webPage->injectedBundleResourceLoadClient().willSendRequestForFrame(*webPage, m_frame, identifier, request, redirectResponse);
-#endif
+
     if (!request.isNull()) {
         request.setRequester(requester);
         request.setIsAppInitiated(appInitiatedValue);
@@ -213,7 +197,6 @@ bool FrameLoaderClientHaiku::shouldUseCredentialStorage(DocumentLoader*, Resourc
 {
     // TODO disable when in "private browsing" mode or similar, or allow to remember passwords or
     // not per website
-    notImplemented();
     return true;
 }
 
@@ -312,12 +295,10 @@ void FrameLoaderClientHaiku::dispatchDidReceiveResponse(DocumentLoader* loader,
 void FrameLoaderClientHaiku::dispatchDidReceiveContentLength(DocumentLoader* /*loader*/,
                                                              ResourceLoaderIdentifier /*id*/, int /*length*/)
 {
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::dispatchDidFinishLoading(DocumentLoader* /*loader*/, ResourceLoaderIdentifier /*identifier*/)
 {
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::dispatchDidFailLoading(DocumentLoader* loader, ResourceLoaderIdentifier, const ResourceError& error)
@@ -338,17 +319,14 @@ void FrameLoaderClientHaiku::dispatchDidDispatchOnloadEvents()
 
 void FrameLoaderClientHaiku::dispatchDidReceiveServerRedirectForProvisionalLoad()
 {
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::dispatchDidCancelClientRedirect()
 {
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::dispatchWillPerformClientRedirect(const URL&, double /*interval*/, WallTime /*fireDate*/, LockBackForwardList)
 {
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::dispatchDidChangeLocationWithinPage()
@@ -361,22 +339,18 @@ void FrameLoaderClientHaiku::dispatchDidChangeLocationWithinPage()
 
 void FrameLoaderClientHaiku::dispatchDidPushStateWithinPage()
 {
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::dispatchDidReplaceStateWithinPage()
 {
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::dispatchDidPopStateWithinPage()
 {
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::dispatchWillClose()
 {
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::dispatchDidReceiveIcon()
@@ -475,15 +449,6 @@ void FrameLoaderClientHaiku::dispatchDidFailLoad(const ResourceError& error)
     }
 
     m_loadingErrorPage = true;
-
-    // NOTE: This could be used to display the error right in the page. However, I find
-    // the error alert somehow better to manage. For example, on a partial load error,
-    // at least some content stays readable if we don't overwrite it with the error text... :-)
-//    BString content("<html><body>");
-//    content << error.localizedDescription().utf8().data();
-//    content << "</body></html>";
-//
-//    m_webFrame->SetFrameSource(content);
 }
 
 void FrameLoaderClientHaiku::dispatchDidFinishDocumentLoad()
@@ -512,7 +477,6 @@ void FrameLoaderClientHaiku::dispatchDidFinishLoad()
 void FrameLoaderClientHaiku::dispatchWillSubmitForm(FormState&, URL&&, String&&, WTF::CompletionHandler<void()>&& function)
 {
     CALLED();
-    notImplemented();
 	// It seems we can access the form content here, and maybe store it for auto-complete and the like.
     function();
 }
@@ -530,7 +494,6 @@ LocalFrame* FrameLoaderClientHaiku::dispatchCreatePage(const NavigationAction& /
 void FrameLoaderClientHaiku::dispatchShow()
 {
     CALLED();
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::dispatchDecidePolicyForResponse(
@@ -613,19 +576,16 @@ void FrameLoaderClientHaiku::dispatchDecidePolicyForNavigationAction(
 void FrameLoaderClientHaiku::cancelPolicyCheck()
 {
     CALLED();
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::dispatchUnableToImplementPolicy(const ResourceError&)
 {
     CALLED();
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::revertToProvisionalState(DocumentLoader*)
 {
     CALLED();
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::setMainDocumentError(WebCore::DocumentLoader* /*loader*/, const WebCore::ResourceError& error)
@@ -667,12 +627,6 @@ void FrameLoaderClientHaiku::committedLoad(WebCore::DocumentLoader* loader, cons
 
     ASSERT(loader->frame());
     loader->commitData(buffer);
-
-#if 0
-    Frame* coreFrame = loader->frame();
-    if (coreFrame && coreFrame->document()->isMediaDocument())
-        loader->cancelMainResourceLoad(coreFrame->loader().client().pluginWillHandleLoadError(loader->response()));
-#endif
 }
 
 void FrameLoaderClientHaiku::finishedLoading(DocumentLoader* /*documentLoader*/)
@@ -739,13 +693,11 @@ bool FrameLoaderClientHaiku::shouldFallBack(const WebCore::ResourceError& error)
 
 bool FrameLoaderClientHaiku::canHandleRequest(const WebCore::ResourceRequest&) const
 {
-    // notImplemented();
     return true;
 }
 
 bool FrameLoaderClientHaiku::canShowMIMETypeAsHTML(const String& /*MIMEType*/) const
 {
-    notImplemented();
     return false;
 }
 
@@ -760,13 +712,6 @@ bool FrameLoaderClientHaiku::canShowMIMEType(const String& mimeType) const
     if (MIMETypeRegistry::canShowMIMEType(mimeType))
         return true;
 
-#if 0
-    Frame* frame = m_webFrame->Frame();
-    if (frame && frame->settings() && frame->settings()->arePluginsEnabled()
-        && PluginDatabase::installedPlugins()->isMIMETypeRegistered(mimeType))
-        return true;
-#endif
-
     return false;
 }
 
@@ -777,7 +722,6 @@ bool FrameLoaderClientHaiku::representationExistsForURLScheme(StringView /*URLSc
 
 String FrameLoaderClientHaiku::generatedMIMETypeForURLScheme(StringView /*URLScheme*/) const
 {
-    notImplemented();
     return String();
 }
 
@@ -787,7 +731,6 @@ void FrameLoaderClientHaiku::frameLoadCompleted()
 
 void FrameLoaderClientHaiku::saveViewStateToItem(HistoryItem&)
 {
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::restoreViewState()
@@ -796,22 +739,18 @@ void FrameLoaderClientHaiku::restoreViewState()
     //   "This signal is emitted when the load of \a frame is finished and the application
     //   may now update its state accordingly."
     // Could be this is important for ports which use actual platform widgets.
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::provisionalLoadStarted()
 {
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::didFinishLoad()
 {
-    notImplemented();
 }
 
 void FrameLoaderClientHaiku::prepareForDataSourceReplacement()
 {
-    // notImplemented(); // Nor does any port except Apple one.
 }
 
 WTF::Ref<DocumentLoader> FrameLoaderClientHaiku::createDocumentLoader(ResourceRequest&& request, SubstituteData&& substituteData)
@@ -835,9 +774,6 @@ void FrameLoaderClientHaiku::transitionToCommittedFromCachedFrame(CachedFrame* c
 {
     CALLED();
     ASSERT(cachedFrame->view());
-
-    // FIXME: I guess we would have to restore platform data from the cachedFrame here,
-    // data associated in savePlatformDataToCachedFrame().
 
     cachedFrame->view()->setTopLevelPlatformWidget(m_webPage->WebView());
 }
@@ -864,7 +800,6 @@ void FrameLoaderClientHaiku::transitionToCommittedForNewPage(InitializingIframe)
 
 String FrameLoaderClientHaiku::userAgent(const URL&) const
 {
-    // FIXME: Get the app name from the app. Hardcoded WebPositive for now.
     return WebCore::standardUserAgent("WebPositive"_s, "1.3"_s);
 }
 
@@ -916,11 +851,6 @@ ObjectContentType FrameLoaderClientHaiku::objectContentType(const URL& url, cons
     if (MIMETypeRegistry::isSupportedImageMIMEType(mimeType))
         return ObjectContentType::Image;
 
-#if 0
-    if (PluginDatabase::installedPlugins()->isMIMETypeRegistered(mimeType))
-        return ObjectContentNetscapePlugin;
-#endif
-
     if (MIMETypeRegistry::isSupportedNonImageMIMEType(mimeType))
         return ObjectContentType::Frame;
 
@@ -934,14 +864,12 @@ RefPtr<Widget> FrameLoaderClientHaiku::createPlugin(HTMLPlugInElement&, const UR
                                                         const Vector<AtomString>&, const String&, bool /*loadManually*/)
 {
     CALLED();
-    notImplemented();
     return nullptr;
 }
 
 void FrameLoaderClientHaiku::redirectDataToPlugin(Widget& pluginWidge)
 {
     CALLED();
-    debugger("plugins are not implemented on Haiku!");
 }
 
 AtomString FrameLoaderClientHaiku::overrideMediaType() const

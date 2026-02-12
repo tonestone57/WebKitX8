@@ -37,6 +37,7 @@
 #include "ImageBuffer.h"
 #include "NotImplemented.h"
 #include "Path.h"
+#include "Pattern.h"
 #include "TransformationMatrix.h"
 #include "ShadowBlur.h"
 
@@ -112,7 +113,7 @@ void GraphicsContextHaiku::drawRect(const FloatRect& rect, float borderThickness
 {
     HGTRACE(("drawRect: [%f:%f] [%f:%f]\n", rect.x(), rect.y(), rect.width(), rect.height()));
     if (m_state.fillBrush().pattern())
-        notImplemented();
+        m_state.fillBrush().pattern()->fill(*this, rect);
     else if (m_state.fillBrush().gradient()) {
         m_state.fillBrush().gradient()->fill(*this, rect);
     } else
@@ -181,9 +182,11 @@ void GraphicsContextHaiku::drawEllipse(const FloatRect& rect)
 {
     HGTRACE(("drawEllipse: [%f:%f] [%f:%f]\n", rect.x(), rect.y(), rect.width(), rect.height()));
     if (m_state.fillBrush().pattern() || m_state.fillBrush().gradient() || fillColor().isVisible()) {
-        if (m_state.fillBrush().pattern())
-            notImplemented();
-        else if (m_state.fillBrush().gradient()) {
+        if (m_state.fillBrush().pattern()) {
+            Path path;
+            path.addEllipse(rect);
+            fillPath(path);
+        } else if (m_state.fillBrush().gradient()) {
             const BGradient& gradient = m_state.fillBrush().gradient()->getHaikuGradient();
             m_view->FillEllipse(rect, gradient);
         } else
@@ -216,9 +219,11 @@ void GraphicsContextHaiku::strokePath(const Path& path)
 
     // TODO: stroke the shadow (cf shadowAndStrokeCurrentCairoPath)
 
-    if (m_state.strokeBrush().pattern())
-        notImplemented();
-    else if (m_state.strokeBrush().gradient()) {
+    if (m_state.strokeBrush().pattern()) {
+        // Fallback to solid color for now
+        if (strokeColor().isVisible())
+            m_view->StrokeShape(path.platformPath(), m_strokeStyle);
+    } else if (m_state.strokeBrush().gradient()) {
         const BGradient& gradient = m_state.strokeBrush().gradient()->getHaikuGradient();
         m_view->StrokeShape(path.platformPath(), gradient);
     } else if (strokeColor().isVisible()) {
@@ -396,9 +401,12 @@ void GraphicsContextHaiku::fillPath(const Path& path)
     // TODO: Render the shadow (cf shadowAndFillCurrentCairoPath)
     drawing_mode mode = m_view->DrawingMode();
 
-    if (m_state.fillBrush().pattern())
-        notImplemented();
-    else if (m_state.fillBrush().gradient()) {
+    if (m_state.fillBrush().pattern()) {
+        m_view->PushState();
+        m_view->ClipToShape(path.platformPath());
+        m_state.fillBrush().pattern()->fill(*this, path.boundingRect());
+        m_view->PopState();
+    } else if (m_state.fillBrush().gradient()) {
         m_view->SetDrawingMode(B_OP_ALPHA);
         const BGradient& gradient = m_state.fillBrush().gradient()->getHaikuGradient();
         m_view->FillShape(path.platformPath(), gradient);
@@ -727,7 +735,7 @@ void GraphicsContextHaiku::didUpdateState(GraphicsContextState& state)
         switch (strokeStyle()) {
 			case WebCore::StrokeStyle::DoubleStroke:
 			case WebCore::StrokeStyle::WavyStroke:
-                notImplemented();
+                // FIXME: Implement fancy strokes
                 m_strokeStyle = B_SOLID_HIGH;
                 break;
 			case WebCore::StrokeStyle::SolidStroke:

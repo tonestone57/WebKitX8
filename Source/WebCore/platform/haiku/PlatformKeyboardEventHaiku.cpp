@@ -81,7 +81,7 @@ String PlatformKeyboardEvent::keyIdentifierForHaikuKeyCode(char singleByte, int 
         case B_PAUSE_KEY:
             return ASCIILiteral::fromLiteralUnsafe("Pause");
         case B_SCROLL_KEY:
-            return ASCIILiteral::fromLiteralUnsafe(""); // FIXME
+            return ASCIILiteral::fromLiteralUnsafe("ScrollLock");
         }
     break;
 
@@ -149,9 +149,9 @@ int PlatformKeyboardEvent::windowsKeyCodeForKeyEvent(char singleByte, int keyCod
         case B_PRINT_KEY:
             return VK_PRINT;
         case B_PAUSE_KEY:
-            return 0; // FIXME
+            return VK_PAUSE;
         case B_SCROLL_KEY:
-            return 0; // FIXME
+            return VK_SCROLL;
         }
         break;
 

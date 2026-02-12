@@ -63,7 +63,9 @@ void ShareableBitmap::paint(GraphicsContext& context, float scaleFactor, const I
     FloatRect destRect(dstPoint, srcRect.size());
     FloatRect srcRectScaled(srcRect);
     srcRectScaled.scale(scaleFactor);
-    notImplemented();
+
+    // Fallback to simple paint for now, ignoring scale
+    paint(context, dstPoint, srcRect);
 }
 
 WebCore::PlatformImagePtr ShareableBitmap::createPlatformImage(WebCore::BackingStoreCopy, WebCore::ShouldInterpolate)

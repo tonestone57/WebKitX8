@@ -26,22 +26,22 @@
 #include "config.h"
 #include <wtf/MemoryFootprint.h>
 
-#include <image.h>
+#include <OS.h>
 
 
 namespace WTF {
 
 size_t memoryFootprint()
 {
-    image_info info;
-    int32* cookie = nullptr;
+    area_info info;
+    ssize_t cookie = 0;
 
-    size_t heapSize = 0;
+    size_t footprint = 0;
 
-    while (get_next_image_info(B_CURRENT_TEAM, cookie, &info) == B_OK)
-        heapSize += info.data_size;
+    while (get_next_area_info(B_CURRENT_TEAM, &cookie, &info) == B_OK)
+        footprint += info.ram_size;
 
-    return heapSize;
+    return footprint;
 }
 
 }

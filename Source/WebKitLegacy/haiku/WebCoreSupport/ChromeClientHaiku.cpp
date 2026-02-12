@@ -131,25 +131,10 @@ void ChromeClientHaiku::focusedElementChanged(Element* node, WebCore::LocalFrame
 
 void ChromeClientHaiku::focusedFrameChanged(Frame*)
 {
-    notImplemented();
 }
 
 RefPtr<Page> ChromeClientHaiku::createWindow(LocalFrame& /*frame*/, const WTF::String&, const WindowFeatures& features, const NavigationAction& /*action*/)
 {
-	// FIXME: I believe the frame is important for cloning session information.
-	// From looking through the Chromium port code, it is passed to the
-	// method that creates a new WebView. I didn't find createView() implemented
-	// anywhere, but only this comment:
-	//
-	// // Create a new related WebView.  This method must clone its session
-	// // storage so any subsequent calls to createSessionStorageNamespace
-	// // conform to the WebStorage specification.
-	// virtual WebView* createView(WebFrame* creator) { return 0; }
-	//
-	// (WebViewClient is probably what browsers or other embedders need to
-	// implement themselves, so this method is not implemented in the Chromium
-	// WebKit code.)
-
 	BRect windowFrame;
 	// If any frame property of the features is set, the windowFrame will be valid and
 	// starts of as an offseted copy of the window frame where this page is embedded.
@@ -180,13 +165,11 @@ void ChromeClientHaiku::show()
 
 bool ChromeClientHaiku::canRunModal() const
 {
-    notImplemented();
     return false;
 }
 
 void ChromeClientHaiku::runModal()
 {
-    notImplemented();
 }
 
 bool ChromeClientHaiku::toolbarsVisible() const
@@ -250,13 +233,10 @@ void ChromeClientHaiku::runJavaScriptAlert(LocalFrame&, const String& msg)
 bool ChromeClientHaiku::runJavaScriptConfirm(LocalFrame&, const String& msg)
 {
     return m_webPage->runJavaScriptConfirm(BString(msg));
-    BAlert* alert = new BAlert("JavaScript", BString(msg).String(), "Yes", "No");
-    return !alert->Go();
 }
 
 bool ChromeClientHaiku::runJavaScriptPrompt(LocalFrame&, const String& /*message*/, const String& /*defaultValue*/, String& /*result*/)
 {
-    notImplemented();
     return false;
 }
 
@@ -375,8 +355,6 @@ void ChromeClientHaiku::mouseDidMoveOverElement(const WebCore::HitTestResult& re
 	if (!m_webView->LockLooper())
 		return;
 
-	// FIXME: Unless HideToolTip() is called here, changing the tool tip has no
-	// effect in BView. Remove when BView is fixed.
 	m_webView->HideToolTip();
 	if (!tip.length())
 		m_webView->SetToolTip(reinterpret_cast<BToolTip*>(NULL));
@@ -388,17 +366,14 @@ void ChromeClientHaiku::mouseDidMoveOverElement(const WebCore::HitTestResult& re
 
 void ChromeClientHaiku::print(LocalFrame&, const WebCore::StringWithDirection&)
 {
-    notImplemented();
 }
 
 void ChromeClientHaiku::exceededDatabaseQuota(LocalFrame&, const String& /*databaseName*/, DatabaseDetails)
 {
-    notImplemented();
 }
 
 void ChromeClientHaiku::reachedMaxAppCacheSize(int64_t /*spaceNeeded*/)
 {
-    notImplemented();
 }
 
 void ChromeClientHaiku::runOpenPanel(LocalFrame&, FileChooser& chooser)
@@ -436,8 +411,6 @@ void ChromeClientHaiku::setCursor(const Cursor& cursor)
 #if ENABLE(REQUEST_ANIMATION_FRAME) && !USE(REQUEST_ANIMATION_FRAME_TIMER)
 void ChromeClientHaiku::scheduleAnimation()
 {
-    ASSERT(false);
-    notImplemented();
 }
 #endif
 
@@ -487,13 +460,10 @@ void ChromeClientHaiku::attachRootGraphicsLayer(LocalFrame&, GraphicsLayer* laye
 void ChromeClientHaiku::attachViewOverlayGraphicsLayer(GraphicsLayer*)
 {
     // FIXME: If we want view-relative page overlays, this would be the place to hook them up.
-	fprintf(stderr, "!!! Trying to create an overlay layer!\n");
-    notImplemented();
 }
 
 void ChromeClientHaiku::setNeedsOneShotDrawingSynchronization()
 {
-    notImplemented();
 }
 
 void ChromeClientHaiku::triggerRenderingUpdate()
@@ -560,4 +530,3 @@ void ChromeClientHaiku::ExitVideoFullscreenForVideoElement(WebCore::HTMLVideoEle
 
 
 } // namespace WebCore
-

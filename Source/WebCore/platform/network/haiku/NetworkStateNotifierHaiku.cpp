@@ -35,14 +35,12 @@ namespace WebCore {
 void NetworkStateNotifier::updateStateWithoutNotifying()
 {
 	// Should return true if at least one network interface is up.
-	notImplemented();
     m_isOnLine = true;
 }
 
 void NetworkStateNotifier::startObserving()
 {
 	// Should register to call singleton().updateStateSoon() when an interface is up/down
-	notImplemented();
 }
 
 } // namespace WebCore

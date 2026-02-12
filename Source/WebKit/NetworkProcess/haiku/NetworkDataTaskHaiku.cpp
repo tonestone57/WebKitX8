@@ -281,9 +281,9 @@ void NetworkDataTaskHaiku::HeadersReceived(BUrlRequest* caller)
         });
     }
 }
-void NetworkDataTaskHaiku::BytesWritten(BUrlRequest* caller, size_t size)
+
+void NetworkDataTaskHaiku::DataReceived(BUrlRequest* caller, const char* data, off_t position, ssize_t size)
 {
-#if 0 // FIXME need to have a BDataIO to handle this
     if (m_currentRequest.isNull())
         return;
 
@@ -294,21 +294,22 @@ void NetworkDataTaskHaiku::BytesWritten(BUrlRequest* caller, size_t size)
     if (m_redirected)
         return;
 
-    if (position != m_position)
-    {
-        debugger("bad redirect");
-        return;
-    }
-
     if (size > 0) {
         m_responseDataSent = true;
-        runOnMainThread([this, data=data, size=size] {
-            m_client->didReceiveData(SharedBuffer::create(data,size));
+        Vector<uint8_t> buffer;
+        buffer.append((const uint8_t*)data, size);
+
+        runOnMainThread([this, protectedThis = Ref { *this }, buffer = WTFMove(buffer)]() mutable {
+            m_client->didReceiveData(SharedBuffer::create(WTFMove(buffer)));
         });
     }
 
     m_position += size;
-#endif
+}
+
+void NetworkDataTaskHaiku::BytesWritten(BUrlRequest* caller, size_t size)
+{
+    // Implemented via DataReceived
 }
 
 void NetworkDataTaskHaiku::UploadProgress(BUrlRequest* caller, off_t bytesSent, off_t bytesTotal)
@@ -317,12 +318,26 @@ void NetworkDataTaskHaiku::UploadProgress(BUrlRequest* caller, off_t bytesSent, 
 
 void NetworkDataTaskHaiku::RequestCompleted(BUrlRequest* caller, bool success)
 {
+    if (success) {
+        m_networkLoadMetrics.responseEnd = MonotonicTime::now();
+        m_networkLoadMetrics.markComplete();
+
+        runOnMainThread([this, protectedThis = Ref { *this }] {
+             m_client->didCompleteWithError(ResourceError(), m_networkLoadMetrics);
+        });
+    } else {
+        ResourceError error("BUrlProtocol", caller->Result().StatusCode(), m_baseUrl, "Request failed");
+        m_networkLoadMetrics.responseEnd = MonotonicTime::now();
+        m_networkLoadMetrics.markComplete();
+         runOnMainThread([this, protectedThis = Ref { *this }, error] {
+             m_client->didCompleteWithError(error, m_networkLoadMetrics);
+        });
+    }
 }
 
 bool NetworkDataTaskHaiku::CertificateVerificationFailed(BUrlRequest* caller, BCertificate& certificate, const char* message)
 {
-    //TODO
-    return true;
+    return false;
 }
 
 void NetworkDataTaskHaiku::DebugMessage(BUrlRequest* caller, BUrlProtocolDebugMessage type, const char* text)

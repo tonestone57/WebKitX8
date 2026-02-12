@@ -56,8 +56,10 @@ Cursor::Cursor(Image* image, const IntPoint& hotSpot)
     , m_cursor(0)
 {
     if (image) {
-        // FIXME: Implement creating a BCursor from an Image*
-        notImplemented();
+        if (auto nativeImage = image->nativeImage()) {
+            if (auto* platformImage = nativeImage->platformImage())
+                m_cursor = new BCursor(platformImage, BPoint(hotSpot.x(), hotSpot.y()));
+        }
     }
 }
 
@@ -114,18 +116,40 @@ void Cursor::ensurePlatformCursor() const
         m_cursor = new BCursor(B_CURSOR_ID_HELP);
         break;
     case Cursor::Type::EastResize:
+        m_cursor = new BCursor(B_CURSOR_ID_RESIZE_EAST);
+        break;
     case Cursor::Type::WestResize:
+        m_cursor = new BCursor(B_CURSOR_ID_RESIZE_WEST);
+        break;
     case Cursor::Type::EastWestResize:
+        m_cursor = new BCursor(B_CURSOR_ID_RESIZE_EAST_WEST);
+        break;
     case Cursor::Type::NorthEastResize:
+        m_cursor = new BCursor(B_CURSOR_ID_RESIZE_NORTH_EAST);
+        break;
     case Cursor::Type::NorthWestResize:
+        m_cursor = new BCursor(B_CURSOR_ID_RESIZE_NORTH_WEST);
+        break;
     case Cursor::Type::SouthEastResize:
+        m_cursor = new BCursor(B_CURSOR_ID_RESIZE_SOUTH_EAST);
+        break;
     case Cursor::Type::SouthWestResize:
+        m_cursor = new BCursor(B_CURSOR_ID_RESIZE_SOUTH_WEST);
+        break;
     case Cursor::Type::NorthSouthResize:
-        // FIXME: Use proper resize cursors
-        m_cursor = new BCursor(B_CURSOR_ID_SYSTEM_DEFAULT);
+        m_cursor = new BCursor(B_CURSOR_ID_RESIZE_NORTH_SOUTH);
+        break;
+    case Cursor::Type::NorthResize:
+        m_cursor = new BCursor(B_CURSOR_ID_RESIZE_NORTH);
+        break;
+    case Cursor::Type::SouthResize:
+        m_cursor = new BCursor(B_CURSOR_ID_RESIZE_SOUTH);
         break;
     case Cursor::Type::NorthEastSouthWestResize:
     case Cursor::Type::NorthWestSouthEastResize:
+        // FIXME: No direct mapping for diagonal double-arrow resize
+        m_cursor = new BCursor(B_CURSOR_ID_SYSTEM_DEFAULT);
+        break;
     case Cursor::Type::ColumnResize:
     case Cursor::Type::RowResize:
         m_cursor = new BCursor(B_CURSOR_ID_SYSTEM_DEFAULT);

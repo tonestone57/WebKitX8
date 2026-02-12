@@ -73,8 +73,8 @@ PassRefPtr<AudioBus> AudioFileReader::createBus(float sampleRate, bool mixToMono
         RefPtr<AudioBus> audioBus = AudioBus::create(channels, track->CountFrames(), true);
         audioBus->setSampleRate(sampleRate);
 
-        notImplemented();
-            // TODO fill the audio bus with the frames!
+        // FIXME: Implement audio decoding using BMediaTrack
+        // This requires decoding chunks and writing them to the AudioBus channels
 
         m_file->ReleaseTrack(track);
         return audioBus;

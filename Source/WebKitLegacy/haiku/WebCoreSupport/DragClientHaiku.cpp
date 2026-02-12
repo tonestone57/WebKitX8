@@ -39,13 +39,11 @@ DragClientHaiku::DragClientHaiku(BWebView* webView)
 
 void DragClientHaiku::willPerformDragDestinationAction(DragDestinationAction, const DragData&)
 {
-    notImplemented();
 }
 
 OptionSet<DragSourceAction> DragClientHaiku::dragSourceActionMaskForPoint(const IntPoint&)
 {
     OptionSet<DragSourceAction> result;
-    notImplemented();
     result.add(DragSourceAction::DHTML);
     result.add(DragSourceAction::Image);
     result.add(DragSourceAction::Link);
@@ -55,12 +53,10 @@ OptionSet<DragSourceAction> DragClientHaiku::dragSourceActionMaskForPoint(const 
 
 void DragClientHaiku::willPerformDragSourceAction(DragSourceAction, const IntPoint&, DataTransfer&)
 {
-    notImplemented();
 }
 
 void DragClientHaiku::startDrag(DragItem, DataTransfer&, Frame&, const std::optional<NodeIdentifier>&)
 {
-    notImplemented();
 }
 
 } // namespace WebCore

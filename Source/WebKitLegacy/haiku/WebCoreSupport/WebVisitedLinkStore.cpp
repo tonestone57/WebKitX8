@@ -100,24 +100,9 @@ void WebVisitedLinkStore::populateVisitedLinksIfNeeded(Page& sourcePage)
 
     m_visitedLinksPopulated = true;
 
-    notImplemented();
-#if 0
-    WebView* webView = kit(&sourcePage);
-    if (!webView)
-        return;
-
-    COMPtr<IWebHistoryDelegate> historyDelegate;
-    webView->historyDelegate(&historyDelegate);
-    if (historyDelegate) {
-        historyDelegate->populateVisitedLinksForWebView(webView);
-        return;
-    }
-
-    WebHistory* history = WebHistory::sharedHistory();
-    if (!history)
-        return;
-    history->addVisitedLinksToVisitedLinkStore(*this);
-#endif
+    // FIXME: Populate visited links from history.
+    // This requires access to the browser's history service which is not yet implemented
+    // in a way that WebCore can directly access or via a delegate pattern compatible here.
 }
 
 void WebVisitedLinkStore::addVisitedLinkHash(SharedStringHash linkHash)

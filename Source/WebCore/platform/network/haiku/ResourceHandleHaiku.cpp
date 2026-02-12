@@ -86,8 +86,8 @@ void ResourceHandle::cancel()
 
 void ResourceHandle::platformLoadResourceSynchronously(NetworkingContext* context, const ResourceRequest& request, StoredCredentialsPolicy /*storedCredentials*/, WebCore::SecurityOrigin*, ResourceError& error, ResourceResponse& response, Vector<unsigned char>& data)
 {
-    fprintf(stderr, "platformLoadResourceSynchronously is not implemented!\n");
-    ASSERT_NOT_REACHED();
+    // FIXME: Implement synchronous loading
+    error = ResourceError(String(), 0, request.url(), String());
 }
 
 
@@ -170,12 +170,10 @@ void ResourceHandle::platformSetDefersLoading(bool defers)
 // TODO move to SynchronousLoaderClientHaiku.cpp
 void SynchronousLoaderClient::didReceiveAuthenticationChallenge(ResourceHandle*, const AuthenticationChallenge&)
 {
-    notImplemented();
 }
 
 ResourceError SynchronousLoaderClient::platformBadResponseError()
 {
-    notImplemented();
     return ResourceError();
 }
 

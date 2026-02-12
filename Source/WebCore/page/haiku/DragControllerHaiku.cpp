@@ -73,12 +73,10 @@ const IntSize& DragController::maxDragImageSize()
 
 void DragController::cleanupAfterSystemDrag()
 {
-    notImplemented();
 }
 
 void DragController::declareAndWriteDragImage(DataTransfer& /*clipboard*/, Element&, const URL&, const String& /*label*/)
 {
-    notImplemented();
 }
 
 } // namespace WebCore

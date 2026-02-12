@@ -64,13 +64,22 @@ static ApplicationMemoryStats sampleMemoryAllocatedForApplication()
 {
     ApplicationMemoryStats applicationStats = {0, 0, 0, 0, 0, 0, 0};
 
-    ssize_t cookie;
+    ssize_t cookie = 0;
     area_info area;
 
-    while (get_next_area_info(B_CURRENT_TEAM, &cookie, &area) == B_OK)
-    {
+    while (get_next_area_info(B_CURRENT_TEAM, &cookie, &area) == B_OK) {
         applicationStats.totalProgramSize += area.size;
-        // TODO fill the other infos...
+        applicationStats.residentSetSize += area.ram_size;
+
+        // This is an approximation
+        if (area.protection & B_EXECUTE_AREA)
+            applicationStats.textSize += area.size;
+        else if (strstr(area.name, "stack") != NULL)
+            applicationStats.dataStackSize += area.size;
+        else if (area.protection & B_WRITE_AREA)
+            applicationStats.dataStackSize += area.size; // Heap / Data
+        else
+            applicationStats.sharedSize += area.size; // Read-only data (likely shared)
     }
 
     return applicationStats;
@@ -149,7 +158,7 @@ WebMemoryStatistics WebMemorySampler::sampleWebKit() const
 
 void WebMemorySampler::sendMemoryPressureEvent()
 {
-    notImplemented();
+    // Haiku does not have a system-wide memory pressure event yet.
 }
 
 }

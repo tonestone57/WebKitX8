@@ -37,6 +37,7 @@
 #include "Widget.h"
 #include <GraphicsDefs.h>
 #include <interface/Screen.h>
+#include <interface/Deskbar.h>
 
 
 namespace WebCore {
@@ -59,15 +60,43 @@ bool screenHasInvertedColors()
 FloatRect screenRect(Widget*)
 {
     BScreen screen;
-    // FIXME: We assume this screen is valid
-    return FloatRect(screen.Frame());
+    if (!screen.IsValid())
+        return FloatRect();
+    // BRect is inclusive, so add 1 to width and height
+    BRect frame = screen.Frame();
+    return FloatRect(frame.left, frame.top, frame.Width() + 1, frame.Height() + 1);
 }
 
 FloatRect screenAvailableRect(Widget* widget)
 {
-    // FIXME: We could use the get_deskbar_frame() function
-    // from InterfaceDefs.h to make this smaller
-    return screenRect(widget);
+    BScreen screen;
+    if (!screen.IsValid())
+        return FloatRect();
+
+    // BRect is inclusive, so add 1 to width and height
+    BRect frame = screen.Frame();
+
+    // Subtract deskbar frame if it exists and intersects
+    BDeskbar deskbar;
+    BRect deskbarFrame = deskbar.Frame();
+
+    if (deskbarFrame.IsValid() && frame.Intersects(deskbarFrame)) {
+        if (deskbarFrame.top <= frame.top && deskbarFrame.bottom >= frame.bottom) {
+             // Vertical deskbar
+             if (deskbarFrame.left <= frame.left)
+                 frame.left = deskbarFrame.right + 1;
+             else
+                 frame.right = deskbarFrame.left - 1;
+        } else if (deskbarFrame.left <= frame.left && deskbarFrame.right >= frame.right) {
+             // Horizontal deskbar
+             if (deskbarFrame.top <= frame.top)
+                 frame.top = deskbarFrame.bottom + 1;
+             else
+                 frame.bottom = deskbarFrame.top - 1;
+        }
+    }
+
+    return FloatRect(frame.left, frame.top, frame.Width() + 1, frame.Height() + 1);
 }
 
 bool screenSupportsExtendedColor(Widget*)
@@ -78,15 +107,28 @@ bool screenSupportsExtendedColor(Widget*)
 int screenDepth(Widget*)
 {
     BScreen screen;
-    // FIXME: We assume this screen is valid
-    color_space cs = screen.ColorSpace();
+    if (!screen.IsValid())
+        return 8;
 
-    size_t pixelChunk, rowAlignment, pixelsPerChunk;
-    if (get_pixel_size_for(cs, &pixelChunk, &rowAlignment, &pixelsPerChunk) == B_OK)
-        // FIXME: Not sure if this is right
-        return pixelChunk * 8;
-
-    return 8;
+    switch (screen.ColorSpace()) {
+    case B_RGBA32:
+    case B_RGB32:
+        return 32;
+    case B_RGB24:
+        return 24;
+    case B_RGB16:
+        return 16;
+    case B_RGB15:
+        return 15;
+    case B_CMAP8:
+    case B_GRAY8:
+        return 8;
+    case B_GRAY1:
+    case B_MONOCHROME_1_BIT:
+        return 1;
+    default:
+        return 24; // Default to 24-bit
+    }
 }
 
 int screenDepthPerComponent(Widget*)
@@ -108,8 +150,9 @@ int screenDepthPerComponent(Widget*)
 bool screenIsMonochrome(Widget*)
 {
     BScreen screen;
-    // FIXME: We assume this screen is valid
-    return screen.ColorSpace() == B_MONOCHROME_1_BIT;
+    if (!screen.IsValid())
+        return false;
+    return screen.ColorSpace() == B_MONOCHROME_1_BIT || screen.ColorSpace() == B_GRAY1;
 }
 
 DestinationColorSpace screenColorSpace(Widget*)

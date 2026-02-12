@@ -64,16 +64,20 @@ void WebPage::updateAccessibilityTree()
 }
 #endif
 
-bool WebPage::platformCanHandleRequest(const ResourceRequest&)
+bool WebPage::platformCanHandleRequest(const ResourceRequest& request)
 {
-    notImplemented();
+    if (request.url().protocolIsInHTTPFamily())
+        return true;
+    if (request.url().protocolIs("file"_s))
+        return true;
+    if (request.url().protocolIs("data"_s))
+        return true;
     return false;
 }
 
 const char* WebPage::interpretKeyEvent(const KeyboardEvent* event)
 {
-    notImplemented();
-    return 0;
+    return nullptr;
 }
 
 String WebPage::platformUserAgent(const URL& url) const
@@ -106,13 +110,11 @@ OptionSet<PointerCharacteristics> WebPage::pointerCharacteristicsOfAllAvailableP
 
 bool WebPage::handleEditingKeyboardEvent(WebCore::KeyboardEvent& event)
 {
-    notImplemented();
     return false;
 }
 
 void WebPage::getPlatformEditorState(LocalFrame& frame, EditorState& result) const
 {
-    notImplemented();
 }
 
 } // namespace WebKit

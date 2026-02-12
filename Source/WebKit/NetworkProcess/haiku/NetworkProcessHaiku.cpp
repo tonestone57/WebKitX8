@@ -28,6 +28,7 @@
 
 #include "NetworkProcessCreationParameters.h"
 #include <WebCore/NotImplemented.h>
+#include <stdio.h>
 
 namespace WebKit {
 
@@ -35,22 +36,21 @@ using namespace WebCore;
 
 void NetworkProcess::platformInitializeNetworkProcess(const NetworkProcessCreationParameters& parameters)
 {
-    notImplemented();
 }
 
 void NetworkProcess::allowSpecificHTTPSCertificateForHost(const CertificateInfo& certificateInfo, const String& host)
 {
-    notImplemented();
+    // FIXME: Implement certificate exception handling using Haiku API
 }
 
 void NetworkProcess::platformTerminate()
 {
-    notImplemented();
 }
 
 void NetworkProcess::clearDiskCache(WallTime modifiedSince, CompletionHandler<void()>&& completionHandler)
 {
-    notImplemented();
+    // FIXME: Clear Haiku network kit cache if available
+    completionHandler();
 }
 
 } // namespace WebKit

@@ -37,7 +37,7 @@ namespace Nicosia {
 
 PaintingContextHaiku::ForPainting::ForPainting(WebCore::CoordinatedTileBuffer& buffer)
 {
-    notImplemented();
+    // FIXME: Initialize GraphicsContext for painting
 }
 
 PaintingContextHaiku::ForPainting::~ForPainting()
@@ -46,29 +46,28 @@ PaintingContextHaiku::ForPainting::~ForPainting()
 
 WebCore::GraphicsContext& PaintingContextHaiku::ForPainting::graphicsContext()
 {
-    notImplemented();
+    // FIXME: Return actual context
+    RELEASE_ASSERT_NOT_REACHED();
 }
 
 void PaintingContextHaiku::ForPainting::replay(const PaintingOperations& paintingOperations)
 {
-    notImplemented();
 }
 
 PaintingContextHaiku::ForRecording::ForRecording(PaintingOperations& paintingOperations)
 {
-    notImplemented();
 }
 
 PaintingContextHaiku::ForRecording::~ForRecording() = default;
 
 WebCore::GraphicsContext& PaintingContextHaiku::ForRecording::graphicsContext()
 {
-    notImplemented();
+    // FIXME: Return recording context
+    RELEASE_ASSERT_NOT_REACHED();
 }
 
 void PaintingContextHaiku::ForRecording::replay(const PaintingOperations&)
 {
-    notImplemented();
 }
 
 } // namespace Nicosia

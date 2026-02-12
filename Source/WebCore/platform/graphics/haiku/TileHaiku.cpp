@@ -35,57 +35,41 @@ namespace WebCore {
 TileHaiku::TileHaiku(TiledBackingStore*, const Coordinate&)
     : m_buffer(BRect(0,0,0,0), B_RGBA32)
 {
-    puts("create");
-    notImplemented();
 }
 
 TileHaiku::~TileHaiku()
 {
-    puts("destroy");
 }
 
 bool TileHaiku::isDirty() const
 {
-    puts("isdirty");
-    notImplemented();
     return false;
 }
 
 void TileHaiku::invalidate(const IntRect&)
 {
-    puts("invalidate");
-    notImplemented();
 }
 
 Vector<IntRect> TileHaiku::updateBackBuffer()
 {
-    puts("update");
-    notImplemented();
+    return { };
 }
 
 void TileHaiku::swapBackBufferToFront()
 {
-    puts("swap");
-    notImplemented();
 }
 
 bool TileHaiku::isReadyToPaint() const
 {
-    puts("ready");
-    notImplemented();
-    return false;
+    return true;
 }
 
 void TileHaiku::paint(GraphicsContext*, const IntRect&)
 {
-    puts("paint");
-    notImplemented();
 }
 
 void TileHaiku::resize(const WebCore::IntSize&)
 {
-    puts("resize");
-    notImplemented();
 }
 
 }
