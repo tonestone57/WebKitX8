@@ -114,9 +114,10 @@ WebColorPickerHaiku::~WebColorPickerHaiku()
 void WebColorPickerHaiku::endPicker()
 {
     if (m_window) {
-        m_window->Lock();
-        m_window->Quit();
+        auto window = m_window;
         m_window = nullptr;
+        window->Lock();
+        window->Quit();
     }
     WebColorPicker::endPicker();
 }
@@ -148,7 +149,6 @@ void WebColorPickerHaiku::didChooseColor(const Color& color)
 
 void WebColorPickerHaiku::didEndChooser()
 {
-    m_window = nullptr;
     endPicker();
 }
 

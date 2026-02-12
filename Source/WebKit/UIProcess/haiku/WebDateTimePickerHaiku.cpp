@@ -312,9 +312,10 @@ WebDateTimePickerHaiku::~WebDateTimePickerHaiku()
 void WebDateTimePickerHaiku::endPicker()
 {
     if (m_window) {
-        m_window->Lock();
-        m_window->Quit();
+        auto window = m_window;
         m_window = nullptr;
+        window->Lock();
+        window->Quit();
     }
     WebDateTimePicker::endPicker();
 }
@@ -338,7 +339,6 @@ void WebDateTimePickerHaiku::didChooseDate(const String& date)
 
 void WebDateTimePickerHaiku::didEndChooser()
 {
-    m_window = nullptr;
     endPicker();
 }
 
