@@ -43,11 +43,7 @@ IOChannel::IOChannel(const String& filePath, Type type, std::optional<WorkQueue:
         openMode = FileSystem::FileOpenMode::ReadWrite;
         break;
     case Type::Create:
-        openMode = FileSystem::FileOpenMode::ReadWrite;
-        // Ensure file is created/truncated?
-        // FileSystem::openFile with ReadWrite | Create usually works.
-        // But explicitly deleting might be safer if we want truncation behavior for "Create".
-        FileSystem::deleteFile(filePath);
+        openMode = FileSystem::FileOpenMode::Truncate;
         break;
     }
 

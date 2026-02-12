@@ -37,7 +37,6 @@ namespace WebCore {
 
 void InspectorClientHaiku::inspectedPageDestroyed()
 {
-    fprintf(stderr, "InspectorClientHaiku::inspectedPageDestroyed\n");
 }
 
 Inspector::FrontendChannel* InspectorClientHaiku::openLocalFrontend(WebCore::PageInspectorController*)

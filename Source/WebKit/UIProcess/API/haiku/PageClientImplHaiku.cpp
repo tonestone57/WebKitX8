@@ -120,12 +120,12 @@ bool PageClientImpl::isViewInWindow()
 
 void PageClientImpl::PageClientImpl::processDidExit()
 {
-    fprintf(stderr, "PageClientImpl::processDidExit\n");
+    // fprintf(stderr, "PageClientImpl::processDidExit\n");
 }
 
 void PageClientImpl::didRelaunchProcess()
 {
-    fprintf(stderr, "PageClientImpl::didRelaunchProcess\n");
+    // fprintf(stderr, "PageClientImpl::didRelaunchProcess\n");
 }
 
 void PageClientImpl::toolTipChanged(const String&, const String& newToolTip)

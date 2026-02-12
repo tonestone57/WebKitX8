@@ -337,7 +337,6 @@ void NetworkDataTaskHaiku::RequestCompleted(BUrlRequest* caller, bool success)
 
 bool NetworkDataTaskHaiku::CertificateVerificationFailed(BUrlRequest* caller, BCertificate& certificate, const char* message)
 {
-    fprintf(stderr, "Certificate verification failed: %s\n", message);
     return false;
 }
 

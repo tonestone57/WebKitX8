@@ -76,10 +76,10 @@ static ApplicationMemoryStats sampleMemoryAllocatedForApplication()
             applicationStats.textSize += area.size;
         else if (strstr(area.name, "stack") != NULL)
             applicationStats.dataStackSize += area.size;
+        else if (area.protection & B_WRITE_AREA)
+            applicationStats.dataStackSize += area.size; // Heap / Data
         else
-            applicationStats.dataStackSize += area.size;
-
-        // TODO: detect shared memory (maybe check area.team?)
+            applicationStats.sharedSize += area.size; // Read-only data (likely shared)
     }
 
     return applicationStats;

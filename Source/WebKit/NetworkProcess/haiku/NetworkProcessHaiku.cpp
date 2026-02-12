@@ -41,7 +41,6 @@ void NetworkProcess::platformInitializeNetworkProcess(const NetworkProcessCreati
 void NetworkProcess::allowSpecificHTTPSCertificateForHost(const CertificateInfo& certificateInfo, const String& host)
 {
     // FIXME: Implement certificate exception handling using Haiku API
-    fprintf(stderr, "NetworkProcess::allowSpecificHTTPSCertificateForHost not implemented for %s\n", host.utf8().data());
 }
 
 void NetworkProcess::platformTerminate()
