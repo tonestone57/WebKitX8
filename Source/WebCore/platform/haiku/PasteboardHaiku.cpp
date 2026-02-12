@@ -247,9 +247,30 @@ bool Pasteboard::canSmartReplace()
 }
 
 
-void Pasteboard::read(PasteboardWebContentReader&, WebContentReadingPolicy, std::optional<long unsigned int>)
+void Pasteboard::read(PasteboardWebContentReader& reader, WebContentReadingPolicy, std::optional<long unsigned int>)
 {
-    notImplemented();
+    AutoClipboardLocker locker(be_clipboard);
+    if (!locker.isLocked())
+        return;
+
+    BMessage* data = be_clipboard->Data();
+    if (!data)
+        return;
+
+    const char* buffer = 0;
+    ssize_t bufferLength;
+
+    if (data->FindData("text/html", B_MIME_TYPE, (const void**)&buffer, &bufferLength) == B_OK) {
+        String html = String::fromUTF8(std::span<const char>(buffer, bufferLength));
+        if (reader.readHTML(html))
+            return;
+    }
+
+    if (data->FindData("text/plain", B_MIME_TYPE, (const void**)&buffer, &bufferLength) == B_OK) {
+        String text = String::fromUTF8(std::span<const char>(buffer, bufferLength));
+        if (reader.readPlainText(text))
+            return;
+    }
 }
 
 

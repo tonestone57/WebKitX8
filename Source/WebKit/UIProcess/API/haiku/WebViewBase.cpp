@@ -36,10 +36,13 @@
 #include "PageLoadState.h"
 #include "WebPageGroup.h"
 #include "WebProcessPool.h"
+#include "WebCore/Cursor.h"
 #include "WebCore/IntRect.h"
 #include "WebCore/Region.h"
 #include "wtf/MainThread.h"
 
+#include <Application.h>
+#include <Cursor.h>
 #include <Window.h>
 
 #if USE(COORDINATED_GRAPHICS) || USE(TEXTURE_MAPPER)
@@ -126,20 +129,37 @@ void WebViewBase::Draw(BRect update)
         return;
 
     IntRect updateArea(update);
-
-    callOnMainRunLoop([this, drawingArea, updateArea](){
-        LockLooper();
-        WebCore::Region unpainted;
-
-        // TODO: Is it possible to make this not require being called from the
-        // main thread?
-        drawingArea->paint(this, updateArea, unpainted);
-
-        UnlockLooper();
-    });
+    WebCore::Region unpainted;
+    drawingArea->paint(this, updateArea, unpainted);
 #endif
 }
 
 void WebViewBase::paint(const IntRect& dirtyRect)
 {
+}
+
+void WebViewBase::setCursor(const WebCore::Cursor& cursor)
+{
+    if (LockLooper()) {
+        if (cursor.platformCursor())
+            SetViewCursor(cursor.platformCursor());
+        else if (cursor.type() == WebCore::Cursor::Type::None) {
+            // Hide cursor
+            // Haiku doesn't have a direct "hide cursor for view" easily without creating a transparent one
+            // or using be_app->HideCursor() which is global.
+            // For now, let's just use the system default if None is requested, or ignore.
+            SetViewCursor(B_CURSOR_SYSTEM_DEFAULT);
+        } else {
+            SetViewCursor(B_CURSOR_SYSTEM_DEFAULT);
+        }
+        UnlockLooper();
+    }
+}
+
+void WebViewBase::setToolTip(const char* toolTip)
+{
+    if (LockLooper()) {
+        SetToolTip(toolTip);
+        UnlockLooper();
+    }
 }

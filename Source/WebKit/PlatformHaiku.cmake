@@ -40,6 +40,7 @@ list(APPEND WebKit_SOURCES
     UIProcess/haiku/TextCheckerHaiku.cpp
     UIProcess/haiku/WebPageProxyHaiku.cpp
     UIProcess/haiku/WebProcessPoolHaiku.cpp
+    UIProcess/haiku/WebContextMenuProxyHaiku.cpp
     UIProcess/haiku/WebPopupMenuProxyHaiku.cpp
     UIProcess/Launcher/haiku/ProcessLauncherHaiku.cpp
     UIProcess/WebsiteData/haiku/WebsiteDataStoreHaiku.cpp
@@ -56,7 +57,7 @@ if (USE_COORDINATED_GRAPHICS)
         WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.cpp
         WebProcess/WebPage/CoordinatedGraphics/CompositingRunLoop.cpp
         WebProcess/WebPage/CoordinatedGraphics/CoordinatedSceneState.cpp
-        WebProcess/WebPage/CoordinatedGraphics/LayerTreeHostPlayStation.cpp
+        WebProcess/WebPage/CoordinatedGraphics/LayerTreeHostHaiku.cpp
         WebProcess/WebPage/CoordinatedGraphics/ThreadedCompositorPlayStation.cpp
         WebProcess/WebPage/CoordinatedGraphics/ThreadedDisplayRefreshMonitorPlayStation.cpp
     )

@@ -30,6 +30,7 @@
 #include "WebColorPicker.h"
 #include "WebDataListSuggestionsDropdown.h"
 #include "WebViewBase.h"
+#include "../../haiku/WebContextMenuProxyHaiku.h"
 #include "../../haiku/WebPopupMenuProxyHaiku.h"
 
 #include "WebCore/Region.h"
@@ -122,12 +123,12 @@ void PageClientImpl::didRelaunchProcess()
 
 void PageClientImpl::toolTipChanged(const String&, const String& newToolTip)
 {
-    //fWebView.setToolTip(newToolTip);
+    fWebView.setToolTip(newToolTip.utf8().data());
 }
 
 void PageClientImpl::setCursor(const WebCore::Cursor& cursor)
 {
-    //fWebView.setCursor(cursor);
+    fWebView.setCursor(cursor);
 }
 
 void PageClientImpl::setCursorHiddenUntilMouseMoves(bool /* hiddenUntilMouseMoves */)
@@ -193,10 +194,9 @@ RefPtr<WebPopupMenuProxy> PageClientImpl::createPopupMenuProxy(WebPageProxy& pag
 }
 
 #if ENABLE(CONTEXT_MENUS)
-Ref<WebContextMenuProxy> PageClientImpl::createContextMenuProxy(WebPageProxy& page, FrameInfoData&&, ContextMenuContextData&& context, const UserData& userData)
+Ref<WebContextMenuProxy> PageClientImpl::createContextMenuProxy(WebPageProxy& page, FrameInfoData&& frameInfo, ContextMenuContextData&& context, const UserData& userData)
 {
-    notImplemented();
-    //return WebContextMenuProxyWin::create(page, WTFMove(context), userData);
+    return WebContextMenuProxyHaiku::create(page, WTF::move(frameInfo), WTF::move(context), userData);
 }
 #endif
 

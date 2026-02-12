@@ -35,8 +35,7 @@
 #include <ControlLook.h>
 #include <InterfaceDefs.h>
 #include <Shape.h>
-#include <private/interface/DefaultColors.h>
-
+#include <View.h>
 
 static int buttonWidth(int scrollbarWidth, int thickness)
 {
@@ -47,11 +46,6 @@ namespace WebCore {
 
 ScrollbarTheme& ScrollbarTheme::nativeTheme()
 {
-	// FIXME: If the ScrollView is embedded in the main frame, we don't want to
-	// draw the outer frame, since that is already drawn be the suroundings.
-	// So it would be cool if we would instantiate one theme per ScrollView. On
-	// the other hand, it looks better with most web sites anyway, since they also
-	// draw an outer frame around a scroll area.
     static ScrollbarThemeHaiku theme(false);
     return theme;
 }
@@ -132,7 +126,7 @@ void ScrollbarThemeHaiku::paintScrollCorner(ScrollableArea& scrollArea, Graphics
     if (rect.width() == 0 || rect.height() == 0)
         return;
 
-    BView* view = context.platformContext();
+    BView* view = (BView*)context.platformContext();
     if (view == nullptr)
         return;
 
@@ -159,7 +153,7 @@ void ScrollbarThemeHaiku::paintScrollbarBackground(GraphicsContext& context, Scr
 {
     if (!be_control_look)
         return;
-    BView* view = context.platformContext();
+    BView* view = (BView*)context.platformContext();
     if (!view)
         return;
 
@@ -198,7 +192,7 @@ void ScrollbarThemeHaiku::paintButton(GraphicsContext& context, Scrollbar& scrol
 {
     if (!be_control_look)
         return;
-    BView* view = context.platformContext();
+    BView* view = (BView*)context.platformContext();
     if (!view)
         return;
 
@@ -246,7 +240,7 @@ void ScrollbarThemeHaiku::paintThumb(GraphicsContext& context, Scrollbar& scroll
 {
     if (!be_control_look)
         return;
-    BView* view = context.platformContext();
+    BView* view = (BView*)context.platformContext();
     if (!view)
         return;
 
@@ -290,18 +284,9 @@ void ScrollbarThemeHaiku::paintThumb(GraphicsContext& context, Scrollbar& scroll
     view->PopState();
 }
 
-rgb_color ScrollbarThemeHaiku::colorForScrollbar(color_which controlColor, bool darkMode) const
+rgb_color ScrollbarThemeHaiku::colorForScrollbar(color_which controlColor, bool) const
 {
-    rgb_color systemColor = ui_color(B_DOCUMENT_BACKGROUND_COLOR);
-    if (darkMode) {
-        if (systemColor.Brightness() > 127) // system is in light mode, but we need dark
-            return BPrivate::GetSystemColor(controlColor, true);
-    } else {
-        if (systemColor.Brightness() < 127) // system is in dark mode but we need light
-            return BPrivate::GetSystemColor(controlColor, false);
-    }
     return ui_color(controlColor);
 }
 
 } // namespace WebCore
-

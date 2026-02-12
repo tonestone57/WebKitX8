@@ -51,11 +51,12 @@ Vector<char> loadResourceIntoArray(const char*);
 
 namespace WebCore {
 
-FloatSize nativeImageDrawingScale(GraphicsContext& context, const FloatRect& destRect, const FloatRect& srcRect)
+RefPtr<Image> Image::loadPlatformResource(const char* name)
 {
-    auto transformedDestinationRect = context.getCTM().mapRect(destRect);
-    return { static_cast<float>(transformedDestinationRect.width() / srcRect.width()), static_cast<float>(transformedDestinationRect.height() / srcRect.height()) };
+    // TODO: We could implement resource loading from the app resources/executable.
+    // For now, return null.
+    notImplemented();
+    return nullptr;
 }
 
 } // namespace WebCore
-
