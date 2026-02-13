@@ -84,6 +84,10 @@ if (NOT USE_CURL)
         WebProcess/Cookies/haiku/WebCookieManagerHaiku.cpp
         WebProcess/WebCoreSupport/haiku/WebFrameNetworkingContext.cpp
     )
+else()
+    list(APPEND WebKit_SOURCES
+        WebProcess/WebCoreSupport/curl/WebFrameNetworkingContext.cpp
+    )
 endif()
 
 # TODO: It seems not all of these headers should be public. Currently, if a
