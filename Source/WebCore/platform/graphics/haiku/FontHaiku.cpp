@@ -145,12 +145,9 @@ void FontCascade::drawGlyphs(GraphicsContext& graphicsContext, const Font& font,
     else
         view->SetDrawingMode(B_OP_OVER);
     view->SetHighColor(color);
-    BFont bfont;
-    // Sometimes we will end up here with a reference to a NULL font… oh well.
-    if (&font == NULL)
-        bfont = be_plain_font;
-    else
-        bfont = *font.platformData().font();
+
+    // We assume 'font' is valid reference as per C++ semantics.
+    BFont bfont = *font.platformData().font();
 
     if (smoothing == FontSmoothingMode::None)
         bfont.SetFlags(B_DISABLE_ANTIALIASING);
@@ -190,12 +187,11 @@ void FontCascade::drawGlyphs(GraphicsContext& graphicsContext, const Font& font,
 
 Path Font::platformPathForGlyph(Glyph glyph) const
 {
-    BFont bfont;
-    if (this == nullptr)
-        bfont = be_plain_font;
-    else
-        bfont = *platformData().font();
+    const BFont* font = platformData().font();
+    if (!font)
+        return Path();
 
+    BFont bfont = *font;
     BShape shape;
     char buffer[4];
     char* tmp = buffer;

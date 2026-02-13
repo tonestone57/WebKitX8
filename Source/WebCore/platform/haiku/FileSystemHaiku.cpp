@@ -151,7 +151,7 @@ PlatformFileHandle openFile(const String& path, FileOpenMode mode)
         flags = B_READ_ONLY;
         break;
     case FileOpenMode::Write:
-        flags = B_WRITE_ONLY | B_CREATE_FILE; // B_ERASE_FILE?
+        flags = B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE;
         break;
     case FileOpenMode::ReadWrite:
         flags = B_READ_WRITE | B_CREATE_FILE;
