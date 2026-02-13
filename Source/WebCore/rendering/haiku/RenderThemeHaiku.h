@@ -88,6 +88,13 @@ protected:
     bool paintMeter(const RenderElement&, const PaintInfo&, const FloatRect&) override;
     bool paintCapsLockIndicator(const RenderElement&, const PaintInfo&, const FloatRect&) override;
 
+    bool paintSearchFieldCancelButton(const RenderElement&, const PaintInfo&, const FloatRect&) override;
+    bool paintSearchFieldResultsDecoration(const RenderElement&, const PaintInfo&, const FloatRect&) override;
+
+    void adjustSearchFieldStyle(RenderStyle&, const Element*) const override;
+    void adjustSearchFieldCancelButtonStyle(RenderStyle&, const Element*) const override;
+    void adjustSearchFieldDecorationStyle(RenderStyle&, const Element*) const override;
+
     Style::PreferredSizePair controlSize(StyleAppearance, const FontCascade&, const Style::PreferredSizePair&, float) const override;
 private:
     uint32 flagsForObject(const RenderElement&) const;

@@ -201,8 +201,9 @@ Path Font::platformPathForGlyph(Glyph glyph) const
     char* tmp = buffer;
     BUnicodeChar::ToUTF8(glyph, &tmp);
 
-    // Note: GetGlyphShapes takes char array.
-    if (bfont.GetGlyphShapes(buffer, 1, &shape) != B_OK)
+    // Note: GetGlyphShapes takes char array and BShape* array.
+    BShape* shapes[1] = { &shape };
+    if (bfont.GetGlyphShapes(buffer, 1, shapes) != B_OK)
         return Path();
 
     return Path(PathHaiku::create(shape));

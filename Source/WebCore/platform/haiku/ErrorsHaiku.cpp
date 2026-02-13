@@ -97,5 +97,10 @@ ResourceError invalidPageRangeToPrint(const URL& failingURL)
     return ResourceError(String::fromUTF8(errorDomainPrint), PrintErrorInvalidPageRange, failingURL, ASCIILiteral::fromLiteralUnsafe("Invalid page range"));
 }
 
+ResourceError fileSystemError(const ResourceResponse& response)
+{
+    return ResourceError(String::fromUTF8(errorDomainNetwork), NetworkErrorFileDoesNotExist, response.url(), ASCIILiteral::fromLiteralUnsafe("File system error"));
+}
+
 } // namespace WebCore
 

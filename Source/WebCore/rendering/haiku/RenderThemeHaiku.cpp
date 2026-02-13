@@ -243,6 +243,82 @@ bool RenderThemeHaiku::paintCapsLockIndicator(const RenderElement&, const PaintI
     return true;
 }
 
+bool RenderThemeHaiku::paintSearchFieldCancelButton(const RenderElement&, const PaintInfo& info, const FloatRect& intRect)
+{
+    if (!be_control_look)
+        return true;
+
+    // Draw a simple 'x' or similar?
+    // Or simpler: just let WebCore handle it or draw standard button?
+    // Let's draw a small X in a circle.
+
+    BView* view = info.context().platformContext();
+    view->PushState();
+
+    // TODO: Use BControlLook if possible, but there isn't a standard cancel button there.
+    // For now simple drawing.
+    BRect rect(intRect);
+    view->SetHighColor(ui_color(B_CONTROL_TEXT_COLOR));
+    view->SetPenSize(2);
+
+    rect.InsetBy(2, 2);
+    view->StrokeLine(rect.LeftTop(), rect.RightBottom());
+    view->StrokeLine(rect.LeftBottom(), rect.RightTop());
+
+    view->PopState();
+    return false;
+}
+
+bool RenderThemeHaiku::paintSearchFieldResultsDecoration(const RenderElement&, const PaintInfo& info, const FloatRect& intRect)
+{
+    if (!be_control_look)
+        return true;
+
+    // Magnifier glass
+    BView* view = info.context().platformContext();
+    view->PushState();
+    BRect rect(intRect);
+    view->SetHighColor(ui_color(B_CONTROL_TEXT_COLOR));
+    view->SetPenSize(2);
+
+    // Simple circle and handle
+    float size = std::min(rect.Width(), rect.Height());
+    BPoint center = rect.Center();
+    view->StrokeEllipse(center, size/3, size/3);
+    BPoint start = center;
+    start.x += size/3 * 0.7;
+    start.y += size/3 * 0.7;
+    BPoint end = center;
+    end.x += size/2;
+    end.y += size/2;
+    view->StrokeLine(start, end);
+
+    view->PopState();
+    return false;
+}
+
+void RenderThemeHaiku::adjustSearchFieldStyle(RenderStyle& style, const Element* element) const
+{
+    adjustTextFieldStyle(style, element);
+    style.setBoxShadow(CSS::Keyword::None { });
+}
+
+void RenderThemeHaiku::adjustSearchFieldCancelButtonStyle(RenderStyle& style, const Element*) const
+{
+    style.resetBorder();
+    style.resetBorderRadius();
+    style.setPadding(WebCore::Style::PaddingEdge::Fixed { 0 }, WebCore::Style::PaddingEdge::Fixed { 0 }, WebCore::Style::PaddingEdge::Fixed { 0 }, WebCore::Style::PaddingEdge::Fixed { 0 });
+    // Keep it square
+    // style.setWidth...
+}
+
+void RenderThemeHaiku::adjustSearchFieldDecorationStyle(RenderStyle& style, const Element*) const
+{
+    style.resetBorder();
+    style.resetBorderRadius();
+    style.setPadding(WebCore::Style::PaddingEdge::Fixed { 0 }, WebCore::Style::PaddingEdge::Fixed { 0 }, WebCore::Style::PaddingEdge::Fixed { 0 }, WebCore::Style::PaddingEdge::Fixed { 0 });
+}
+
 void RenderThemeHaiku::adjustMenuListStyle(RenderStyle& style, const Element* element) const
 {
     adjustMenuListButtonStyle(style, element);

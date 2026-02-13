@@ -31,9 +31,12 @@
 
 #include <wtf/text/CString.h>
 
+#include <Directory.h>
 #include <Entry.h>
+#include <File.h>
 #include <FindDirectory.h>
 #include <Path.h>
+#include <fs_attr.h>
 
 
 namespace WebCore {
@@ -87,6 +90,134 @@ std::optional<WallTime> fileModificationTime(const String& path)
     if (entry.GetModificationTime(&time) == B_OK)
         return WallTime::fromRawSeconds(time);
     return std::nullopt;
+}
+
+bool fileExists(const String& path)
+{
+    BEntry entry(path.utf8().data());
+    return entry.Exists();
+}
+
+bool deleteNonEmptyDirectory(const String& path)
+{
+    // BEntry::Remove() handles recursive deletion for directories?
+    // "If the entry is a directory, it must be empty to be removed." - BeBook
+    // So we need to implement recursive deletion.
+
+    BDirectory dir(path.utf8().data());
+    if (dir.InitCheck() != B_OK)
+        return false;
+
+    BEntry entry;
+    while (dir.GetNextEntry(&entry) == B_OK) {
+        if (entry.IsDirectory()) {
+            BPath subPath;
+            entry.GetPath(&subPath);
+            if (!deleteNonEmptyDirectory(String::fromUTF8(subPath.Path())))
+                return false;
+        } else {
+            if (entry.Remove() != B_OK)
+                return false;
+        }
+    }
+    return dir.GetEntry(&entry) == B_OK && entry.Remove() == B_OK;
+}
+
+String pathGetFileName(const String& path)
+{
+    BPath bpath(path.utf8().data());
+    return String::fromUTF8(bpath.Leaf());
+}
+
+String directoryName(const String& path)
+{
+    BPath bpath(path.utf8().data());
+    BPath parent;
+    if (bpath.GetParent(&parent) == B_OK)
+        return String::fromUTF8(parent.Path());
+    return String();
+}
+
+bool makeAllDirectories(const String& path)
+{
+    return create_directory(path.utf8().data(), 0777) == B_OK;
+}
+
+PlatformFileHandle openFile(const String& path, FileOpenMode mode)
+{
+    int flags = 0;
+    switch (mode) {
+    case FileOpenMode::Read:
+        flags = B_READ_ONLY;
+        break;
+    case FileOpenMode::Write:
+        flags = B_WRITE_ONLY | B_CREATE_FILE; // B_ERASE_FILE?
+        break;
+    case FileOpenMode::ReadWrite:
+        flags = B_READ_WRITE | B_CREATE_FILE;
+        break;
+#if ENABLE(FILE_SYSTEM_POSIX)
+    case FileOpenMode::Append:
+        flags = B_WRITE_ONLY | B_CREATE_FILE | B_OPEN_AT_END;
+        break;
+#endif
+    }
+
+    BFile* file = new BFile(path.utf8().data(), flags);
+    if (file->InitCheck() != B_OK) {
+        delete file;
+        return invalidPlatformFileHandle;
+    }
+    return file;
+}
+
+void closeFile(PlatformFileHandle& handle)
+{
+    if (handle != invalidPlatformFileHandle) {
+        delete handle;
+        handle = invalidPlatformFileHandle;
+    }
+}
+
+long long seekFile(PlatformFileHandle handle, long long offset, FileSeekOrigin origin)
+{
+    if (handle == invalidPlatformFileHandle)
+        return -1;
+
+    int seekMode = SEEK_SET;
+    switch (origin) {
+    case FileSeekOrigin::Beginning:
+        seekMode = SEEK_SET;
+        break;
+    case FileSeekOrigin::Current:
+        seekMode = SEEK_CUR;
+        break;
+    case FileSeekOrigin::End:
+        seekMode = SEEK_END;
+        break;
+    }
+
+    return handle->Seek(offset, seekMode);
+}
+
+int writeToFile(PlatformFileHandle handle, const void* data, int length)
+{
+    if (handle == invalidPlatformFileHandle)
+        return -1;
+    return handle->Write(data, length);
+}
+
+int readFromFile(PlatformFileHandle handle, void* data, int length)
+{
+    if (handle == invalidPlatformFileHandle)
+        return -1;
+    return handle->Read(data, length);
+}
+
+bool fileIsDirectory(const String& path)
+{
+    BEntry entry(path.utf8().data());
+    return entry.IsDirectory();
 }
 
 } // namespace FileSystem
