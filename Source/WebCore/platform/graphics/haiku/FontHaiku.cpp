@@ -35,10 +35,12 @@
 #include "NotImplemented.h"
 #include <wtf/text/CString.h>
 #include <Font.h>
+#include <Shape.h>
 #include <String.h>
 #include <UnicodeChar.h>
 #include <View.h>
 
+#include "PathHaiku.h"
 
 namespace WebCore {
 
@@ -101,9 +103,22 @@ void FontCascade::drawGlyphs(GraphicsContext& graphicsContext, const Font& font,
 
 Path Font::platformPathForGlyph(Glyph glyph) const
 {
-	UNUSED_PARAM(glyph);
-	
-	return Path();
+    BFont bfont;
+    if (this == nullptr)
+        bfont = be_plain_font;
+    else
+        bfont = *platformData().font();
+
+    BShape shape;
+    char buffer[4];
+    char* tmp = buffer;
+    BUnicodeChar::ToUTF8(glyph, &tmp);
+
+    // Note: GetGlyphShapes takes char array.
+    if (bfont.GetGlyphShapes(buffer, 1, &shape) != B_OK)
+        return Path();
+
+    return Path(PathHaiku::create(shape));
 }
 
 bool FontCascade::canUseGlyphDisplayList(const RenderStyle&)

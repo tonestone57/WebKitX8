@@ -250,4 +250,39 @@ String fileButtonReplaceButtonLabel() { return "Replace"_s; }
 
 String unsupportedPluginText() { return "Unsupported Plug-in"_s; }
 
+String contextMenuItemTagBold()
+{
+    return "Bold"_s;
+}
+
+String contextMenuItemTagItalic()
+{
+    return "Italic"_s;
+}
+
+String contextMenuItemTagUnderline()
+{
+    return "Underline"_s;
+}
+
+String contextMenuItemTagOutline()
+{
+    return "Outline"_s;
+}
+
+String contextMenuItemTagLeftToRight()
+{
+    return "Left to Right"_s;
+}
+
+String contextMenuItemTagRightToLeft()
+{
+    return "Right to Left"_s;
+}
+
+String contextMenuItemTagDefaultDirection()
+{
+    return "Default Direction"_s;
+}
+
 } // namespace WebCore

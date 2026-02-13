@@ -35,6 +35,7 @@
 #include "PaintInfo.h"
 #include "RenderBox.h"
 #include "RenderElement.h"
+#include "RenderProgress.h"
 #include "RenderStyle+SettersInlines.h"
 #include "UserAgentScripts.h"
 #include "UserAgentStyleSheets.h"
@@ -277,6 +278,74 @@ bool RenderThemeHaiku::paintButton(const RenderElement& object, const PaintInfo&
 
     be_control_look->DrawButtonFrame(view, rect, view->Bounds(), base, view->ViewColor(), flags);
     be_control_look->DrawButtonBackground(view, rect, view->Bounds(), base, flags);
+
+    return false;
+}
+
+bool RenderThemeHaiku::paintProgressBar(const RenderElement& object, const PaintInfo& info, const FloatRect& intRect)
+{
+    if (!be_control_look)
+        return true;
+
+    if (!is<RenderProgress>(object))
+        return true;
+
+    const auto& renderProgress = downcast<RenderProgress>(object);
+    double position = renderProgress.position();
+
+    rgb_color base = colorForValue(B_CONTROL_BACKGROUND_COLOR, object.useDarkAppearance());
+    rgb_color barColor = colorForValue(B_CONTROL_HIGHLIGHT_COLOR, object.useDarkAppearance());
+
+    BRect rect(intRect);
+    BView* view = info.context().platformContext();
+
+    view->PushState();
+    be_control_look->DrawBorder(view, rect, view->Bounds(), base, B_PLAIN_BORDER);
+    rect.InsetBy(1, 1);
+
+    view->SetHighColor(base);
+    view->FillRect(rect);
+
+    if (position > 0) {
+        BRect barRect = rect;
+        barRect.right = barRect.left + barRect.Width() * position;
+        view->SetHighColor(barColor);
+        view->FillRect(barRect);
+    }
+    view->PopState();
+
+    return false;
+}
+
+bool RenderThemeHaiku::paintSearchField(const RenderElement& object, const PaintInfo& info, const FloatRect& intRect)
+{
+    return paintTextField(object, info, intRect);
+}
+
+bool RenderThemeHaiku::paintInnerSpinButton(const RenderElement& object, const PaintInfo& info, const FloatRect& intRect)
+{
+    if (!be_control_look)
+        return true;
+
+    rgb_color base = colorForValue(B_CONTROL_BACKGROUND_COLOR, object.useDarkAppearance());
+    BRect rect(intRect);
+    BView* view = info.context().platformContext();
+    uint32 flags = flagsForObject(object);
+
+    BRect topRect = rect;
+    topRect.bottom = topRect.top + topRect.Height() / 2;
+    BRect bottomRect = rect;
+    bottomRect.top = topRect.bottom + 1;
+
+    view->PushState();
+    be_control_look->DrawButtonFrame(view, topRect, view->Bounds(), base, view->ViewColor(), flags);
+    be_control_look->DrawButtonBackground(view, topRect, view->Bounds(), base, flags);
+    be_control_look->DrawArrowShape(view, topRect, view->Bounds(), base, BControlLook::B_UP_ARROW, flags, B_DARKEN_MAX_TINT);
+
+    be_control_look->DrawButtonFrame(view, bottomRect, view->Bounds(), base, view->ViewColor(), flags);
+    be_control_look->DrawButtonBackground(view, bottomRect, view->Bounds(), base, flags);
+    be_control_look->DrawArrowShape(view, bottomRect, view->Bounds(), base, BControlLook::B_DOWN_ARROW, flags, B_DARKEN_MAX_TINT);
+    view->PopState();
 
     return false;
 }

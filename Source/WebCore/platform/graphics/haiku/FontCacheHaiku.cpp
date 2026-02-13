@@ -40,6 +40,7 @@
 #include <Font.h>
 #include <String.h>
 #include <interface/Font.h>
+#include <string.h>
 
 namespace WebCore {
 
@@ -101,19 +102,42 @@ Vector<FontSelectionCapabilities> FontCache::getFontSelectionCapabilitiesInFamil
 {
     Vector<FontSelectionCapabilities> result;
 
-#if 0
-    int32 count = count_font_styles(familyName);
+    font_family family;
+    strncpy(family, familyName.string().utf8().data(), B_FONT_FAMILY_LENGTH);
+    family[B_FONT_FAMILY_LENGTH] = 0;
+
+    int32 count = count_font_styles(family);
+    if (count <= 0)
+        return result;
 
     result.reserveInitialCapacity(count);
 
-    font_style nativeStyle;
+    font_style style;
+    for (int index = 0; index < count; index++) {
+        if (get_font_style(family, index, &style) == B_OK) {
+             FontSelectionCapabilities capabilities;
+             String styleString = String::fromUTF8(style);
 
-    for (int index = 0; index < count; index++)
-    {
-        get_font_style(familyName, index, &nativeStyle);
-        result.uncheckedAppend(nativeStyle);
+             // Default
+             capabilities.weight = FontSelectionValue(400);
+             capabilities.width = FontSelectionValue(100);
+             capabilities.slope = FontSelectionValue(0); // Normal
+
+             if (styleString.contains("Bold")) capabilities.weight = FontSelectionValue(700);
+             if (styleString.contains("Thin")) capabilities.weight = FontSelectionValue(100);
+             if (styleString.contains("Light")) capabilities.weight = FontSelectionValue(300);
+             if (styleString.contains("Medium")) capabilities.weight = FontSelectionValue(500);
+             if (styleString.contains("Black")) capabilities.weight = FontSelectionValue(900);
+
+             if (styleString.contains("Italic") || styleString.contains("Oblique"))
+                 capabilities.slope = FontSelectionValue(20); // Italic
+
+             if (styleString.contains("Condensed")) capabilities.width = FontSelectionValue(75);
+             if (styleString.contains("Expanded")) capabilities.width = FontSelectionValue(125);
+
+             result.append(capabilities);
+        }
     }
-#endif
     return result;
 }
 

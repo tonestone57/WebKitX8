@@ -80,6 +80,10 @@ protected:
     bool paintRadio(const RenderElement&, const PaintInfo&, const FloatRect&) override;
     bool paintButton(const RenderElement&, const PaintInfo&, const FloatRect&) override;
 
+    bool paintProgressBar(const RenderElement&, const PaintInfo&, const FloatRect&) override;
+    bool paintSearchField(const RenderElement&, const PaintInfo&, const FloatRect&) override;
+    bool paintInnerSpinButton(const RenderElement&, const PaintInfo&, const FloatRect&) override;
+
     Style::PreferredSizePair controlSize(StyleAppearance, const FontCascade&, const Style::PreferredSizePair&, float) const override;
 private:
     uint32 flagsForObject(const RenderElement&) const;
