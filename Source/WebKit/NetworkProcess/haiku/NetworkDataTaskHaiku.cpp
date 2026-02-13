@@ -255,6 +255,10 @@ void NetworkDataTaskHaiku::HeadersReceived(BUrlRequest* caller)
         }
 
         if (statusCode == 401) {
+            if (m_storedCredentialsPolicy == StoredCredentialsPolicy::Use) {
+                // If we have stored credentials, we might have used them?
+                // Or we should ask the client.
+            }
             AuthenticationNeeded(dynamic_cast<BHttpRequest*>(m_request), response);
             // AuthenticationNeeded may have aborted the request
             // so we need to make sure we can continue.
@@ -284,6 +288,10 @@ void NetworkDataTaskHaiku::HeadersReceived(BUrlRequest* caller)
         ResourceRequest request = m_currentRequest;
         ResourceResponse responseCopy = response;
         request.setURL(url);
+
+        if (m_shouldClearReferrerOnHTTPSToHTTPRedirect && responseCopy.url().protocolIs("https"_s) && request.url().protocolIs("http"_s))
+            request.clearHTTPReferrer();
+
         m_client->willPerformHTTPRedirection(WTFMove(responseCopy),WTFMove(request),
             [this](const ResourceRequest& newRequest)
             {
@@ -337,10 +345,16 @@ void NetworkDataTaskHaiku::DataReceived(BUrlRequest* caller, const char* data, o
 void NetworkDataTaskHaiku::BytesWritten(BUrlRequest* caller, size_t size)
 {
     // Handled by NetworkDataOutput::Write
+    if (m_client)
+        m_client->didSendData(size, 0); // Total bytes to be sent unknown here?
 }
 
 void NetworkDataTaskHaiku::UploadProgress(BUrlRequest* caller, off_t bytesSent, off_t bytesTotal)
 {
+    if (m_client && bytesTotal > 0) {
+        // FIXME: Calculate delta bytes sent and call m_client->didSendData.
+        // This requires tracking previous bytesSent in a member variable.
+    }
 }
 
 void NetworkDataTaskHaiku::RequestCompleted(BUrlRequest* caller, bool success)
@@ -375,6 +389,10 @@ void NetworkDataTaskHaiku::RequestCompleted(BUrlRequest* caller, bool success)
 
 bool NetworkDataTaskHaiku::CertificateVerificationFailed(BUrlRequest* caller, BCertificate& certificate, const char* message)
 {
+    // Return true to continue, false to abort.
+    // Ideally we should ask the client.
+    // For now, fail securely.
+    // FIXME: Implement proper verification via client using didReceiveAuthenticationChallenge
     return false;
 }
 

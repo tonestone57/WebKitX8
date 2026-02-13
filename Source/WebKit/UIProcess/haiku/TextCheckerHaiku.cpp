@@ -115,7 +115,6 @@ void TextChecker::ignoreWord(SpellDocumentTag, const String& word)
 void TextChecker::requestCheckingOfString(Ref<TextCheckerCompletion>&& completion, int32_t)
 {
     // FIXME: Implement background checking
-    notImplemented();
     completion->didFinishCheckingText({ });
 }
 

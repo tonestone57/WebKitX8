@@ -35,6 +35,7 @@
 #include "PaintInfo.h"
 #include "RenderBox.h"
 #include "RenderElement.h"
+#include "RenderProgress.h"
 #include "RenderStyle+SettersInlines.h"
 #include "UserAgentScripts.h"
 #include "UserAgentStyleSheets.h"
@@ -179,6 +180,11 @@ bool RenderThemeHaiku::paintTextField(const RenderElement& object, const PaintIn
     return false;
 }
 
+bool RenderThemeHaiku::paintSearchField(const RenderElement& object, const PaintInfo& info, const FloatRect& intRect)
+{
+    return paintTextField(object, info, intRect);
+}
+
 void RenderThemeHaiku::adjustTextAreaStyle(RenderStyle& style, const Element* element) const
 {
 	adjustTextFieldStyle(style, element);
@@ -187,6 +193,39 @@ void RenderThemeHaiku::adjustTextAreaStyle(RenderStyle& style, const Element* el
 bool RenderThemeHaiku::paintTextArea(const RenderElement& object, const PaintInfo& info, const FloatRect& intRect)
 {
     return paintTextField(object, info, intRect);
+}
+
+bool RenderThemeHaiku::paintProgressBar(const RenderElement& object, const PaintInfo& info, const FloatRect& intRect)
+{
+    if (info.context().paintingDisabled())
+        return true;
+
+    BRect rect(intRect);
+    BView* view = info.context().platformContext();
+    rgb_color base = colorForValue(B_CONTROL_BACKGROUND_COLOR, object.useDarkAppearance());
+    rgb_color barColor = ui_color(B_SUCCESS_COLOR); // Use success color for progress
+
+    // Draw the track (background)
+    view->SetHighColor(tint_color(base, B_DARKEN_1_TINT));
+    view->StrokeRect(rect);
+    rect.InsetBy(1, 1);
+    view->SetHighColor(tint_color(base, B_LIGHTEN_2_TINT));
+    view->FillRect(rect);
+
+    // Draw the progress bar
+    if (object.isProgress()) {
+        const auto& progress = downcast<RenderProgress>(object);
+        double position = progress.position();
+        if (position > 0) {
+            BRect progressRect = rect;
+            progressRect.right = progressRect.left + progressRect.Width() * position;
+            view->SetHighColor(barColor);
+            view->FillRect(progressRect);
+        }
+        // FIXME: Handle indeterminate state animation?
+    }
+
+    return false;
 }
 
 void RenderThemeHaiku::adjustMenuListStyle(RenderStyle& style, const Element* element) const

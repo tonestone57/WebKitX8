@@ -72,11 +72,6 @@ void NetworkStorageSession::setCookiesFromDOM(const URL& firstParty,
     BPrivate::Network::BNetworkCookie* heapCookie
         = new BPrivate::Network::BNetworkCookie(value, BUrl(url));
 
-#if TRACE_COOKIE_JAR
-    printf("CookieJar: Add %s for %s\n", heapCookie->RawCookie(true).String(),
-        url.string().utf8().data());
-    printf("  from %s\n", value.utf8().data());
-#endif
     platformSession().GetCookieJar().AddCookie(heapCookie);
 }
 
@@ -91,10 +86,6 @@ std::pair<String, bool> NetworkStorageSession::cookiesForDOM(const URL& firstPar
         IncludeSecureCookies includeSecureCookies, ApplyTrackingPrevention,
         ShouldRelaxThirdPartyCookieBlocking) const
 {
-#if TRACE_COOKIE_JAR
-	printf("CookieJar: Request for %s\n", url.string().utf8().data());
-#endif
-
 	BString result;
 	BUrl hUrl(url);
 	bool secure = false;
@@ -186,7 +177,21 @@ void NetworkStorageSession::deleteAllCookies(WTF::CompletionHandler<void()>&& co
 
 void NetworkStorageSession::deleteAllCookiesModifiedSince(WallTime since, WTF::CompletionHandler<void()>&& completionHandler)
 {
-    // FIXME: Implement time-based deletion
+    BPrivate::Network::BNetworkCookieJar::Iterator it(platformSession().GetCookieJar().GetIterator());
+    const BPrivate::Network::BNetworkCookie* c;
+    Vector<const BPrivate::Network::BNetworkCookie*> cookiesToRemove;
+
+    time_t sinceTime = static_cast<time_t>(since.secondsSinceEpoch().seconds());
+
+    while ((c = it.Next())) {
+        if (c->LastAccessTime() >= sinceTime || c->CreationTime() >= sinceTime) {
+            cookiesToRemove.append(c);
+        }
+    }
+
+    for (auto* cookie : cookiesToRemove) {
+        platformSession().GetCookieJar().RemoveCookie(cookie);
+    }
     completionHandler();
 }
 
@@ -267,13 +272,13 @@ Vector<Cookie> NetworkStorageSession::getCookies(const URL& url)
 
 void NetworkStorageSession::hasCookies(const RegistrableDomain& domain, CompletionHandler<void(bool)>&& completionHandler) const
 {
-    // BNetworkCookieJar doesn't seem to have a direct "has cookies for domain" check.
-    // We can iterate.
     BPrivate::Network::BNetworkCookieJar::Iterator it(platformSession().GetCookieJar().GetIterator());
     const BPrivate::Network::BNetworkCookie* c;
     bool found = false;
+    // FIXME: BNetworkCookie domain matching might be more complex (subdomains).
+    // This simple string match assumes exact domain or parent domain logic is handled elsewhere or acceptable.
     while ((c = it.Next())) {
-        if (String::fromUTF8(c->Domain()) == domain.string()) {
+        if (String::fromUTF8(c->Domain()).endsWith(domain.string())) {
             found = true;
             break;
         }
@@ -285,9 +290,6 @@ bool NetworkStorageSession::getRawCookies(const URL& firstParty,
 	const SameSiteInfo& sameSiteInfo, const URL& url, std::optional<FrameIdentifier> frameID,
 	std::optional<PageIdentifier> pageID, ApplyTrackingPrevention, ShouldRelaxThirdPartyCookieBlocking, Vector<Cookie>& rawCookies) const
 {
-#if TRACE_COOKIE_JAR
-	printf("CookieJar: get raw cookies for %s\n", url.string().utf8().data());
-#endif
     rawCookies.clear();
 
     BUrl hUrl(url);
@@ -318,10 +320,6 @@ std::pair<String, bool> NetworkStorageSession::cookieRequestHeaderFieldValue(con
 	std::optional<PageIdentifier> pageID, IncludeSecureCookies includeSecureCookies, ApplyTrackingPrevention,
 	ShouldRelaxThirdPartyCookieBlocking) const
 {
-#if TRACE_COOKIE_JAR
-	printf("CookieJar: RequestHeaderField for %s\n", url.string().utf8().data());
-#endif
-
 	BString result;
 	BUrl hUrl(url);
 	bool secure = false;

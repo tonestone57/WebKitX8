@@ -172,6 +172,10 @@ void RemoteWebInspectorUIProxy::platformLoad(const String& path, CompletionHandl
 
 void RemoteWebInspectorUIProxy::platformPickColorFromScreen(CompletionHandler<void(const std::optional<WebCore::Color>&)>&& completionHandler)
 {
+    // FIXME: Implement screen color picking (maybe using Magnify kit or BScreen)
+    // For now, let's just return a placeholder or notify impossibility.
+    // BAlert* alert = new BAlert("Pick Color", "Screen color picking is not yet implemented.", "OK");
+    // alert->Go(nullptr);
     notImplemented();
     completionHandler(std::nullopt);
 }

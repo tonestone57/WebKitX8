@@ -358,9 +358,8 @@ void PageClientImpl::printFrame(WebFrameProxy& frame)
     if (!fWebView.LockLooper())
         return;
 
-    auto printJob = new BPrintJob("WebKit Page");
+    auto printJob = std::make_shared<BPrintJob>("WebKit Page");
     if (printJob->ConfigJob() != B_OK) {
-        delete printJob;
         fWebView.UnlockLooper();
         return;
     }
@@ -380,10 +379,8 @@ void PageClientImpl::printFrame(WebFrameProxy& frame)
         WebCore::FloatBoxExtent(marginTop, marginRight, marginBottom, marginLeft));
 
     auto page = fWebView.page();
-    if (!page) {
-        delete printJob;
+    if (!page)
         return;
-    }
 
     page->beginPrinting(&frame, printInfo);
 
@@ -416,7 +413,6 @@ void PageClientImpl::printFrame(WebFrameProxy& frame)
                         printJob->CommitJob();
                     }
                     page->endPrinting();
-                    delete printJob;
                     for (auto* b : *bitmaps)
                         delete b;
                     return;
