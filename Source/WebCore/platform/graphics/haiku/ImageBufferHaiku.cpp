@@ -211,9 +211,52 @@ Vector<uint8_t> encodeData(BBitmap* bitmap, const String& mimeType, std::optiona
     delete[] translators;
 
 
-    BMallocIO translatedStream;
-        // BBitmapStream doesn't take "const Bitmap*"...
+    // BBitmapStream doesn't take "const Bitmap*"...
     BBitmapStream bitmapStream(bitmap);
+
+    class VectorPositionIO : public BPositionIO {
+    public:
+        VectorPositionIO(Vector<uint8_t>& vector) : m_vector(vector), m_position(0) {}
+
+        ssize_t Read(void* buffer, size_t size) override { return B_NOT_ALLOWED; }
+        ssize_t Write(const void* buffer, size_t size) override {
+            size_t newSize = m_position + size;
+            if (newSize > m_vector.size())
+                m_vector.grow(newSize);
+            // grow() reserves capacity but doesn't change size? No, grow() usually ensures capacity.
+            // resize() changes size.
+            // We want to update size.
+            if (newSize > m_vector.size())
+                 m_vector.resize(newSize);
+
+            memcpy(m_vector.data() + m_position, buffer, size);
+            m_position += size;
+            return size;
+        }
+
+        off_t Seek(off_t position, uint32 seekMode) override {
+            switch (seekMode) {
+                case SEEK_SET: m_position = position; break;
+                case SEEK_CUR: m_position += position; break;
+                case SEEK_END: m_position = m_vector.size() + position; break;
+            }
+            return m_position;
+        }
+        off_t Position() const override { return m_position; }
+
+        status_t SetSize(off_t size) override {
+            m_vector.resize(size);
+            return B_OK;
+        }
+
+    private:
+        Vector<uint8_t>& m_vector;
+        off_t m_position;
+    };
+
+    Vector<uint8_t> result;
+    VectorPositionIO translatedStream(result);
+
     BBitmap* tmp = NULL;
     if (roster->Translate(&bitmapStream, 0, 0, &translatedStream, translatorType,
                           B_TRANSLATOR_BITMAP, mimeType.utf8().data()) != B_OK) {
@@ -222,13 +265,6 @@ Vector<uint8_t> encodeData(BBitmap* bitmap, const String& mimeType, std::optiona
     }
 
     bitmapStream.DetachBitmap(&tmp);
-
-    // FIXME we could use a BVectorIO to avoid an extra copy here
-    Vector<uint8_t> result;
-    off_t size;
-    translatedStream.GetSize(&size);
-    result.append(std::span<uint8_t>((uint8_t*)translatedStream.Buffer(), size));
-
     return result;
 }
 

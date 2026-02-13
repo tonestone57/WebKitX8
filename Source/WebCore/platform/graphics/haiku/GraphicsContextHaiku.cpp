@@ -194,8 +194,13 @@ void GraphicsContextHaiku::drawEllipse(const FloatRect& rect)
     }
 
     if (strokeStyle() != WebCore::StrokeStyle::NoStroke && strokeThickness() > 0.0f && strokeColor().isVisible()) {
-        // TODO: Gradient stroke
-        m_view->StrokeEllipse(rect, m_strokeStyle);
+        if (m_state.strokeBrush().gradient()) {
+            BShape shape;
+            shape.AddEllipse(rect);
+            const BGradient& gradient = m_state.strokeBrush().gradient()->getHaikuGradient();
+            m_view->StrokeShape(&shape, gradient);
+        } else
+            m_view->StrokeEllipse(rect, m_strokeStyle);
     }
 }
 
@@ -205,9 +210,32 @@ void GraphicsContextHaiku::strokeRect(const FloatRect& rect, float width)
     if (strokeStyle() == WebCore::StrokeStyle::NoStroke || width <= 0.0f || !strokeColor().isVisible())
         return;
 
+    if (hasDropShadow()) {
+        const auto shadow = dropShadow();
+        ShadowBlur contextShadow(*shadow, shadowsIgnoreTransforms());
+        FloatRect shadowRect = rect;
+        shadowRect.inflate(width / 2.0f);
+        contextShadow.drawShadowLayer(getCTM(), clipBounds(), shadowRect,
+            [&](GraphicsContext& shadowContext) {
+                shadowContext.setStrokeColor(Color::black);
+                shadowContext.setStrokeThickness(width);
+                shadowContext.strokeRect(rect, width);
+            },
+            [&](ImageBuffer& buffer, const FloatPoint& p, const FloatSize& s) {
+                this->drawImageBuffer(buffer, FloatRect(p, s), FloatRect(FloatPoint(), s), { CompositeOperator::SourceOver });
+            });
+    }
+
+    if (m_state.strokeBrush().gradient()) {
+        BShape shape;
+        shape.AddRect(rect);
+        const BGradient& gradient = m_state.strokeBrush().gradient()->getHaikuGradient();
+        m_view->StrokeShape(&shape, gradient);
+        return;
+    }
+
     float oldSize = m_view->PenSize();
     m_view->SetPenSize(width);
-    // TODO stroke the shadow
     m_view->StrokeRect(rect, m_strokeStyle);
     m_view->SetPenSize(oldSize);
 }
@@ -217,7 +245,21 @@ void GraphicsContextHaiku::strokePath(const Path& path)
     HGTRACE(("strokePath: (--todo print values)\n"));
     m_view->MovePenTo(B_ORIGIN);
 
-    // TODO: stroke the shadow (cf shadowAndStrokeCurrentCairoPath)
+    if (hasDropShadow()) {
+        const auto shadow = dropShadow();
+        ShadowBlur contextShadow(*shadow, shadowsIgnoreTransforms());
+        FloatRect shadowRect = path.boundingRect();
+        shadowRect.inflate(strokeThickness() / 2.0f);
+        contextShadow.drawShadowLayer(getCTM(), clipBounds(), shadowRect,
+            [&](GraphicsContext& shadowContext) {
+                shadowContext.setStrokeColor(Color::black);
+                shadowContext.setStrokeThickness(strokeThickness());
+                shadowContext.strokePath(path);
+            },
+            [&](ImageBuffer& buffer, const FloatPoint& p, const FloatSize& s) {
+                this->drawImageBuffer(buffer, FloatRect(p, s), FloatRect(FloatPoint(), s), { CompositeOperator::SourceOver });
+            });
+    }
 
     if (m_state.strokeBrush().pattern()) {
         // Fallback to solid color for now
@@ -398,7 +440,19 @@ void GraphicsContextHaiku::fillPath(const Path& path)
     m_view->SetFillRule(fillRule() == WindRule::NonZero ? B_NONZERO : B_EVEN_ODD);
     m_view->MovePenTo(B_ORIGIN);
 
-    // TODO: Render the shadow (cf shadowAndFillCurrentCairoPath)
+    if (hasDropShadow()) {
+        const auto shadow = dropShadow();
+        ShadowBlur contextShadow(*shadow, shadowsIgnoreTransforms());
+        contextShadow.drawShadowLayer(getCTM(), clipBounds(), path.boundingRect(),
+            [&](GraphicsContext& shadowContext) {
+                shadowContext.setFillColor(Color::black);
+                shadowContext.fillPath(path);
+            },
+            [&](ImageBuffer& buffer, const FloatPoint& p, const FloatSize& s) {
+                this->drawImageBuffer(buffer, FloatRect(p, s), FloatRect(FloatPoint(), s), { CompositeOperator::SourceOver });
+            });
+    }
+
     drawing_mode mode = m_view->DrawingMode();
 
     if (m_state.fillBrush().pattern()) {

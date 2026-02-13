@@ -211,13 +211,10 @@ FontPlatformData::SetFallBackStandardFont(const BString& font)
 	strlcpy(m_FallbackStandardFontFamily, font.String(), B_FONT_FAMILY_LENGTH);
 }
 
-RefPtr<SharedBuffer> FontPlatformData::openTypeTable(uint32_t table) const
+RefPtr<SharedBuffer> FontPlatformData::openTypeTable(uint32_t) const
 {
-	UNUSED_PARAM(table);
-    // FIXME: Implement accessing raw font table data.
-    // Haiku BFont does not expose raw table access directly.
-    notImplemented();
-	return nullptr;
+    // Haiku BFont API does not provide access to raw OpenType tables.
+    return nullptr;
 }
 
 String FontPlatformData::description() const

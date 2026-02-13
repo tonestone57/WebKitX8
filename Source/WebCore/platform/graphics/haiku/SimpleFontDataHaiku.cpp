@@ -65,9 +65,7 @@ void Font::platformInit()
     BRect rect;
     font->GetBoundingBoxesAsGlyphs("x", 1, B_SCREEN_METRIC, &rect);
 
-    m_fontMetrics.setXHeight(rect.Height() / 1.25);
-        // FIXME we shouldn't need to divide here, but it passes this test:
-        // css2.1/20110323/c541-word-sp-000.htm
+    m_fontMetrics.setXHeight(rect.Height());
 }
 
 void Font::platformCharWidthInit()
@@ -89,7 +87,7 @@ RefPtr<Font> Font::platformCreateScaledFont(const FontDescription& fontDescripti
 
 RefPtr<Font> Font::platformCreateHalfWidthFont() const
 {
-    // FIXME: https://bugs.webkit.org/show_bug.cgi?id=281333 : implement half width font for this platform.
+    // Haiku does not support creating a half-width variant of a font directly.
     return nullptr;
 }
 

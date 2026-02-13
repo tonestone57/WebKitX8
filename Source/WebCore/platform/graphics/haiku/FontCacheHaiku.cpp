@@ -48,14 +48,54 @@ void FontCache::platformInit()
 }
 
 
+static bool fontHasGlyphs(const font_family& family, const StringView& text)
+{
+    BFont font;
+    if (font.SetFamilyAndStyle(family, nullptr) != B_OK)
+        return false;
+
+    String string = text.toString();
+    CString utf8 = string.utf8();
+    // Check if the font has the first character of the cluster
+    // This is a simplification, but often sufficient for fallback
+    bool hasGlyph = false;
+    font.GetHasGlyphs(utf8.data(), 1, &hasGlyph);
+    return hasGlyph;
+}
+
 RefPtr<Font> FontCache::systemFallbackForCharacterCluster(const FontDescription& description,
 	const Font& /*originalFontData*/, WebCore::IsForPlatformFont,
-	WebCore::FontCache::PreferColoredFont, StringView)
+	WebCore::FontCache::PreferColoredFont, StringView text)
 {
+    // List of fallback families to try
+    const char* fallbackFamilies[] = {
+        "Noto Sans",
+        "Noto Serif",
+        "Noto Sans CJK JP",
+        "Noto Sans CJK SC",
+        "Noto Sans CJK TC",
+        "Noto Sans CJK KR",
+        "Noto Sans Symbols",
+        "DejaVu Sans",
+        "VL Gothic",
+        "IPAGothic",
+        "WenQuanYi Micro Hei",
+        "Sans"
+    };
+
+    // Try to find a font that supports the character
+    for (const char* family : fallbackFamilies) {
+        font_family bFamily;
+        if (BFont().SetFamilyAndStyle(family, nullptr) == B_OK) {
+             strncpy(bFamily, family, B_FONT_FAMILY_LENGTH);
+             if (fontHasGlyphs(bFamily, text)) {
+                 FontPlatformData data(description, AtomString::fromUTF8(family));
+                 return fontForPlatformData(data);
+             }
+        }
+    }
+
     FontPlatformData data(description, AtomString::fromUTF8("Sans"));
-        // FIXME check that the requested characters are actually available,
-        // and try to use the other info in the arguments (should this be
-        // monospace, etc)
     return fontForPlatformData(data);
 }
 
@@ -110,24 +150,43 @@ Vector<FontSelectionCapabilities> FontCache::getFontSelectionCapabilitiesInFamil
         font_style nativeStyle;
         uint32 flags = 0;
         if (get_font_style(familyName.string().utf8().data(), index, &nativeStyle, &flags) == B_OK) {
-            // Map Haiku font style to FontSelectionCapabilities
-            // Haiku doesn't expose weight/stretch/slope directly in a standard way except via name or flags
-            // But for now, we can try to guess or just return default capabilities if we can't parse it.
-            // Actually, FontSelectionCapabilities expects weight/width/slope ranges.
-
-            // FIXME: Properly parse style name or flags to Determine weight/width/slope.
-            // For now, we will add a default capability which implies the font is available.
-            // Or we can try to use BFont to inspect it if possible.
-
             FontSelectionCapabilities capabilities;
 
-            // Simple heuristics based on style name
             String style = String::fromUTF8(nativeStyle);
-            if (style.containsIgnoringASCIICase("Bold"_s)) {
-                capabilities.weight = { FontSelectionValue(700), FontSelectionValue(700), FontSelectionValue(700) };
-            }
+
+            // Weight
+            int weight = 400;
+            if (style.containsIgnoringASCIICase("Thin"_s)) weight = 100;
+            else if (style.containsIgnoringASCIICase("Extra Light"_s) || style.containsIgnoringASCIICase("Ultra Light"_s)) weight = 200;
+            else if (style.containsIgnoringASCIICase("Light"_s)) weight = 300;
+            else if (style.containsIgnoringASCIICase("Medium"_s)) weight = 500;
+            else if (style.containsIgnoringASCIICase("Semi Bold"_s) || style.containsIgnoringASCIICase("Demi Bold"_s)) weight = 600;
+            else if (style.containsIgnoringASCIICase("Bold"_s)) weight = 700;
+            else if (style.containsIgnoringASCIICase("Extra Bold"_s) || style.containsIgnoringASCIICase("Ultra Bold"_s)) weight = 800;
+            else if (style.containsIgnoringASCIICase("Black"_s) || style.containsIgnoringASCIICase("Heavy"_s)) weight = 900;
+
+            capabilities.weight = { FontSelectionValue(weight), FontSelectionValue(weight), FontSelectionValue(weight) };
+
+            // Width/Stretch
+            int width = 100; // Normal
+            // FontSelectionValue for width: UltraCondensed = 50, Normal = 100, UltraExpanded = 200?
+            // WebKit uses: UltraCondensed=50, ExtraCondensed=62.5, Condensed=75, SemiCondensed=87.5, Normal=100...
+            if (style.containsIgnoringASCIICase("Ultra Condensed"_s)) width = 50;
+            else if (style.containsIgnoringASCIICase("Extra Condensed"_s)) width = 63;
+            else if (style.containsIgnoringASCIICase("Condensed"_s)) width = 75;
+            else if (style.containsIgnoringASCIICase("Semi Condensed"_s)) width = 88;
+            else if (style.containsIgnoringASCIICase("Semi Expanded"_s)) width = 113;
+            else if (style.containsIgnoringASCIICase("Expanded"_s)) width = 125;
+            else if (style.containsIgnoringASCIICase("Extra Expanded"_s)) width = 150;
+            else if (style.containsIgnoringASCIICase("Ultra Expanded"_s)) width = 200;
+
+            capabilities.width = { FontSelectionValue(width), FontSelectionValue(width), FontSelectionValue(width) };
+
+            // Slope
             if (style.containsIgnoringASCIICase("Italic"_s) || style.containsIgnoringASCIICase("Oblique"_s)) {
                 capabilities.slope = { FontSelectionValue::italic(), FontSelectionValue::italic(), FontSelectionValue::italic() };
+            } else {
+                 capabilities.slope = { FontSelectionValue::normal(), FontSelectionValue::normal(), FontSelectionValue::normal() };
             }
 
             result.append(capabilities);
