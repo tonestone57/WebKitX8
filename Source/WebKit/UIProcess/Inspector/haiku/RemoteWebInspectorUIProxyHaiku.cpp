@@ -52,17 +52,55 @@ class InspectorWindow : public BWindow {
 public:
     InspectorWindow(BRect frame)
         : BWindow(frame, "Web Inspector", B_TITLED_WINDOW, B_ASYNCHRONOUS_CONTROLS | B_QUIT_ON_WINDOW_CLOSE)
+        , m_filePanel(nullptr)
     {
+    }
+
+    ~InspectorWindow()
+    {
+        delete m_filePanel;
     }
 
     void MessageReceived(BMessage* message) override
     {
         switch (message->what) {
+        case B_SAVE_REQUESTED:
+            handleSaveRequest(message);
+            break;
         default:
             BWindow::MessageReceived(message);
             break;
         }
     }
+
+    void save(const String& suggestedURL, const String& content, bool forceSaveAs)
+    {
+        m_saveContent = content;
+
+        if (!m_filePanel)
+            m_filePanel = new BFilePanel(B_SAVE_PANEL, new BMessenger(this));
+
+        if (!suggestedURL.isEmpty())
+            m_filePanel->SetSaveText(suggestedURL.utf8().data());
+
+        m_filePanel->Show();
+    }
+
+private:
+    void handleSaveRequest(BMessage* message)
+    {
+        entry_ref ref;
+        const char* name;
+        if (message->FindRef("directory", &ref) == B_OK && message->FindString("name", &name) == B_OK) {
+            BDirectory dir(&ref);
+            BFile file(&dir, name, B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
+            if (file.InitCheck() == B_OK)
+                file.Write(m_saveContent.utf8().data(), m_saveContent.utf8().length());
+        }
+    }
+
+    BFilePanel* m_filePanel;
+    String m_saveContent;
 };
 
 WebPageProxy* RemoteWebInspectorUIProxy::platformCreateFrontendPageAndWindow()
@@ -111,10 +149,17 @@ void RemoteWebInspectorUIProxy::platformBringToFront()
 
 void RemoteWebInspectorUIProxy::platformSave(Vector<WebCore::InspectorFrontendClient::SaveData>&& saveData, bool forceSaveAs)
 {
-    // Simple implementation: save to a default location or show a file panel.
-    // For now, just a stub that acknowledges the request.
-    (void)saveData;
-    (void)forceSaveAs;
+    for (const auto& data : saveData) {
+        if (m_inspectorPage) {
+             if (auto* client = static_cast<PageClientImpl*>(&m_inspectorPage->pageClient())) {
+                 if (auto* view = client->viewWidget()) {
+                     if (auto* window = dynamic_cast<InspectorWindow*>(view->Window())) {
+                         window->save(data.url, data.content, forceSaveAs);
+                     }
+                 }
+             }
+        }
+    }
 }
 
 void RemoteWebInspectorUIProxy::platformLoad(const String& path, CompletionHandler<void(const String&)>&& completionHandler)
@@ -153,6 +198,7 @@ void RemoteWebInspectorUIProxy::platformSetForcedAppearance(WebCore::InspectorFr
 
 void RemoteWebInspectorUIProxy::platformStartWindowDrag()
 {
+    platformBringToFront();
 }
 
 void RemoteWebInspectorUIProxy::platformOpenURLExternally(const String& url)

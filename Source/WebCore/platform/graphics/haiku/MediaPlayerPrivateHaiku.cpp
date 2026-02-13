@@ -104,33 +104,55 @@ void MediaPlayerPrivate::load(const String& url, WebCore::MediaSourcePrivateClie
 }
 #endif
 
+struct LoadContext {
+    RefPtr<MediaPlayerPrivate> player;
+    String url;
+};
+
 void MediaPlayerPrivate::load(const String& url)
 {
     // Cleanup from previous request (can this even happen?)
     if (m_soundPlayer)
         m_soundPlayer->Stop(false);
     delete m_soundPlayer;
+    m_soundPlayer = nullptr;
 
     m_mediaLock.Lock();
     cancelLoad();
 
     m_mediaLock.Unlock();
 
-    // TODO we need more detailed info from the BMediaFile to accurately report
-    // the m_readyState and the m_networkState to WebKit. The API will need to
-    // be extended on Haiku side to query the internal state (and probably
-    // BMediaFile should not block until data is ready?)
-    IdentifyTracks(url);
+    // Spawn thread
+    LoadContext* context = new LoadContext{this, url};
+    thread_id thread = spawn_thread(loaderThread, "Media Loader", B_NORMAL_PRIORITY, context);
+    resume_thread(thread);
+}
+
+int32 MediaPlayerPrivate::loaderThread(void* cookie)
+{
+    LoadContext* context = (LoadContext*)cookie;
+    if (context->player) {
+         context->player->IdentifyTracks(context->url);
+         // Dispatch completion
+         RunLoop::main().dispatch([player = context->player] {
+             if (player) player->didLoad();
+         });
+    }
+    delete context;
+    return 0;
+}
+
+void MediaPlayerPrivate::didLoad()
+{
     if (m_mediaFile && m_mediaFile->InitCheck() == B_OK) {
         m_player.characteristicChanged();
         m_player.durationChanged();
         m_player.sizeChanged();
         m_player.firstVideoFrameAvailable();
 
-        //m_readyState = MediaPlayer::HaveMetadata;
-        //m_readyState = MediaPlayer::HaveFutureData;
         m_readyState = MediaPlayer::ReadyState::HaveEnoughData;
-        m_networkState = MediaPlayer::NetworkState::Loaded; // Loading;
+        m_networkState = MediaPlayer::NetworkState::Loaded;
+        m_buffered.add(MediaTime::zeroTime(), duration());
     } else {
         m_readyState = MediaPlayer::ReadyState::HaveMetadata;
         m_networkState = MediaPlayer::NetworkState::FormatError;
@@ -299,7 +321,19 @@ void MediaPlayerPrivate::setVolume(float volume)
 {
     m_volume = volume;
     if (m_soundPlayer)
-        m_soundPlayer->SetVolume(volume);
+        m_soundPlayer->SetVolume(m_muted ? 0.0 : m_volume);
+}
+
+void MediaPlayerPrivate::setMuted(bool muted)
+{
+    m_muted = muted;
+    if (m_soundPlayer)
+        m_soundPlayer->SetVolume(m_muted ? 0.0 : m_volume);
+}
+
+void MediaPlayerPrivate::setRate(float rate)
+{
+    m_rate = rate;
 }
 
 MediaPlayer::NetworkState MediaPlayerPrivate::networkState() const
@@ -314,13 +348,7 @@ MediaPlayer::ReadyState MediaPlayerPrivate::readyState() const
 
 PlatformTimeRanges& MediaPlayerPrivate::buffered() const
 {
-    // FIXME: Return actual buffered ranges based on network cache or BMediaFile state.
-    // For now, if we have a media file and are playing, assume we have content.
-    static PlatformTimeRanges ranges;
-    if (m_readyState >= MediaPlayer::ReadyState::HaveEnoughData && duration().toDouble() > 0) {
-        ranges.add(MediaTime::zeroTime(), duration());
-    }
-    return ranges;
+    return m_buffered;
 }
 
 bool MediaPlayerPrivate::didLoadingProgress() const
@@ -356,6 +384,9 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
 #endif
 
     if (m_mediaFile->InitCheck() == B_OK) {
+        // Lock while modifying members
+        Locker locker(m_mediaLock);
+
         for (int i = m_mediaFile->CountTracks() - 1; i >= 0; i--)
         {
             BMediaTrack* track = m_mediaFile->TrackAt(i);

@@ -33,7 +33,72 @@
 #include <Window.h>
 #include <cmath>
 
+#include "APIOpenPanelParameters.h"
+#include "WebOpenPanelResultListenerProxy.h"
+#include <WebCore/NotificationData.h>
+#include <WebCore/NotificationResources.h>
+
+#include <Alert.h>
+#include <FilePanel.h>
+#include <Notification.h>
+#include <Entry.h>
+#include <Path.h>
+#include <Messenger.h>
+
 namespace WebKit {
+
+class OpenPanelHandler : public BHandler {
+public:
+    OpenPanelHandler(Ref<WebOpenPanelResultListenerProxy>&& listener)
+        : BHandler("OpenPanelHandler")
+        , m_listener(WTFMove(listener))
+        , m_panel(nullptr)
+    {
+    }
+
+    ~OpenPanelHandler()
+    {
+        delete m_panel;
+    }
+
+    void setPanel(BFilePanel* panel)
+    {
+        m_panel = panel;
+    }
+
+    void MessageReceived(BMessage* message) override
+    {
+        switch (message->what) {
+        case B_REFS_RECEIVED:
+        case B_SIMPLE_DATA: {
+            Vector<String> filenames;
+            entry_ref ref;
+            for (int32 i = 0; message->FindRef("refs", i, &ref) == B_OK; i++) {
+                BEntry entry(&ref, true);
+                BPath path;
+                if (entry.GetPath(&path) == B_OK)
+                    filenames.append(String::fromUTF8(path.Path()));
+            }
+            m_listener->chooseFiles(filenames);
+            break;
+        }
+        case B_CANCEL:
+            m_listener->cancel();
+            break;
+        default:
+            BHandler::MessageReceived(message);
+            return;
+        }
+
+        if (Looper())
+            Looper()->RemoveHandler(this);
+        delete this;
+    }
+
+private:
+    Ref<WebOpenPanelResultListenerProxy> m_listener;
+    BFilePanel* m_panel;
+};
 
 PageUIClientHaiku::PageUIClientHaiku(WebViewBase& webView)
     : m_webView(webView)
@@ -90,6 +155,54 @@ void PageUIClientHaiku::printFrame(WebPageProxy& page, WebFrameProxy& frame, con
     }
 
     completionHandler();
+}
+
+void PageUIClientHaiku::runOpenPanel(WebPageProxy&, WebFrameProxy&, const WebCore::SecurityOriginData&, API::OpenPanelParameters& parameters, WebOpenPanelResultListenerProxy& listener)
+{
+    BWindow* window = m_webView.Window();
+    if (!window) {
+        listener.cancel();
+        return;
+    }
+
+    OpenPanelHandler* handler = new OpenPanelHandler(listener);
+    window->AddHandler(handler);
+
+    uint32 nodeFlavors = B_FILE_NODE;
+    if (parameters.allowDirectories())
+        nodeFlavors |= B_DIRECTORY_NODE;
+
+    BFilePanel* panel = new BFilePanel(B_OPEN_PANEL, new BMessenger(handler), nullptr, nodeFlavors, parameters.allowMultipleFiles());
+    handler->setPanel(panel);
+    panel->Show();
+}
+
+void PageUIClientHaiku::showNotification(WebPageProxy&, const WebCore::NotificationData& data, RefPtr<WebCore::NotificationResources>&&, CompletionHandler<void()>&& completionHandler)
+{
+    BNotification notification(B_INFORMATION_NOTIFICATION);
+    notification.SetTitle(data.title.utf8().data());
+    notification.SetContent(data.body.utf8().data());
+    notification.Send();
+    completionHandler();
+}
+
+void PageUIClientHaiku::runJavaScriptAlert(WebPageProxy&, const String& message, WebFrameProxy&, const WebCore::SecurityOriginData&, CompletionHandler<void()>&& completionHandler)
+{
+    BAlert* alert = new BAlert("JavaScript Alert", message.utf8().data(), "OK");
+    alert->Go();
+    completionHandler();
+}
+
+void PageUIClientHaiku::runJavaScriptConfirm(WebPageProxy&, const String& message, WebFrameProxy&, const WebCore::SecurityOriginData&, CompletionHandler<void(bool)>&& completionHandler)
+{
+    BAlert* alert = new BAlert("JavaScript Confirm", message.utf8().data(), "Cancel", "OK");
+    int32 button = alert->Go();
+    completionHandler(button == 1);
+}
+
+void PageUIClientHaiku::runJavaScriptPrompt(WebPageProxy&, const String&, const String&, WebFrameProxy&, const WebCore::SecurityOriginData&, CompletionHandler<void(const String&)>&& completionHandler)
+{
+    completionHandler(String());
 }
 
 } // namespace WebKit

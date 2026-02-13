@@ -341,6 +341,18 @@ void NetworkDataTaskHaiku::BytesWritten(BUrlRequest* caller, size_t size)
 
 void NetworkDataTaskHaiku::UploadProgress(BUrlRequest* caller, off_t bytesSent, off_t bytesTotal)
 {
+    if (m_state == State::Canceling || m_state == State::Completed)
+        return;
+
+    off_t delta = bytesSent - m_lastBytesSent;
+    m_lastBytesSent = bytesSent;
+
+    if (delta > 0 && m_client) {
+        runOnMainThread([this, protectedThis = Ref { *this }, delta, bytesSent, bytesTotal]() {
+             if (m_client)
+                 m_client->didSendData(delta, bytesSent, bytesTotal);
+        });
+    }
 }
 
 void NetworkDataTaskHaiku::RequestCompleted(BUrlRequest* caller, bool success)
@@ -411,9 +423,25 @@ void NetworkDataTaskHaiku::AuthenticationNeeded(BHttpRequest* request, const Res
 
     // Create a basic ProtectionSpace. Haiku BHttpRequest handles auth internally to some degree,
     // but here we are intercepting the failure.
-    // FIXME: Extract realm and scheme from response headers.
+    String authHeader = response.httpHeaderField(HTTPHeaderName::WWWAuthenticate);
+    WebCore::ProtectionSpace::AuthenticationScheme scheme = WebCore::ProtectionSpace::AuthenticationScheme::HTTPBasic;
+    String realm = "realm"_s;
+
+    if (!authHeader.isEmpty()) {
+        if (authHeader.containsIgnoringASCIICase("Digest"))
+            scheme = WebCore::ProtectionSpace::AuthenticationScheme::HTTPDigest;
+
+        // Simple realm extraction (very basic)
+        size_t realmPos = authHeader.find("realm=\"");
+        if (realmPos != notFound) {
+            size_t endPos = authHeader.find("\"", realmPos + 7);
+            if (endPos != notFound)
+                realm = authHeader.substring(realmPos + 7, endPos - (realmPos + 7));
+        }
+    }
+
     WebCore::ProtectionSpace protectionSpace(m_baseUrl.host(), m_baseUrl.port().value_or(0),
-        WebCore::ProtectionSpace::ServerType::HTTP, "realm"_s, WebCore::ProtectionSpace::AuthenticationScheme::HTTPBasic);
+        WebCore::ProtectionSpace::ServerType::HTTP, realm, scheme);
 
     // Using a default ResourceError as previousFailureCount
     m_client->didReceiveAuthenticationChallenge(AuthenticationChallenge(protectionSpace, Credential(), 0, response, ResourceError()), NegotiatedLegacyTLS::No, [protectedThis = Ref { *this }](AuthenticationChallengeDisposition disposition, const Credential& credential) {

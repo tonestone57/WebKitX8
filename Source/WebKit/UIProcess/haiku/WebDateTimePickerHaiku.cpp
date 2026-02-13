@@ -209,7 +209,7 @@ public:
             {
                 BString str;
                 BLanguage language("en");
-                BFormattingConventions conventions("en_US");
+                BFormattingConventions conventions("en_GB");
 
                 if (m_calendar) {
                     conventions.SetExplicitDateFormat(B_LONG_DATE_FORMAT, m_format);

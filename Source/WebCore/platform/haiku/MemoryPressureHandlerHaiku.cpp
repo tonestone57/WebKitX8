@@ -23,32 +23,43 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma once
+#include "config.h"
+#include "MemoryPressureHandler.h"
 
-#include "APIUIClient.h"
-#include <wtf/Ref.h>
+#include <OS.h>
+#include <wtf/MainThread.h>
+#include <wtf/RunLoop.h>
 
-namespace WebKit {
-class WebViewBase;
+namespace WebCore {
+
+void MemoryPressureHandler::platformReleaseMemory(Critical)
+{
 }
 
-namespace WebKit {
+std::optional<MemoryPressureHandler::ReliefLogger::MemoryUsage> MemoryPressureHandler::ReliefLogger::platformMemoryUsage()
+{
+    return std::nullopt;
+}
 
-class PageUIClientHaiku : public API::UIClient {
-public:
-    explicit PageUIClientHaiku(WebViewBase&);
-    virtual ~PageUIClientHaiku();
+void MemoryPressureHandler::install()
+{
+    if (m_installed)
+        return;
 
-    void printFrame(WebPageProxy&, WebFrameProxy&, const WebCore::FloatSize& pdfFirstPageSize, CompletionHandler<void()>&&) override;
+    m_installed = true;
 
-    void runOpenPanel(WebPageProxy&, WebFrameProxy&, const WebCore::SecurityOriginData&, API::OpenPanelParameters&, WebOpenPanelResultListenerProxy&) override;
-    void showNotification(WebPageProxy&, const WebCore::NotificationData&, RefPtr<WebCore::NotificationResources>&&, CompletionHandler<void()>&&) override;
-    void runJavaScriptAlert(WebPageProxy&, const String&, WebFrameProxy&, const WebCore::SecurityOriginData&, CompletionHandler<void()>&&) override;
-    void runJavaScriptConfirm(WebPageProxy&, const String&, WebFrameProxy&, const WebCore::SecurityOriginData&, CompletionHandler<void(bool)>&&) override;
-    void runJavaScriptPrompt(WebPageProxy&, const String&, const String&, WebFrameProxy&, const WebCore::SecurityOriginData&, CompletionHandler<void(const String&)>&&) override;
+    RunLoop::main().dispatchRepeating([] {
+        system_info info;
+        if (get_system_info(&info) == B_OK) {
+            uint64_t freeMemory = (uint64_t)info.free_memory * B_PAGE_SIZE;
+            uint64_t totalMemory = (uint64_t)info.max_pages * B_PAGE_SIZE;
 
-private:
-    WebViewBase& m_webView;
-};
+            // Trigger if less than 64MB or 5% memory free
+            if (freeMemory < 64 * 1024 * 1024 || (totalMemory > 0 && (double)freeMemory / totalMemory < 0.05)) {
+                MemoryPressureHandler::singleton().triggerMemoryPressureEvent(false);
+            }
+        }
+    }, 10_s);
+}
 
-} // namespace WebKit
+} // namespace WebCore
