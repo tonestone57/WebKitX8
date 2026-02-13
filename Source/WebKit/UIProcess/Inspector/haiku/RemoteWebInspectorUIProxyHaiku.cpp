@@ -54,10 +54,26 @@ public:
     InspectorWindow(BRect frame)
         : BWindow(frame, "Web Inspector", B_TITLED_WINDOW, B_ASYNCHRONOUS_CONTROLS | B_QUIT_ON_WINDOW_CLOSE)
         , m_saveData("")
+        , m_filePanel(nullptr)
     {
     }
 
+    ~InspectorWindow()
+    {
+        delete m_filePanel;
+    }
+
     void SetSaveData(const String& data) { m_saveData = data; }
+
+    void RequestSave(const String& filename)
+    {
+        if (!m_filePanel) {
+            BMessenger messenger(this);
+            m_filePanel = new BFilePanel(B_SAVE_PANEL, &messenger, nullptr, 0, false);
+        }
+        m_filePanel->SetSaveText(filename.utf8().data());
+        m_filePanel->Show();
+    }
 
     void MessageReceived(BMessage* message) override
     {
@@ -84,6 +100,7 @@ public:
     }
 private:
     String m_saveData;
+    BFilePanel* m_filePanel;
 };
 
 WebPageProxy* RemoteWebInspectorUIProxy::platformCreateFrontendPageAndWindow()
@@ -144,16 +161,7 @@ void RemoteWebInspectorUIProxy::platformSave(Vector<WebCore::InspectorFrontendCl
             if (auto* view = client->viewWidget()) {
                 if (auto* window = dynamic_cast<InspectorWindow*>(view->Window())) {
                     window->SetSaveData(data);
-
-                    // Note: BFilePanel ownership is tricky.
-                    // Usually caller owns it. We leak it here for simplicity in this snippet,
-                    // but in a real app we should track it or set it to auto-delete on close (not standard).
-                    // Or keep a member variable in InspectorWindow.
-                    // For now, this is a "task completion" step.
-                    BMessenger messenger(window);
-                    BFilePanel* panel = new BFilePanel(B_SAVE_PANEL, &messenger, nullptr, 0, false);
-                    panel->SetSaveText(filename.utf8().data());
-                    panel->Show();
+                    window->RequestSave(filename);
                 }
             }
         }
