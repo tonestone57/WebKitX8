@@ -674,8 +674,10 @@ bool PathHaiku::applyElements(const PathElementApplier& function) const
             // unless we specifically added arcs that weren't converted.
             // Documentation says BShapeIterator iterates over the commands.
 
-            // For now, leaving as-is or logging is acceptable as WebCore Path usually
-            // doesn't consume Arcs directly in this direction (it adds them via addArc).
+            // For now, leaving as-is is acceptable as WebCore Path usually doesn't consume
+            // Arcs directly in this direction (it adds them via addArc which decomposes to beziers).
+            // This stub ensures we don't crash or fail iteration, effectively ignoring non-bezier arcs
+            // if they ever appear in BShape (which is rare as BShape::ArcTo appends beziers).
             return B_OK;
         }
 

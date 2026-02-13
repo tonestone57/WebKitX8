@@ -196,7 +196,7 @@ void SharedTimerHaiku::stop()
 {
     m_shouldRun = false;
     // Stopping the timer thread here causes issues with event loop processing, potentially affecting scrolling.
-    // So we just set the flag to not run the callback.
+    // So we just set the next event time to 0 (infinite wait) to idle the thread without killing it.
     if (m_timerThread)
         m_timerThread->setNextEventTime(0);
 }
