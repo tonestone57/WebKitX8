@@ -62,9 +62,9 @@ RefPtr<FontCustomPlatformData> FontCustomPlatformData::create(SharedBuffer& buff
 	return adoptRef(new FontCustomPlatformData(area, font, std::move(creationData)));
 }
 
-RefPtr<FontCustomPlatformData> FontCustomPlatformData::createMemorySafe(SharedBuffer&, const String&)
+RefPtr<FontCustomPlatformData> FontCustomPlatformData::createMemorySafe(SharedBuffer& buffer, const String& itemInCollection)
 {
-    return nullptr;
+    return create(buffer, itemInCollection);
 }
 
 bool FontCustomPlatformData::supportsFormat(const String& format)
@@ -72,6 +72,7 @@ bool FontCustomPlatformData::supportsFormat(const String& format)
     return equalIgnoringASCIICase(format, ASCIILiteral::fromLiteralUnsafe("truetype"))
         || equalIgnoringASCIICase(format, ASCIILiteral::fromLiteralUnsafe("opentype"))
         || equalIgnoringASCIICase(format, ASCIILiteral::fromLiteralUnsafe("woff"))
+        || equalIgnoringASCIICase(format, ASCIILiteral::fromLiteralUnsafe("woff2"))
     ;
 }
 

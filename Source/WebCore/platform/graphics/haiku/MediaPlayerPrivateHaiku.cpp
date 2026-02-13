@@ -77,19 +77,25 @@ MediaPlayerPrivate::MediaPlayerPrivate(MediaPlayer& player)
     , m_videoTrack(nullptr)
     , m_soundPlayer(nullptr)
     , m_frameBuffer(nullptr)
-    , m_loaderThread(-1)
+    , m_identifyThread(-1)
     , m_player(player)
     , m_networkState(MediaPlayer::NetworkState::Empty)
     , m_readyState(MediaPlayer::ReadyState::HaveNothing)
     , m_volume(1.0)
     , m_currentTime(0.f)
     , m_paused(true)
+    , m_muted(false)
+    , m_rate(1.0)
+    , m_preload(MediaPlayer::Preload::Auto)
 {
 }
 
 MediaPlayerPrivate::~MediaPlayerPrivate()
 {
     delete m_soundPlayer;
+
+    if (m_identifyThread >= 0)
+        wait_for_thread(m_identifyThread, NULL);
 
     m_mediaLock.Lock();
 
@@ -105,11 +111,6 @@ void MediaPlayerPrivate::load(const String& url, WebCore::MediaSourcePrivateClie
 }
 #endif
 
-struct LoadContext {
-    RefPtr<MediaPlayerPrivate> player;
-    String url;
-};
-
 void MediaPlayerPrivate::load(const String& url)
 {
     // Cleanup from previous request (can this even happen?)
@@ -118,61 +119,39 @@ void MediaPlayerPrivate::load(const String& url)
     delete m_soundPlayer;
     m_soundPlayer = nullptr;
 
-    // Must call cancelLoad (which joins threads) WITHOUT holding the lock
-    // because the thread might be trying to acquire it.
-    cancelLoad();
+    if (m_identifyThread >= 0)
+        wait_for_thread(m_identifyThread, NULL);
 
     m_mediaLock.Lock();
-    // Reset state protected by lock if needed, though cancelLoad did most of it.
+    cancelLoad();
     m_mediaLock.Unlock();
 
-    // Spawn thread
-    LoadContext* context = new LoadContext{this, url};
-    m_loaderThread = spawn_thread(loaderThread, "Media Loader", B_NORMAL_PRIORITY, context);
-    resume_thread(m_loaderThread);
-}
+    struct IdentifyParams {
+        MediaPlayerPrivate* self;
+        String url;
+    };
+    IdentifyParams* params = new IdentifyParams { this, url };
 
-int32 MediaPlayerPrivate::loaderThread(void* cookie)
-{
-    LoadContext* context = (LoadContext*)cookie;
-    if (context->player) {
-         context->player->IdentifyTracks(context->url);
-         // Dispatch completion
-         RunLoop::main().dispatch([player = context->player] {
-             if (player) player->didLoad();
-         });
-    }
-    delete context;
-    return 0;
+    m_identifyThread = spawn_thread([](void* data) -> int32 {
+        IdentifyParams* params = (IdentifyParams*)data;
+        params->self->IdentifyTracks(params->url);
+        delete params;
+        return 0;
+    }, "Media Identify", B_NORMAL_PRIORITY, params);
+
+    resume_thread(m_identifyThread);
+
+    m_networkState = MediaPlayer::NetworkState::Loading;
+    m_player.networkStateChanged();
 }
 
 void MediaPlayerPrivate::didLoad()
 {
-    if (m_mediaFile && m_mediaFile->InitCheck() == B_OK) {
-        m_player.characteristicChanged();
-        m_player.durationChanged();
-        m_player.sizeChanged();
-        m_player.firstVideoFrameAvailable();
-
-        m_readyState = MediaPlayer::ReadyState::HaveEnoughData;
-        m_networkState = MediaPlayer::NetworkState::Loaded;
-        m_buffered.add(MediaTime::zeroTime(), duration());
-    } else {
-        m_readyState = MediaPlayer::ReadyState::HaveMetadata;
-        m_networkState = MediaPlayer::NetworkState::FormatError;
-    }
-    m_player.networkStateChanged();
-    m_player.readyStateChanged();
+    // This is now handled inside IdentifyTracks callback to main thread
 }
 
 void MediaPlayerPrivate::cancelLoad()
 {
-    if (m_loaderThread >= 0) {
-        status_t exitValue;
-        wait_for_thread(m_loaderThread, &exitValue);
-        m_loaderThread = -1;
-    }
-
     // m_mediaLock is expected to be held by caller
     delete m_mediaFile;
     m_mediaFile = nullptr;
@@ -314,6 +293,9 @@ void MediaPlayerPrivate::seekToTarget(const SeekTarget& time)
         m_videoTrack->SeekToTime(&newTime);
     if (m_audioTrack)
         m_audioTrack->SeekToTime(&newTime);
+
+    m_currentTime = newTime / 1000000.f;
+    m_mediaLock.Unlock();
 }
 
 bool MediaPlayerPrivate::seeking() const
@@ -330,19 +312,24 @@ void MediaPlayerPrivate::setVolume(float volume)
 {
     m_volume = volume;
     if (m_soundPlayer)
-        m_soundPlayer->SetVolume(m_muted ? 0.0 : m_volume);
+        m_soundPlayer->SetVolume(m_muted ? 0.0f : m_volume);
 }
 
 void MediaPlayerPrivate::setMuted(bool muted)
 {
     m_muted = muted;
     if (m_soundPlayer)
-        m_soundPlayer->SetVolume(m_muted ? 0.0 : m_volume);
+        m_soundPlayer->SetVolume(m_muted ? 0.0f : m_volume);
 }
 
-void MediaPlayerPrivate::setRate(float rate)
+void MediaPlayerPrivate::setRate(double rate)
 {
     m_rate = rate;
+}
+
+void MediaPlayerPrivate::setPreload(MediaPlayer::Preload preload)
+{
+    m_preload = preload;
 }
 
 MediaPlayer::NetworkState MediaPlayerPrivate::networkState() const
@@ -357,6 +344,12 @@ MediaPlayer::ReadyState MediaPlayerPrivate::readyState() const
 
 PlatformTimeRanges& MediaPlayerPrivate::buffered() const
 {
+    // FIXME: Return actual buffered ranges based on network cache or BMediaFile state.
+    // For now, if we have a media file and are playing, assume we have content.
+    m_buffered.clear();
+    if (m_readyState >= MediaPlayer::ReadyState::HaveEnoughData && duration() > MediaTime::zeroTime()) {
+        m_buffered.add(MediaTime::zeroTime(), duration());
+    }
     return m_buffered;
 }
 
@@ -365,6 +358,21 @@ bool MediaPlayerPrivate::didLoadingProgress() const
     bool progress = m_didReceiveData;
     m_didReceiveData = false;
     return progress;
+}
+
+uint64_t MediaPlayerPrivate::bytesLoaded() const
+{
+    return 0;
+}
+
+uint64_t MediaPlayerPrivate::totalBytes() const
+{
+    return 0;
+}
+
+MediaPlayer::MovieLoadType MediaPlayerPrivate::movieLoadType() const
+{
+    return MediaPlayer::MovieLoadType::Unknown;
 }
 
 void MediaPlayerPrivate::paint(GraphicsContext& context, const FloatRect& r)
@@ -383,19 +391,19 @@ void MediaPlayerPrivate::paint(GraphicsContext& context, const FloatRect& r)
 
 void MediaPlayerPrivate::IdentifyTracks(const String& url)
 {
-    // TODO something here is blocking inside the Media Kit. We should rework
-    // things so that this is run in a separate thread (Media Thread?). This
-    // would avoid the annoying freeze whenever a media is being loaded.
 #if B_HAIKU_VERSION <= B_HAIKU_VERSION_1_BETA_5
-    m_mediaFile = new BMediaFile(BUrl(url.utf8().data()));
+    BMediaFile* mediaFile = new BMediaFile(BUrl(url.utf8().data()));
 #else
-    m_mediaFile = new BMediaFile(BUrl(url.utf8().data(), false));
+    BMediaFile* mediaFile = new BMediaFile(BUrl(url.utf8().data(), false));
 #endif
 
-    if (m_mediaFile->InitCheck() == B_OK) {
-        // Lock while modifying members
-        Locker locker(m_mediaLock);
+    status_t err = mediaFile->InitCheck();
 
+    m_mediaLock.Lock();
+    m_mediaFile = mediaFile;
+    m_mediaLock.Unlock();
+
+    if (err == B_OK) {
         for (int i = m_mediaFile->CountTracks() - 1; i >= 0; i--)
         {
             BMediaTrack* track = m_mediaFile->TrackAt(i);
@@ -403,35 +411,52 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
             media_format format;
             track->DecodedFormat(&format);
 
+            m_mediaLock.Lock();
             if (format.IsVideo()) {
-                if (m_videoTrack)
-                    continue;
-                m_videoTrack = track;
-
-                m_frameBuffer = new BBitmap(
-                    BRect(0, 0, format.Width() - 1, format.Height() - 1),
-                    B_RGB32);
-
-                if (m_audioTrack)
-                    break;
+                if (!m_videoTrack) {
+                    m_videoTrack = track;
+                    m_frameBuffer = new BBitmap(
+                        BRect(0, 0, format.Width() - 1, format.Height() - 1),
+                        B_RGB32);
+                }
             }
 
             if (format.IsAudio()) {
-                if (m_audioTrack)
-                    continue;
-                m_audioTrack = track;
-
-                m_soundPlayer = new BSoundPlayer(&format.u.raw_audio,
-                    "HTML5 Audio", playCallback, NULL, this);
-                m_soundPlayer->SetVolume(m_volume);
-                if (!m_paused)
-                    m_soundPlayer->Start();
-
-                if (m_videoTrack)
-                    break;
+                if (!m_audioTrack) {
+                    m_audioTrack = track;
+                    m_soundPlayer = new BSoundPlayer(&format.u.raw_audio,
+                        "HTML5 Audio", playCallback, NULL, this);
+                    m_soundPlayer->SetVolume(m_volume);
+                    if (!m_paused)
+                        m_soundPlayer->Start();
+                }
             }
+            m_mediaLock.Unlock();
         }
     }
+
+    // Notify main thread
+    WeakPtr<MediaPlayerPrivate> p = WeakPtr(this);
+    callOnMainThread([p, err] {
+        if (!p) return;
+        if (err == B_OK) {
+            p->m_player.characteristicChanged();
+            p->m_player.durationChanged();
+            p->m_player.sizeChanged();
+            if (p->m_videoTrack)
+                p->m_player.firstVideoFrameAvailable();
+
+            p->m_readyState = MediaPlayer::ReadyState::HaveEnoughData;
+            p->m_networkState = MediaPlayer::NetworkState::Loaded;
+        } else {
+            p->m_readyState = MediaPlayer::ReadyState::HaveMetadata;
+            p->m_networkState = MediaPlayer::NetworkState::FormatError;
+        }
+        p->m_player.networkStateChanged();
+        p->m_player.readyStateChanged();
+    });
+
+    m_identifyThread = -1;
 }
 
 // #pragma mark - static methods

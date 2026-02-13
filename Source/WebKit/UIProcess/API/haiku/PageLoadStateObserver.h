@@ -25,6 +25,9 @@
 #pragma once
 
 #include "PageLoadState.h"
+#include "WebPageProxy.h"
+#include "WebView.h"
+#include "WebViewBase.h"
 #include "WebViewConstants.h"
 
 #include <Application.h>
@@ -43,7 +46,13 @@ public:
     void deref() const final { RefCounted::deref(); }
 
     void willChangeIsLoading() override {}
-    void didChangeIsLoading() override {}
+    void didChangeIsLoading() override
+    {
+        BMessage message(DID_CHANGE_IS_LOADING);
+        bool loading = webView->getRenderView()->page()->pageLoadState().isLoading();
+        message.AddBool("loading", loading);
+        be_app->PostMessage(&message);
+    }
 
     void willChangeTitle() override {}
     void didChangeTitle() override
@@ -54,7 +63,12 @@ public:
     }
 
     void willChangeActiveURL() override {}
-    void didChangeActiveURL() override {}
+    void didChangeActiveURL() override
+    {
+        BMessage message(DID_CHANGE_ACTIVE_URL);
+        message.AddString("url", webView->getCurrentURL());
+        be_app->PostMessage(&message);
+    }
 
     void willChangeHasOnlySecureContent() override {}
     void didChangeHasOnlySecureContent() override {}
@@ -68,13 +82,31 @@ public:
     }
 
     void willChangeCanGoBack() override {}
-    void didChangeCanGoBack() override {}
+    void didChangeCanGoBack() override
+    {
+        BMessage message(DID_CHANGE_BACK_FORWARD);
+        bool canGoBack = webView->getRenderView()->page()->pageLoadState().canGoBack();
+        message.AddBool("canGoBack", canGoBack);
+        be_app->PostMessage(&message);
+    }
 
     void willChangeCanGoForward() override {}
-    void didChangeCanGoForward() override {}
+    void didChangeCanGoForward() override
+    {
+        BMessage message(DID_CHANGE_BACK_FORWARD);
+        bool canGoForward = webView->getRenderView()->page()->pageLoadState().canGoForward();
+        message.AddBool("canGoForward", canGoForward);
+        be_app->PostMessage(&message);
+    }
 
     void willChangeNetworkRequestsInProgress() override {}
-    void didChangeNetworkRequestsInProgress() override {}
+    void didChangeNetworkRequestsInProgress() override
+    {
+        BMessage message(DID_CHANGE_NETWORK_REQUESTS);
+        bool networkRequests = webView->getRenderView()->page()->pageLoadState().networkRequestsInProgress();
+        message.AddBool("networkRequestsInProgress", networkRequests);
+        be_app->PostMessage(&message);
+    }
 
     void willChangeCertificateInfo() override {}
     void didChangeCertificateInfo() override {}

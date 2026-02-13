@@ -37,6 +37,9 @@ public:
     ScrollbarThemeHaiku(bool drawOuterFrame);
     virtual ~ScrollbarThemeHaiku();
 
+    void registerScrollbar(Scrollbar&) override;
+    void unregisterScrollbar(Scrollbar&) override;
+
     bool hasButtons(Scrollbar&) override;
     bool hasThumb(Scrollbar&) override;
 

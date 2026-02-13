@@ -41,11 +41,29 @@ public:
 
     void printFrame(WebPageProxy&, WebFrameProxy&, const WebCore::FloatSize& pdfFirstPageSize, CompletionHandler<void()>&&) override;
 
+    void createNewPage(WebPageProxy&, Ref<API::PageConfiguration>&&, Ref<API::NavigationAction>&&, CompletionHandler<void(RefPtr<WebPageProxy>&&)>&&) override;
+    void showPage(WebPageProxy*) override;
+    void close(WebPageProxy*) override;
+
     void runOpenPanel(WebPageProxy&, WebFrameProxy&, const WebCore::SecurityOriginData&, API::OpenPanelParameters&, WebOpenPanelResultListenerProxy&) override;
     void showNotification(WebPageProxy&, const WebCore::NotificationData&, RefPtr<WebCore::NotificationResources>&&, CompletionHandler<void()>&&) override;
     void runJavaScriptAlert(WebPageProxy&, const String&, WebFrameProxy&, const WebCore::SecurityOriginData&, CompletionHandler<void()>&&) override;
     void runJavaScriptConfirm(WebPageProxy&, const String&, WebFrameProxy&, const WebCore::SecurityOriginData&, CompletionHandler<void(bool)>&&) override;
     void runJavaScriptPrompt(WebPageProxy&, const String&, const String&, WebFrameProxy&, const WebCore::SecurityOriginData&, CompletionHandler<void(const String&)>&&) override;
+
+    void setStatusText(WebPageProxy*, const String&) override;
+    void mouseDidMoveOverElement(WebPageProxy&, const WebHitTestResultData&, OptionSet<WebEventModifier>) override;
+
+    void toolbarsAreVisible(WebPageProxy&, Function<void(bool)>&&) override;
+    void setToolbarsAreVisible(WebPageProxy&, bool) override;
+    void menuBarIsVisible(WebPageProxy&, Function<void(bool)>&&) override;
+    void setMenuBarIsVisible(WebPageProxy&, bool) override;
+    void statusBarIsVisible(WebPageProxy&, Function<void(bool)>&&) override;
+    void setStatusBarIsVisible(WebPageProxy&, bool) override;
+    void setIsResizable(WebPageProxy&, bool) override;
+
+    void setWindowFrame(WebPageProxy&, const WebCore::FloatRect&) override;
+    void windowFrame(WebPageProxy&, Function<void(WebCore::FloatRect)>&&) override;
 
 private:
     WebViewBase& m_webView;
