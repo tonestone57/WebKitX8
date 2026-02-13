@@ -431,12 +431,44 @@ void NetworkDataTaskHaiku::AuthenticationNeeded(BHttpRequest* request, const Res
         if (authHeader.containsIgnoringASCIICase("Digest"))
             scheme = WebCore::ProtectionSpace::AuthenticationScheme::HTTPDigest;
 
-        // Simple realm extraction (very basic)
-        size_t realmPos = authHeader.find("realm=\"");
+        // Parse realm robustly
+        size_t realmPos = authHeader.findIgnoringASCIICase("realm");
+        while (realmPos != notFound) {
+             // Ensure it is a whole word
+             bool precedingCharOk = (realmPos == 0) || authHeader[realmPos - 1] == ' ' || authHeader[realmPos - 1] == '\t' || authHeader[realmPos - 1] == ',';
+             if (precedingCharOk)
+                 break;
+             realmPos = authHeader.findIgnoringASCIICase("realm", realmPos + 1);
+        }
+
         if (realmPos != notFound) {
-            size_t endPos = authHeader.find("\"", realmPos + 7);
-            if (endPos != notFound)
-                realm = authHeader.substring(realmPos + 7, endPos - (realmPos + 7));
+            size_t ptr = realmPos + 5;
+            // Skip whitespace
+            while (ptr < authHeader.length() && (authHeader[ptr] == ' ' || authHeader[ptr] == '\t'))
+                ptr++;
+
+            if (ptr < authHeader.length() && authHeader[ptr] == '=') {
+                ptr++;
+                // Skip whitespace
+                while (ptr < authHeader.length() && (authHeader[ptr] == ' ' || authHeader[ptr] == '\t'))
+                    ptr++;
+
+                if (ptr < authHeader.length()) {
+                    if (authHeader[ptr] == '"') {
+                        // Quoted realm
+                        ptr++;
+                        size_t endPos = authHeader.find('"', ptr);
+                        if (endPos != notFound)
+                            realm = authHeader.substring(ptr, endPos - ptr);
+                    } else {
+                        // Token realm (unquoted)
+                        size_t endPos = ptr;
+                        while (endPos < authHeader.length() && authHeader[endPos] != ',' && authHeader[endPos] != ' ' && authHeader[endPos] != '\t')
+                            endPos++;
+                        realm = authHeader.substring(ptr, endPos - ptr);
+                    }
+                }
+            }
         }
     }
 
