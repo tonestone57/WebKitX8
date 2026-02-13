@@ -77,6 +77,7 @@ MediaPlayerPrivate::MediaPlayerPrivate(MediaPlayer& player)
     , m_videoTrack(nullptr)
     , m_soundPlayer(nullptr)
     , m_frameBuffer(nullptr)
+    , m_loaderThread(-1)
     , m_player(player)
     , m_networkState(MediaPlayer::NetworkState::Empty)
     , m_readyState(MediaPlayer::ReadyState::HaveNothing)
@@ -117,15 +118,18 @@ void MediaPlayerPrivate::load(const String& url)
     delete m_soundPlayer;
     m_soundPlayer = nullptr;
 
-    m_mediaLock.Lock();
+    // Must call cancelLoad (which joins threads) WITHOUT holding the lock
+    // because the thread might be trying to acquire it.
     cancelLoad();
 
+    m_mediaLock.Lock();
+    // Reset state protected by lock if needed, though cancelLoad did most of it.
     m_mediaLock.Unlock();
 
     // Spawn thread
     LoadContext* context = new LoadContext{this, url};
-    thread_id thread = spawn_thread(loaderThread, "Media Loader", B_NORMAL_PRIORITY, context);
-    resume_thread(thread);
+    m_loaderThread = spawn_thread(loaderThread, "Media Loader", B_NORMAL_PRIORITY, context);
+    resume_thread(m_loaderThread);
 }
 
 int32 MediaPlayerPrivate::loaderThread(void* cookie)
@@ -163,12 +167,17 @@ void MediaPlayerPrivate::didLoad()
 
 void MediaPlayerPrivate::cancelLoad()
 {
-    m_mediaLock.Lock();
+    if (m_loaderThread >= 0) {
+        status_t exitValue;
+        wait_for_thread(m_loaderThread, &exitValue);
+        m_loaderThread = -1;
+    }
+
+    // m_mediaLock is expected to be held by caller
     delete m_mediaFile;
     m_mediaFile = nullptr;
     m_audioTrack = nullptr;
     m_videoTrack = nullptr;
-    m_mediaLock.Unlock();
 }
 
 void MediaPlayerPrivate::prepareToPlay()

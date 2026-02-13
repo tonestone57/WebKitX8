@@ -347,17 +347,17 @@ private:
 
     void start()
     {
-        if (!m_view.LockLooper())
+        if (!m_view || !m_view->LockLooper())
             return;
 
         m_printJob = std::make_shared<BPrintJob>("WebKit Page");
         if (m_printJob->ConfigJob() != B_OK) {
-            m_view.UnlockLooper();
+            m_view->UnlockLooper();
             return;
         }
 
         BRect printableRect = m_printJob->PrintableRect();
-        m_view.UnlockLooper();
+        m_view->UnlockLooper();
 
         WebCore::PrintInfo printInfo;
         printInfo.pageSetupScaleFactor = 1.0;
@@ -412,7 +412,7 @@ private:
 
     void print()
     {
-        if (!m_view.LockLooper())
+        if (!m_view || !m_view->LockLooper())
             return;
 
         m_printJob->BeginJob();
@@ -430,7 +430,7 @@ private:
         for (int32 i = firstPage - 1; i < lastPage; ++i) {
             if (i >= 0 && i < (int32)m_snapshots.size() && m_snapshots[i]) {
                 if (auto bitmap = m_snapshots[i]->createBBitmap()) {
-                    if (BWindow* window = m_view.Window()) {
+                    if (BWindow* window = m_view->Window()) {
                         PrintView* printView = new PrintView(printableRect, bitmap.get());
                         printView->Hide();
                         window->AddChild(printView);
@@ -445,10 +445,10 @@ private:
             m_printJob->SpoolPage();
         }
         m_printJob->CommitJob();
-        m_view.UnlockLooper();
+        m_view->UnlockLooper();
     }
 
-    WebViewBase& m_view;
+    WeakPtr<WebViewBase> m_view;
     WebPageProxy& m_page;
     WebFrameProxy& m_frame;
     std::shared_ptr<BPrintJob> m_printJob;

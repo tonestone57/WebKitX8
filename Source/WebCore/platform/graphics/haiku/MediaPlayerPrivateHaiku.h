@@ -119,6 +119,7 @@ private:
         BSoundPlayer* m_soundPlayer;
         BBitmap* m_frameBuffer;
         BLocker m_mediaLock;
+        thread_id m_loaderThread;
         mutable PlatformTimeRanges m_buffered;
 
         MediaPlayer& m_player;
