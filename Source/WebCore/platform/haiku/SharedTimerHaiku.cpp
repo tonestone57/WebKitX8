@@ -195,8 +195,10 @@ void SharedTimerHaiku::start(double interval)
 void SharedTimerHaiku::stop()
 {
     m_shouldRun = false;
-// FIXME: Stopping the timer thread here seems to cause issues with event loop processing, potentially affecting scrolling.
-//    m_timerThread->setNextEventTime(0);
+    // Stopping the timer thread here causes issues with event loop processing, potentially affecting scrolling.
+    // So we just set the flag to not run the callback.
+    if (m_timerThread)
+        m_timerThread->setNextEventTime(0);
 }
 
 void SharedTimerHaiku::MessageReceived(BMessage*)

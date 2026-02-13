@@ -538,8 +538,19 @@ String RenderThemeHaiku::mediaControlsBase64StringForIconNameAndType(const Strin
 
 String RenderThemeHaiku::mediaControlsFormattedStringForDuration(double durationInSeconds)
 {
-    // FIXME: Format this somehow, maybe through BDateTime?
-    return makeString(durationInSeconds);
+    // Format MM:SS or HH:MM:SS
+    if (std::isinf(durationInSeconds))
+        return "infinite"_s;
+
+    int seconds = static_cast<int>(durationInSeconds);
+    int hours = seconds / 3600;
+    int minutes = (seconds % 3600) / 60;
+    seconds = seconds % 60;
+
+    if (hours > 0)
+        return makeString(hours, ":", minutes < 10 ? "0" : "", minutes, ":", seconds < 10 ? "0" : "", seconds);
+
+    return makeString(minutes, ":", seconds < 10 ? "0" : "", seconds);
 }
 
 
