@@ -132,9 +132,9 @@ void NetworkStorageSession::setCookies(const Vector<Cookie>& cookies, const URL&
 void NetworkStorageSession::setCookie(const Cookie& cookie)
 {
     BPrivate::Network::BNetworkCookie* newCookie = new BPrivate::Network::BNetworkCookie(
-        cookie.name, cookie.value, BUrl(cookie.domain));
+        cookie.name.utf8().data(), cookie.value.utf8().data(), BUrl(cookie.domain.utf8().data()));
 
-    newCookie->SetPath(cookie.path);
+    newCookie->SetPath(cookie.path.utf8().data());
     newCookie->SetSecure(cookie.secure);
     newCookie->SetHttpOnly(cookie.httpOnly);
     newCookie->SetExpiration(cookie.expires.value_or(0)); // Convert to time_t if needed, or 0 for session?
