@@ -30,6 +30,7 @@
 #include "NetworkResourceLoader.h"
 
 #include <WebCore/AuthenticationChallenge.h>
+#include <WebCore/ProtectionSpace.h>
 #include <WebCore/CookieJar.h>
 #include <WebCore/HTTPParsers.h>
 #include <WebCore/NetworkStorageSession.h>
@@ -53,6 +54,29 @@ namespace WebKit {
 
 using namespace WebCore;
 
+class NetworkDataOutput : public BDataIO {
+public:
+    NetworkDataOutput(NetworkDataTaskHaiku* task)
+        : m_task(task)
+    {
+    }
+
+    ssize_t Write(const void* buffer, size_t size) override
+    {
+        if (m_task)
+            m_task->didReceiveData(buffer, size);
+        return size;
+    }
+
+    ssize_t Read(void* buffer, size_t size) override { return 0; }
+    off_t Seek(off_t position, uint32 seekMode) override { return 0; }
+    off_t Position() const override { return 0; }
+    status_t SetSize(off_t size) override { return B_OK; }
+
+private:
+    NetworkDataTaskHaiku* m_task;
+};
+
 NetworkDataTaskHaiku::NetworkDataTaskHaiku(NetworkSession& session, NetworkDataTaskClient& client,
     const ResourceRequest& requestWithCredentials, StoredCredentialsPolicy storedCredentialsPolicy,
     ContentSniffingPolicy shouldContentSniff, ContentEncodingSniffingPolicy,
@@ -60,6 +84,7 @@ NetworkDataTaskHaiku::NetworkDataTaskHaiku(NetworkSession& session, NetworkDataT
     : NetworkDataTask(session, client, requestWithCredentials, storedCredentialsPolicy,
         shouldClearReferrerOnHTTPSToHTTPRedirect, dataTaskIsForMainFrameNavigation)
     , m_postData(NULL)
+    , m_output(NULL)
     , m_responseDataSent(false)
     , m_redirected(false)
     , m_position(0)
@@ -84,6 +109,7 @@ NetworkDataTaskHaiku::~NetworkDataTaskHaiku()
     if (m_request)
         m_request->SetListener(NULL);
     delete m_request;
+    delete m_output;
 }
 
 void NetworkDataTaskHaiku::createRequest(ResourceRequest&& request)
@@ -97,6 +123,9 @@ void NetworkDataTaskHaiku::createRequest(ResourceRequest&& request)
 
     if (m_request == NULL)
         return;
+
+    m_output = new NetworkDataOutput(this);
+    m_request->SetOutput(m_output);
 
     m_baseUrl = URL(m_request->Url());
 
@@ -307,7 +336,7 @@ void NetworkDataTaskHaiku::DataReceived(BUrlRequest* caller, const char* data, o
 
 void NetworkDataTaskHaiku::BytesWritten(BUrlRequest* caller, size_t size)
 {
-    // Implemented via DataReceived
+    // Handled by NetworkDataOutput::Write
 }
 
 void NetworkDataTaskHaiku::UploadProgress(BUrlRequest* caller, off_t bytesSent, off_t bytesTotal)
@@ -349,6 +378,22 @@ bool NetworkDataTaskHaiku::CertificateVerificationFailed(BUrlRequest* caller, BC
     return false;
 }
 
+void NetworkDataTaskHaiku::didReceiveData(const void* buffer, size_t size)
+{
+    if (!m_client || m_state == State::Canceling || m_state == State::Completed)
+        return;
+
+    if (size == 0) return;
+
+    Vector<uint8_t> dataVector;
+    dataVector.append((const uint8_t*)buffer, size);
+
+    runOnMainThread([protectedThis = Ref { *this }, dataVector = WTFMove(dataVector)] {
+        if (protectedThis->m_client)
+            protectedThis->m_client->didReceiveData(SharedBuffer::create(WTFMove(dataVector)));
+    });
+}
+
 void NetworkDataTaskHaiku::DebugMessage(BUrlRequest* caller, BUrlProtocolDebugMessage type, const char* text)
 {
 }
@@ -364,7 +409,14 @@ void NetworkDataTaskHaiku::AuthenticationNeeded(BHttpRequest* request, const Res
         return;
     }
 
-    m_client->didReceiveAuthenticationChallenge(AuthenticationChallenge(response, SslError, response, SslError), NegotiatedLegacyTLS::No, [this](AuthenticationChallengeDisposition disposition, const Credential& credential) {
+    // Create a basic ProtectionSpace. Haiku BHttpRequest handles auth internally to some degree,
+    // but here we are intercepting the failure.
+    // FIXME: Extract realm and scheme from response headers.
+    WebCore::ProtectionSpace protectionSpace(m_baseUrl.host(), m_baseUrl.port().value_or(0),
+        WebCore::ProtectionSpace::ServerType::HTTP, "realm"_s, WebCore::ProtectionSpace::AuthenticationScheme::HTTPBasic);
+
+    // Using a default ResourceError as previousFailureCount
+    m_client->didReceiveAuthenticationChallenge(AuthenticationChallenge(protectionSpace, Credential(), 0, response, ResourceError()), NegotiatedLegacyTLS::No, [this](AuthenticationChallengeDisposition disposition, const Credential& credential) {
         if (disposition == AuthenticationChallengeDisposition::UseCredential && !credential.isEmpty()) {
             // Apply credentials to the request logic
             BHttpAuthentication& auth = dynamic_cast<BHttpRequest*>(m_request)->Authentication();
