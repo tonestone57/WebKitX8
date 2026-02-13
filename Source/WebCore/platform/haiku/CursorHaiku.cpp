@@ -168,9 +168,13 @@ void Cursor::ensurePlatformCursor() const
         m_cursor = new BCursor(B_CURSOR_ID_PROGRESS);
         break;
     case Cursor::Type::Cell:
+        m_cursor = new BCursor(B_CURSOR_ID_CROSS_HAIR);
+        break;
     case Cursor::Type::ContextMenu:
-    case Cursor::Type::Alias:
         m_cursor = new BCursor(B_CURSOR_ID_SYSTEM_DEFAULT);
+        break;
+    case Cursor::Type::Alias:
+        m_cursor = new BCursor(B_CURSOR_ID_CREATE_LINK);
         break;
     case Cursor::Type::NoDrop:
         m_cursor = new BCursor(B_CURSOR_ID_NO_DROP);

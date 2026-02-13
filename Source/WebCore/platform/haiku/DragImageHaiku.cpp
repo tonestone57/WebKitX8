@@ -27,9 +27,18 @@
 #include "config.h"
 #include "DragImage.h"
 
+#include "BitmapImage.h"
 #include "CachedImage.h"
 #include "FontCascade.h"
 #include "Image.h"
+#include "NotImplemented.h"
+#include "TextRun.h"
+
+#include <Bitmap.h>
+#include <InterfaceDefs.h>
+#include <TranslationUtils.h>
+#include <View.h>
+#include <cstring>
 
 namespace WebCore {
 
@@ -78,22 +87,30 @@ DragImageRef scaleDragImage(DragImageRef image, FloatSize scale)
     if (!image)
         return nullptr;
 
-    BBitmap* original = static_cast<BBitmap*>(image);
-    BRect bounds = original->Bounds();
-    BRect newBounds(0, 0, bounds.Width() * scale.width(), bounds.Height() * scale.height());
+    if (scale.width() == 1 && scale.height() == 1)
+        return image;
 
-    BBitmap* scaled = new BBitmap(newBounds, B_RGBA32, true);
-    if (scaled->Lock()) {
-        BView* view = new BView(newBounds, "drawing", 0, 0);
-        scaled->AddChild(view);
-        view->SetDrawingMode(B_OP_COPY);
-        view->DrawBitmap(original, newBounds);
-        scaled->RemoveChild(view);
-        delete view;
-        scaled->Unlock();
+    BRect oldRect = image->Bounds();
+    BRect newRect(0, 0, oldRect.Width() * scale.width(), oldRect.Height() * scale.height());
+
+    BBitmap* newBitmap = new BBitmap(newRect, image->ColorSpace(), true);
+    if (newBitmap->InitCheck() != B_OK) {
+        delete newBitmap;
+        delete image;
+        return nullptr;
     }
-    delete original;
-    return scaled;
+
+    BView* view = new BView(newRect, "drawing", B_FOLLOW_ALL, 0);
+    newBitmap->AddChild(view);
+    if (newBitmap->Lock()) {
+        view->DrawBitmap(image, newRect);
+        view->Sync();
+        newBitmap->RemoveChild(view);
+        newBitmap->Unlock();
+    }
+    delete view;
+    delete image;
+    return newBitmap;
 }
 
 DragImageRef dissolveDragImageToFraction(DragImageRef image, float fraction)
@@ -120,7 +137,7 @@ DragImageRef dissolveDragImageToFraction(DragImageRef image, float fraction)
     return bitmap;
 }
 
-DragImageRef createDragImageFromImage(Image* image, ImageOrientation)
+DragImageRef createDragImageFromImage(Image* image, ImageOrientation, GraphicsClient*, float)
 {
     if (!image)
         return nullptr;
@@ -129,7 +146,11 @@ DragImageRef createDragImageFromImage(Image* image, ImageOrientation)
     if (!nativeImage)
         return nullptr;
 
-    return new BBitmap(nativeImage.get());
+    const BBitmap* source = nativeImage->platformImage().get();
+    if (!source)
+        return nullptr;
+
+    return new BBitmap(source);
 }
 
 DragImageRef createDragImageForColor(const Color& color, const FloatRect& rect, float, Path&)
@@ -162,14 +183,64 @@ IntSize dragImageSize(DragImageRef image)
     return IntSize(r.Width() + 1, r.Height() + 1);
 }
 
-DragImageRef createDragImageIconForCachedImageFilename(const String&)
+DragImageRef createDragImageIconForCachedImageFilename(const String& filename)
 {
-    return nullptr;
+    BBitmap* bitmap = BTranslationUtils::GetBitmap(filename.utf8().data());
+    return bitmap;
 }
 
-DragImageRef createDragImageForLink(Element&, URL&, const String& label, TextIndicatorData&, FontCascade&, float)
+DragImageData createDragImageForLink(Element&, URL& url, const String& label, TextIndicatorData&, FontCascade&, float)
 {
-    return nullptr;
+    // Simple drag image for links: Label on top, URL on bottom
+    BFont font;
+    if (be_plain_font)
+        font = *be_plain_font;
+
+    font.SetSize(DragLinkLabelFontsize);
+
+    float labelWidth = font.StringWidth(label.utf8().data());
+    float urlWidth = font.StringWidth(url.string().utf8().data());
+    float width = std::max(labelWidth, urlWidth) + 10;
+    float height = DragLinkLabelFontsize + DragLinkUrlFontSize + 10;
+
+    BRect rect(0, 0, width, height);
+    BBitmap* bitmap = new BBitmap(rect, B_RGBA32, true);
+    if (bitmap->InitCheck() != B_OK) {
+        delete bitmap;
+        return { nullptr, nullptr };
+    }
+
+    BView* view = new BView(rect, "drag", B_FOLLOW_NONE, 0);
+    bitmap->AddChild(view);
+
+    if (bitmap->Lock()) {
+        view->SetHighColor(B_TRANSPARENT_COLOR);
+        view->FillRect(rect);
+
+        view->SetHighColor(0, 0, 0, 255); // Black text
+        view->SetFont(&font);
+
+        // Draw Label
+        font_height fh;
+        font.GetHeight(&fh);
+        float y = fh.ascent + 2;
+        view->DrawString(label.utf8().data(), BPoint(5, y));
+
+        // Draw URL
+        font.SetSize(DragLinkUrlFontSize);
+        font.GetHeight(&fh);
+        y += fh.ascent + fh.descent + fh.leading + 2;
+        view->SetHighColor(0, 0, 255, 255); // Blue URL
+        view->SetFont(&font);
+        view->DrawString(url.string().utf8().data(), BPoint(5, y));
+
+        view->Sync();
+        bitmap->RemoveChild(view);
+        bitmap->Unlock();
+    }
+    delete view;
+
+    return { bitmap, nullptr };
 }
 
 } // namespace WebCore

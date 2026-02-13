@@ -46,9 +46,14 @@ public:
     }
 
 private:
+    void didStartProvisionalNavigation(WebKit::WebPageProxy&, const WebCore::ResourceRequest&, API::Navigation*, API::Object*) override;
     void didCommitNavigation(WebKit::WebPageProxy& page, API::Navigation* navigation, API::Object* userData) override;
     void didReceiveServerRedirectForProvisionalNavigation(WebKit::WebPageProxy& page, API::Navigation* navigation, API::Object* userData) override;
     void didFinishNavigation(WebKit::WebPageProxy& page, API::Navigation* navigation, API::Object* userData) override;
+    void didFailProvisionalNavigationWithError(WebKit::WebPageProxy&, WebKit::FrameInfoData&&, API::Navigation*, const WTF::URL&, const WebCore::ResourceError&, API::Object*) override;
+    void didFailNavigationWithError(WebKit::WebPageProxy&, const WebKit::FrameInfoData&, API::Navigation*, const WTF::URL&, const WebCore::ResourceError&, API::Object*) override;
+    void didSameDocumentNavigation(WebKit::WebPageProxy&, API::Navigation*, WebKit::SameDocumentNavigationType, API::Object*) override;
+    void renderingProgressDidChange(WebKit::WebPageProxy&, OptionSet<WebCore::LayoutMilestone>) override;
 
     BWebView* m_webView;
 };

@@ -36,6 +36,8 @@
 #include <InterfaceDefs.h>
 #include <Shape.h>
 #include <View.h>
+#include <wtf/HashSet.h>
+#include <wtf/NeverDestroyed.h>
 
 static int buttonWidth(int scrollbarWidth, int thickness)
 {
@@ -59,6 +61,22 @@ ScrollbarThemeHaiku::~ScrollbarThemeHaiku()
 {
 }
 
+static HashSet<Scrollbar*>& scrollbars()
+{
+    static NeverDestroyed<HashSet<Scrollbar*>> scrollbars;
+    return scrollbars;
+}
+
+void ScrollbarThemeHaiku::registerScrollbar(Scrollbar& scrollbar)
+{
+    scrollbars().add(&scrollbar);
+}
+
+void ScrollbarThemeHaiku::unregisterScrollbar(Scrollbar& scrollbar)
+{
+    scrollbars().remove(&scrollbar);
+}
+
 int ScrollbarThemeHaiku::scrollbarThickness(ScrollbarWidth scrollbarWidth, OverlayScrollbarSizeRelevancy overlayRelavancy)
 {
     int width = B_V_SCROLL_BAR_WIDTH;
@@ -66,7 +84,7 @@ int ScrollbarThemeHaiku::scrollbarThickness(ScrollbarWidth scrollbarWidth, Overl
         width = (int)be_control_look->GetScrollBarWidth();
 
     if (scrollbarWidth == ScrollbarWidth::Thin)
-        width = std::max(10, width * 2 / 3);
+        width = (width * 2) / 3;
 
     if (m_drawOuterFrame)
        return width + 1;

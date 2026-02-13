@@ -311,6 +311,9 @@ void NetworkDataTaskHaiku::HeadersReceived(BUrlRequest* caller)
 
 void NetworkDataTaskHaiku::DataReceived(BUrlRequest* caller, const char* data, off_t position, ssize_t size)
 {
+    if (m_output)
+        return;
+
     if (m_currentRequest.isNull())
         return;
 
@@ -408,6 +411,18 @@ void NetworkDataTaskHaiku::didReceiveData(const void* buffer, size_t size)
 
 void NetworkDataTaskHaiku::DebugMessage(BUrlRequest* caller, BUrlProtocolDebugMessage type, const char* text)
 {
+#if !LOG_DISABLED
+    switch (type) {
+        case B_URL_PROTOCOL_DEBUG_TEXT:
+            LOG(Network, "NetworkDataTaskHaiku Debug: %s", text);
+            break;
+        case B_URL_PROTOCOL_DEBUG_ERROR:
+            LOG(Network, "NetworkDataTaskHaiku Error: %s", text);
+            break;
+        default:
+            break;
+    }
+#endif
 }
 
 void NetworkDataTaskHaiku::AuthenticationNeeded(BHttpRequest* request, const ResourceResponse& response)

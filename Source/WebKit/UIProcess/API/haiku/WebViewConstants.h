@@ -31,5 +31,42 @@ enum {
     DID_CHANGE_PROGRESS = 'dcpr',
     DID_CHANGE_TITLE = 'dctt',
     URL_LOAD_HANDLE = 'urlh',
-    READY_TO_PAINT = 'retp'
+    READY_TO_PAINT = 'retp',
+
+    // NavigationClient events
+    DID_START_PROVISIONAL_NAVIGATION = 'dspn',
+    DID_RECEIVE_SERVER_REDIRECT_FOR_PROVISIONAL_NAVIGATION = 'dsrp',
+    DID_FAIL_PROVISIONAL_NAVIGATION = 'dfpn',
+    DID_FAIL_NAVIGATION = 'dfin',
+    DID_SAME_DOCUMENT_NAVIGATION = 'dsdn',
+    RENDERING_PROGRESS_DID_CHANGE = 'rpdc',
+
+    // PageLoadStateObserver events
+    DID_CHANGE_BACK_FORWARD = 'dcbf',
+    DID_CHANGE_IS_LOADING = 'dcil',
+    DID_CHANGE_ACTIVE_URL = 'dcau',
+    DID_CHANGE_NETWORK_REQUESTS = 'dcnr',
+
+    // PageUIClient events
+    CREATE_NEW_PAGE = 'crnp',
+    SHOW_PAGE = 'shpg',
+    CLOSE_PAGE = 'clpg',
+    RUN_JAVASCRIPT_ALERT = 'rjka',
+    RUN_JAVASCRIPT_CONFIRM = 'rjkc',
+    RUN_JAVASCRIPT_PROMPT = 'rjkp',
+    SET_STATUS_TEXT = 'stst',
+    MOUSE_DID_MOVE_OVER_ELEMENT = 'mdmo',
+
+    TOOLBARS_VISIBILITY_CHANGED = 'tvch',
+    MENU_BAR_VISIBILITY_CHANGED = 'mbvc',
+    STATUS_BAR_VISIBILITY_CHANGED = 'sbvc',
+    RESIZABLE_CHANGED = 'rsch',
+    WINDOW_FRAME_CHANGED = 'wfch',
+
+    // PageClient events
+    CONTENT_SIZE_CHANGED = 'csch',
+    PROCESS_DID_EXIT = 'prde',
+    PROCESS_DID_RELAUNCH = 'prdr',
+    PAGE_CLOSED = 'pgcl',
+    IS_PLAYING_AUDIO_CHANGED = 'ipac'
 };

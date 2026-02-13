@@ -147,8 +147,9 @@ void GraphicsContextHaiku::drawBitmap(BBitmap* image, const FloatRect& destRect,
     if (options.interpolationQuality() > InterpolationQuality::Low)
         flags |= B_FILTER_BITMAP_BILINEAR;
 
-    // FIXME: Async doesn't draw shadows (rarely they do appear,
-    // so there is a data race somewhere)
+    // Synchronize to ensure state (like shadows/clipping) is up to date before drawing the bitmap.
+    // This addresses the issue where async drawing might miss shadow updates.
+    m_view->Sync();
     m_view->DrawBitmap(image, BRect(srcRect), BRect(destRect), flags);
 }
 
@@ -194,8 +195,13 @@ void GraphicsContextHaiku::drawEllipse(const FloatRect& rect)
     }
 
     if (strokeStyle() != WebCore::StrokeStyle::NoStroke && strokeThickness() > 0.0f && strokeColor().isVisible()) {
-        // TODO: Gradient stroke
-        m_view->StrokeEllipse(rect, m_strokeStyle);
+        if (m_state.strokeBrush().gradient()) {
+            BShape shape;
+            shape.AddEllipse(rect);
+            const BGradient& gradient = m_state.strokeBrush().gradient()->getHaikuGradient();
+            m_view->StrokeShape(&shape, gradient);
+        } else
+            m_view->StrokeEllipse(rect, m_strokeStyle);
     }
 }
 
@@ -205,9 +211,32 @@ void GraphicsContextHaiku::strokeRect(const FloatRect& rect, float width)
     if (strokeStyle() == WebCore::StrokeStyle::NoStroke || width <= 0.0f || !strokeColor().isVisible())
         return;
 
+    if (hasDropShadow()) {
+        const auto shadow = dropShadow();
+        ShadowBlur contextShadow(*shadow, shadowsIgnoreTransforms());
+        FloatRect shadowRect = rect;
+        shadowRect.inflate(width / 2.0f);
+        contextShadow.drawShadowLayer(getCTM(), clipBounds(), shadowRect,
+            [&](GraphicsContext& shadowContext) {
+                shadowContext.setStrokeColor(Color::black);
+                shadowContext.setStrokeThickness(width);
+                shadowContext.strokeRect(rect, width);
+            },
+            [&](ImageBuffer& buffer, const FloatPoint& p, const FloatSize& s) {
+                this->drawImageBuffer(buffer, FloatRect(p, s), FloatRect(FloatPoint(), s), { CompositeOperator::SourceOver });
+            });
+    }
+
+    if (m_state.strokeBrush().gradient()) {
+        BShape shape;
+        shape.AddRect(rect);
+        const BGradient& gradient = m_state.strokeBrush().gradient()->getHaikuGradient();
+        m_view->StrokeShape(&shape, gradient);
+        return;
+    }
+
     float oldSize = m_view->PenSize();
     m_view->SetPenSize(width);
-    // TODO stroke the shadow
     m_view->StrokeRect(rect, m_strokeStyle);
     m_view->SetPenSize(oldSize);
 }
@@ -217,7 +246,21 @@ void GraphicsContextHaiku::strokePath(const Path& path)
     HGTRACE(("strokePath: (--todo print values)\n"));
     m_view->MovePenTo(B_ORIGIN);
 
-    // TODO: stroke the shadow (cf shadowAndStrokeCurrentCairoPath)
+    if (hasDropShadow()) {
+        const auto shadow = dropShadow();
+        ShadowBlur contextShadow(*shadow, shadowsIgnoreTransforms());
+        FloatRect shadowRect = path.boundingRect();
+        shadowRect.inflate(strokeThickness() / 2.0f);
+        contextShadow.drawShadowLayer(getCTM(), clipBounds(), shadowRect,
+            [&](GraphicsContext& shadowContext) {
+                shadowContext.setStrokeColor(Color::black);
+                shadowContext.setStrokeThickness(strokeThickness());
+                shadowContext.strokePath(path);
+            },
+            [&](ImageBuffer& buffer, const FloatPoint& p, const FloatSize& s) {
+                this->drawImageBuffer(buffer, FloatRect(p, s), FloatRect(FloatPoint(), s), { CompositeOperator::SourceOver });
+            });
+    }
 
     if (m_state.strokeBrush().pattern()) {
         // Fallback to solid color for now
@@ -243,8 +286,17 @@ void GraphicsContextHaiku::fillRect(const FloatRect& rect, const Color& color)
         HGTRACE(("hasDropShadow end\n"));
     }
     
-    // FillRect doesn't respect blending modes, DrawBitmap does
+    // FillRect doesn't respect blending modes, DrawBitmap does.
+    // However, if the color is opaque and we are in Copy or SourceOver mode (mostly),
+    // FillRect is much faster.
     const auto [r, g, b, a] = color.toColorTypeLossy<SRGBA<uint8_t>>().resolved();
+
+    if (a == 255 && m_view->DrawingMode() == B_OP_COPY) {
+        m_view->SetHighColor(r, g, b, 255);
+        m_view->FillRect(rect);
+        return;
+    }
+
     const uint32_t c = ((a << 24) | (r << 16) | (g << 8) | b);
     m_fillBitmap->Lock();
     uint32_t *bits = reinterpret_cast<uint32_t *>(m_fillBitmap->Bits());
@@ -271,8 +323,16 @@ void GraphicsContextHaiku::fillRect(const FloatRect& rect, RequiresClipToRect re
         contextShadow.drawRectShadow(*this, FloatRoundedRect(rect));
         HGTRACE(("hasDropShadow end\n"));
     }
-    // FillRect doesn't respect blending modes, DrawBitmap does
+
     const auto [r, g, b, a] = state().fillBrush().color().toColorTypeLossy<SRGBA<uint8_t>>().resolved();
+
+    if (a == 255 && m_view->DrawingMode() == B_OP_COPY) {
+        m_view->SetHighColor(r, g, b, 255);
+        m_view->FillRect(rect);
+        return;
+    }
+
+    // FillRect doesn't respect blending modes, DrawBitmap does
     const uint32_t c = ((a << 24) | (r << 16) | (g << 8) | b);
     m_fillBitmap->Lock();
     uint32_t *bits = reinterpret_cast<uint32_t *>(m_fillBitmap->Bits());
@@ -398,7 +458,19 @@ void GraphicsContextHaiku::fillPath(const Path& path)
     m_view->SetFillRule(fillRule() == WindRule::NonZero ? B_NONZERO : B_EVEN_ODD);
     m_view->MovePenTo(B_ORIGIN);
 
-    // TODO: Render the shadow (cf shadowAndFillCurrentCairoPath)
+    if (hasDropShadow()) {
+        const auto shadow = dropShadow();
+        ShadowBlur contextShadow(*shadow, shadowsIgnoreTransforms());
+        contextShadow.drawShadowLayer(getCTM(), clipBounds(), path.boundingRect(),
+            [&](GraphicsContext& shadowContext) {
+                shadowContext.setFillColor(Color::black);
+                shadowContext.fillPath(path);
+            },
+            [&](ImageBuffer& buffer, const FloatPoint& p, const FloatSize& s) {
+                this->drawImageBuffer(buffer, FloatRect(p, s), FloatRect(FloatPoint(), s), { CompositeOperator::SourceOver });
+            });
+    }
+
     drawing_mode mode = m_view->DrawingMode();
 
     if (m_state.fillBrush().pattern()) {
@@ -567,12 +639,13 @@ void GraphicsContextHaiku::drawLinesForText(const FloatPoint& point,
     float oldSize = m_view->PenSize();
     m_view->SetPenSize(bounds.height());
 
-    // TODO would be faster to use BeginLineArray/EndLineArray here
+    m_view->BeginLineArray(widths.size());
     for (const auto& width: widths)
     {
-        m_view->StrokeLine(BPoint(bounds.x() + width.begin, y),
-            BPoint(bounds.x() + width.end, y));
+        m_view->AddLine(BPoint(bounds.x() + width.begin, y),
+            BPoint(bounds.x() + width.end, y), m_view->HighColor());
     }
+    m_view->EndLineArray();
 
     m_view->SetPenSize(oldSize);
 }

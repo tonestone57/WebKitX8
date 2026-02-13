@@ -68,9 +68,8 @@ void NativeImage::clearSubimages()
 #if USE(COORDINATED_GRAPHICS)
 uint64_t NativeImage::uniqueID() const
 {
-    // FIXME this assumes a single bitmap per area
     if (auto& image = platformImage())
-        return area_for(image->Bits());
+        return reinterpret_cast<uint64_t>(image.get());
     return 0;
 }
 #endif

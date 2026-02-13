@@ -28,6 +28,7 @@
 
 #include "NetworkProcessCreationParameters.h"
 #include <WebCore/NotImplemented.h>
+#include <wtf/Language.h>
 #include <stdio.h>
 
 namespace WebKit {
@@ -36,6 +37,7 @@ using namespace WebCore;
 
 void NetworkProcess::platformInitializeNetworkProcess(const NetworkProcessCreationParameters& parameters)
 {
+    WTF::listenForLanguageChangeNotifications();
 }
 
 void NetworkProcess::allowSpecificHTTPSCertificateForHost(const CertificateInfo& certificateInfo, const String& host)

@@ -35,6 +35,7 @@
 #include "../../haiku/WebDateTimePickerHaiku.h"
 #include "../../haiku/WebPopupMenuProxyHaiku.h"
 #include "../../haiku/WebContextMenuProxyHaiku.h"
+#include "WebViewConstants.h"
 
 #include "WebCore/Region.h"
 #include "WebFrameProxy.h"
@@ -124,14 +125,16 @@ bool PageClientImpl::isViewInWindow()
     return fWebView.Window() != nullptr;
 }
 
-void PageClientImpl::PageClientImpl::processDidExit()
+void PageClientImpl::processDidExit()
 {
-    // fprintf(stderr, "PageClientImpl::processDidExit\n");
+    if (BWindow* window = fWebView.Window())
+        window->PostMessage(PROCESS_DID_EXIT);
 }
 
 void PageClientImpl::didRelaunchProcess()
 {
-    // fprintf(stderr, "PageClientImpl::didRelaunchProcess\n");
+    if (BWindow* window = fWebView.Window())
+        window->PostMessage(PROCESS_DID_RELAUNCH);
 }
 
 void PageClientImpl::toolTipChanged(const String&, const String& newToolTip)
@@ -271,7 +274,8 @@ void PageClientImpl::updateAcceleratedCompositingMode(const LayerTreeContext& la
 
 void PageClientImpl::pageClosed()
 {
-    // Cleanup if needed
+    if (BWindow* window = fWebView.Window())
+        window->PostMessage(PAGE_CLOSED);
 }
 
 void PageClientImpl::preferencesDidChange()
@@ -285,8 +289,12 @@ void PageClientImpl::preferencesDidChange()
 
 void PageClientImpl::didChangeContentSize(const IntSize& size)
 {
-    // Should update scrollbars?
-    // fWebView.SetContentSize(size); // Assuming BView or similar has this concept or we manage scrollbars
+    if (BWindow* window = fWebView.Window()) {
+        BMessage message(CONTENT_SIZE_CHANGED);
+        message.AddFloat("width", size.width());
+        message.AddFloat("height", size.height());
+        window->PostMessage(&message);
+    }
 }
 
 void PageClientImpl::didCommitLoadForMainFrame(const String& /* mimeType */, bool /* useCustomContentProvider */ )
@@ -477,10 +485,21 @@ void PageClientImpl::didSameDocumentNavigationForMainFrame(SameDocumentNavigatio
 
 void PageClientImpl::didChangeBackgroundColor()
 {
-    // fWebView.SetViewColor(page->backgroundColor());
-    if (fWebView.LockLooper()) {
-        fWebView.Invalidate();
-        fWebView.UnlockLooper();
+    if (auto* page = fWebView.page()) {
+        if (std::optional<WebCore::Color> color = page->backgroundColor()) {
+             auto srgba = color->toColorTypeLossy<SRGBA<uint8_t>>();
+             if (fWebView.LockLooper()) {
+                 rgb_color haikuColor = {
+                     srgba.red,
+                     srgba.green,
+                     srgba.blue,
+                     srgba.alpha
+                 };
+                 fWebView.SetViewColor(haikuColor);
+                 fWebView.Invalidate();
+                 fWebView.UnlockLooper();
+             }
+        }
     }
 }
 
@@ -490,7 +509,14 @@ void PageClientImpl::isPlayingAudioWillChange()
 
 void PageClientImpl::isPlayingAudioDidChange()
 {
-    // Could update window title or icon to show audio status
+    if (BWindow* window = fWebView.Window()) {
+        BMessage message(IS_PLAYING_AUDIO_CHANGED);
+        bool isPlaying = false;
+        if (auto* page = fWebView.page())
+            isPlaying = page->isPlayingAudio();
+        message.AddBool("playing", isPlaying);
+        window->PostMessage(&message);
+    }
 }
 
 void PageClientImpl::refView()
