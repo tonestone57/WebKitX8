@@ -75,6 +75,8 @@ String PlatformKeyboardEvent::keyIdentifierForHaikuKeyCode(char singleByte, int 
             return ASCIILiteral::fromLiteralUnsafe("F11");
         case B_F12_KEY:
             return ASCIILiteral::fromLiteralUnsafe("F12");
+        // Haiku doesn't have standard constants for F13-F24 in InterfaceDefs.h,
+        // but we can map them if we knew the codes.
         case B_PRINT_KEY:
             return ASCIILiteral::fromLiteralUnsafe("Print");
         case B_PAUSE_KEY:
@@ -667,6 +669,10 @@ PlatformKeyboardEvent::PlatformKeyboardEvent(const BMessage* message)
         m_modifiers.add(PlatformEvent::Modifier::AltKey);
     if (modifiers & B_OPTION_KEY)
         m_modifiers.add(PlatformEvent::Modifier::MetaKey);
+
+    // Haiku doesn't have a specific modifier for keypad, but we can infer it
+    // or check if key is a keypad key.
+    // For now, let's leave it as is, or use a heuristic if needed.
 }
 
 void PlatformKeyboardEvent::disambiguateKeyDownEvent(Type type, bool backwardCompatibilityMode)

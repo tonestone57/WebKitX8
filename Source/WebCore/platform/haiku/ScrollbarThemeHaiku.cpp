@@ -59,6 +59,17 @@ ScrollbarThemeHaiku::~ScrollbarThemeHaiku()
 {
 }
 
+void ScrollbarThemeHaiku::registerScrollbar(Scrollbar& scrollbar)
+{
+    // No specific registration needed for Haiku scrollbars currently,
+    // but this overrides the base class method.
+}
+
+void ScrollbarThemeHaiku::unregisterScrollbar(Scrollbar& scrollbar)
+{
+    // No specific unregistration needed.
+}
+
 int ScrollbarThemeHaiku::scrollbarThickness(ScrollbarWidth scrollbarWidth, OverlayScrollbarSizeRelevancy overlayRelavancy)
 {
     // FIXME: Should we make a distinction between a Small and a Regular Scrollbar?

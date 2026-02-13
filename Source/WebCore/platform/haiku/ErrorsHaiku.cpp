@@ -84,17 +84,17 @@ ResourceError downloadDestinationError(const ResourceResponse& response, const S
 
 ResourceError printError(const URL& failingURL, const String& errorMessage)
 {
-    return ResourceError(String::fromUTF8(errorDomainPrint), PrintErrorGeneral, failingURL, errorMessage);
+    return ResourceError(errorDomainPrint, PrintErrorGeneral, failingURL, errorMessage);
 }
 
 ResourceError printerNotFoundError(const URL& failingURL)
 {
-    return ResourceError(String::fromUTF8(errorDomainPrint), PrintErrorPrinterNotFound, failingURL, ASCIILiteral::fromLiteralUnsafe("Printer not found"));
+    return ResourceError(errorDomainPrint, PrintErrorPrinterNotFound, failingURL, "Printer not found"_s);
 }
 
 ResourceError invalidPageRangeToPrint(const URL& failingURL)
 {
-    return ResourceError(String::fromUTF8(errorDomainPrint), PrintErrorInvalidPageRange, failingURL, ASCIILiteral::fromLiteralUnsafe("Invalid page range"));
+    return ResourceError(errorDomainPrint, PrintErrorInvalidPageRange, failingURL, "Invalid page range"_s);
 }
 
 } // namespace WebCore

@@ -37,6 +37,17 @@ String logLevelString()
     return String::fromUTF8(getenv("WEBKIT_DEBUG"));
 }
 
+void log(WTFLogChannel* channel, WTFLogLevel level, const char* format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    vfprintf(stderr, format, args);
+    va_end(args);
+
+    // Also send to system log or serial if requested
+    // OS::dprintf(format, args); // Hypothetical API, Haiku usually uses debug_printf or syslog
+}
+
 } // namespace WebCore
 
 #endif // !LOG_DISABLED

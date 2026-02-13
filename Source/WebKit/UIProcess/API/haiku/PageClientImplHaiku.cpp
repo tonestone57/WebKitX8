@@ -226,8 +226,12 @@ IntPoint PageClientImpl::rootViewToScreen(const IntPoint& point)
 
 void PageClientImpl::doneWithKeyEvent(const NativeWebKeyboardEvent& event, bool wasEventHandled)
 {
-    // If the event wasn't handled by WebKit, we might want to pass it to the BView's default handling?
-    // But usually BView::KeyDown is what triggered this, so we are done.
+    if (!wasEventHandled) {
+        // If not handled by WebKit, we might want to let the system handle it.
+        // For example, system shortcuts.
+        // However, in BView model, events are consumed by the view mostly.
+        // If we wanted to propagate, we would need to pass it up.
+    }
 }
 
 RefPtr<WebPopupMenuProxy> PageClientImpl::createPopupMenuProxy(WebPageProxy& page)
@@ -310,26 +314,32 @@ void PageClientImpl::didFinishLoadingDataForCustomContentProvider(const String&,
 
 void PageClientImpl::navigationGestureDidBegin()
 {
+    // Not implemented on Haiku
 }
 
 void PageClientImpl::navigationGestureWillEnd(bool, WebBackForwardListItem&)
 {
+    // Not implemented on Haiku
 }
 
 void PageClientImpl::navigationGestureDidEnd(bool, WebBackForwardListItem&)
 {
+    // Not implemented on Haiku
 }
 
 void PageClientImpl::navigationGestureDidEnd()
 {
+    // Not implemented on Haiku
 }
 
 void PageClientImpl::willRecordNavigationSnapshot(WebBackForwardListItem&)
 {
+    // Not implemented on Haiku
 }
 
 void PageClientImpl::didRemoveNavigationGestureSnapshot()
 {
+    // Not implemented on Haiku
 }
 
 void PageClientImpl::didFirstVisuallyNonEmptyLayoutForMainFrame()

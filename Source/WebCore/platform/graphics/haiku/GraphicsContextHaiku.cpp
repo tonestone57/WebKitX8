@@ -177,7 +177,6 @@ void GraphicsContextHaiku::drawLine(const FloatPoint& point1, const FloatPoint& 
     m_view->StrokeLine(start, end, m_strokeStyle);
 }
 
-// This method is only used to draw the little circles used in lists.
 void GraphicsContextHaiku::drawEllipse(const FloatRect& rect)
 {
     HGTRACE(("drawEllipse: [%f:%f] [%f:%f]\n", rect.x(), rect.y(), rect.width(), rect.height()));
@@ -564,12 +563,13 @@ void GraphicsContextHaiku::drawLinesForText(const FloatPoint& point,
     float oldSize = m_view->PenSize();
     m_view->SetPenSize(bounds.height());
 
-    // TODO would be faster to use BeginLineArray/EndLineArray here
+    m_view->BeginLineArray(widths.size());
     for (const auto& width: widths)
     {
-        m_view->StrokeLine(BPoint(bounds.x() + width.begin, y),
-            BPoint(bounds.x() + width.end, y));
+        m_view->AddLine(BPoint(bounds.x() + width.begin, y),
+            BPoint(bounds.x() + width.end, y), m_view->HighColor());
     }
+    m_view->EndLineArray();
 
     m_view->SetPenSize(oldSize);
 }

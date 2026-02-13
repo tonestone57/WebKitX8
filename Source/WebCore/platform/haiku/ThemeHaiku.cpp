@@ -120,6 +120,40 @@ void ThemeHaiku::paintArrow(GraphicsContext& graphicsContext, const FloatRect& r
     }
 }
 
+void ThemeHaiku::paintProgressBar(GraphicsContext& graphicsContext, const FloatRect& rect, const FloatRect& progressRect, bool useDarkAppearance)
+{
+    BView* view = (BView*)graphicsContext.platformContext();
+    if (!view)
+        return;
+
+    rgb_color barColor = ui_color(B_CONTROL_BACKGROUND_COLOR);
+    rgb_color progressColor = ui_color(B_SUCCESS_COLOR); // Greenish
+
+    BRect frame(rect);
+    BRect progressFrame(progressRect);
+
+    // Draw background (track)
+    // Haiku doesn't have a simple DrawProgressBar method in BControlLook that matches exact rects easily without BStatusBar.
+    // We simulate it.
+
+    view->SetHighColor(barColor);
+    view->FillRect(frame);
+    view->SetHighColor(tint_color(barColor, B_DARKEN_2_TINT));
+    view->StrokeRect(frame);
+
+    // Draw progress
+    if (progressFrame.Width() > 0) {
+        view->SetHighColor(progressColor);
+        view->FillRect(progressFrame);
+    }
+}
+
+void ThemeHaiku::paintMeter(GraphicsContext& graphicsContext, const FloatRect& rect, const FloatRect& valueRect, bool useDarkAppearance)
+{
+    // Re-use progress bar logic for now
+    paintProgressBar(graphicsContext, rect, valueRect, useDarkAppearance);
+}
+
 rgb_color ThemeHaiku::colorForValue(color_which colorConstant, bool useDarkAppearance)
 {
     return ui_color(colorConstant);
