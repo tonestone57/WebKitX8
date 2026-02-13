@@ -112,11 +112,13 @@ void TextChecker::ignoreWord(SpellDocumentTag, const String& word)
     TextCheckerEnchant::singleton().ignoreWord(word);
 }
 
-void TextChecker::requestCheckingOfString(Ref<TextCheckerCompletion>&& completion, int32_t)
+void TextChecker::requestCheckingOfString(Ref<TextCheckerCompletion>&& completion, int32_t insertionPoint)
 {
-    // FIXME: Implement background checking
-    notImplemented();
-    completion->didFinishCheckingText({ });
+    // Basic synchronous check for now as Enchant is fast enough for small strings
+    // In a real implementation we might want to run this on a background thread.
+    Vector<WebCore::TextCheckingResult> results;
+    TextCheckerEnchant::singleton().checkTextOfParagraph(completion->text(), results);
+    completion->didFinishCheckingText(WTFMove(results));
 }
 
 void TextChecker::setTestingMode(bool)

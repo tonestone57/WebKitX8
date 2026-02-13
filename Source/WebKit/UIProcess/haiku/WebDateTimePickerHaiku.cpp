@@ -218,19 +218,30 @@ public:
                 }
 
                 if (m_hourMenu && m_hourMenu->Superitem()) {
-                    if (m_calendar) {
-                        // Append time to date string if both exist (datetimelocal)
-                    } else {
-                        // Time only
-                    }
+                    // Logic to combine date and time if needed
                     BString timeStr;
-                    timeStr << m_hourMenu->Superitem()->Label();
+                    BMenuItem* hourItem = m_hourMenu->FindMarked();
+                    if (hourItem)
+                        timeStr << hourItem->Label();
+                    else
+                        timeStr << "00";
+
                     if (timeStr.Length() < 2) timeStr.Prepend("0");
                     timeStr << ':';
-                    if (m_minuteMenu && m_minuteMenu->Superitem())
-                        timeStr << m_minuteMenu->Superitem()->Label();
 
-                    str << timeStr;
+                    BMenuItem* minuteItem = m_minuteMenu->FindMarked();
+                    if (minuteItem) {
+                        BString minStr = minuteItem->Label();
+                        if (minStr.Length() < 2) minStr.Prepend("0");
+                        timeStr << minStr;
+                    } else {
+                        timeStr << "00";
+                    }
+
+                    if (m_calendar)
+                        str << "T" << timeStr;
+                    else
+                        str = timeStr;
                 }
 
                 String dateString = String::fromUTF8(str.String());

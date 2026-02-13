@@ -116,8 +116,8 @@ void WebColorPickerHaiku::endPicker()
     if (m_window) {
         auto window = m_window;
         m_window = nullptr;
-        window->Lock();
-        window->Quit();
+        if (window->Lock())
+            window->Quit();
     }
     WebColorPicker::endPicker();
 }

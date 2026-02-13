@@ -88,7 +88,7 @@ void WebPopupMenuProxyHaiku::showPopupMenu(const WebCore::IntRect& rect, WebCore
 
     m_webView.UnlockLooper();
 
-    BMenuItem* selectedItem = m_menu->Go(screenPoint, false, false);
+    BMenuItem* selectedItem = m_menu->Go(screenPoint, false, true);
 
     if (selectedItem) {
         BMessage* msg = selectedItem->Message();
@@ -98,6 +98,10 @@ void WebPopupMenuProxyHaiku::showPopupMenu(const WebCore::IntRect& rect, WebCore
                 client()->valueChangedForPopupMenu(this, index);
             }
         }
+    } else {
+        // User cancelled the menu
+        if (client())
+            client()->valueChangedForPopupMenu(this, -1); // Or appropriate cancellation logic
     }
 
     // Clean up

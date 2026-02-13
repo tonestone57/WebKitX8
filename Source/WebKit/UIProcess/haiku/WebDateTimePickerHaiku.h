@@ -34,6 +34,8 @@ namespace WebKit {
 
 class WebPageProxy;
 
+class DateTimeChooserWindow;
+
 class WebDateTimePickerHaiku final : public WebDateTimePicker {
 public:
     static Ref<WebDateTimePickerHaiku> create(WebPageProxy&);
@@ -48,7 +50,7 @@ public:
 private:
     WebDateTimePickerHaiku(WebPageProxy&);
 
-    BWindow* m_window;
+    DateTimeChooserWindow* m_window;
 };
 
 } // namespace WebKit
