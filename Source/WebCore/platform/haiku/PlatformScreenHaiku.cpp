@@ -57,9 +57,16 @@ bool screenHasInvertedColors()
     return false;
 }
 
-FloatRect screenRect(Widget*)
+FloatRect screenRect(Widget* widget)
 {
     BScreen screen;
+    if (widget) {
+        if (BView* view = widget->platformWidget()) {
+            if (BWindow* window = view->Window())
+                screen = BScreen(window);
+        }
+    }
+
     if (!screen.IsValid())
         return FloatRect();
     // BRect is inclusive, so add 1 to width and height
@@ -70,6 +77,13 @@ FloatRect screenRect(Widget*)
 FloatRect screenAvailableRect(Widget* widget)
 {
     BScreen screen;
+    if (widget) {
+        if (BView* view = widget->platformWidget()) {
+            if (BWindow* window = view->Window())
+                screen = BScreen(window);
+        }
+    }
+
     if (!screen.IsValid())
         return FloatRect();
 

@@ -61,7 +61,6 @@ private:
     bool supportsKeySystem(const String& keySystem, const String& mimeType) const final
     {
         return false;
-        //return MediaPlayerPrivate::supportsKeySystem(keySystem, mimeType);
     }
 };
 
@@ -83,12 +82,16 @@ MediaPlayerPrivate::MediaPlayerPrivate(MediaPlayer& player)
     , m_volume(1.0)
     , m_currentTime(0.f)
     , m_paused(true)
+    , m_identifyThread(-1)
 {
 }
 
 MediaPlayerPrivate::~MediaPlayerPrivate()
 {
     delete m_soundPlayer;
+
+    if (m_identifyThread >= 0)
+        wait_for_thread(m_identifyThread, NULL);
 
     m_mediaLock.Lock();
 
@@ -120,23 +123,29 @@ void MediaPlayerPrivate::load(const String& url)
     // the m_readyState and the m_networkState to WebKit. The API will need to
     // be extended on Haiku side to query the internal state (and probably
     // BMediaFile should not block until data is ready?)
-    IdentifyTracks(url);
-    if (m_mediaFile && m_mediaFile->InitCheck() == B_OK) {
-        m_player.characteristicChanged();
-        m_player.durationChanged();
-        m_player.sizeChanged();
-        m_player.firstVideoFrameAvailable();
 
-        //m_readyState = MediaPlayer::HaveMetadata;
-        //m_readyState = MediaPlayer::HaveFutureData;
-        m_readyState = MediaPlayer::ReadyState::HaveEnoughData;
-        m_networkState = MediaPlayer::NetworkState::Loaded; // Loading;
-    } else {
-        m_readyState = MediaPlayer::ReadyState::HaveMetadata;
-        m_networkState = MediaPlayer::NetworkState::FormatError;
-    }
+    // IdentifyTracks(url); -- moved to thread
+
+    if (m_identifyThread >= 0)
+        wait_for_thread(m_identifyThread, NULL);
+
+    struct IdentifyParams {
+        MediaPlayerPrivate* self;
+        String url;
+    };
+    IdentifyParams* params = new IdentifyParams { this, url };
+
+    m_identifyThread = spawn_thread([](void* data) -> int32 {
+        IdentifyParams* params = (IdentifyParams*)data;
+        params->self->IdentifyTracks(params->url);
+        delete params;
+        return 0;
+    }, "Media Identify", B_NORMAL_PRIORITY, params);
+
+    resume_thread(m_identifyThread);
+
+    m_networkState = MediaPlayer::NetworkState::Loading;
     m_player.networkStateChanged();
-    m_player.readyStateChanged();
 }
 
 void MediaPlayerPrivate::cancelLoad()
@@ -316,11 +325,13 @@ PlatformTimeRanges& MediaPlayerPrivate::buffered() const
 {
     // FIXME: Return actual buffered ranges based on network cache or BMediaFile state.
     // For now, if we have a media file and are playing, assume we have content.
-    static PlatformTimeRanges ranges;
-    if (m_readyState >= MediaPlayer::ReadyState::HaveEnoughData && duration().toDouble() > 0) {
-        ranges.add(MediaTime::zeroTime(), duration());
+    // This is required for seeking to work properly in many HTML5 players.
+
+    m_buffered.clear();
+    if (m_readyState >= MediaPlayer::ReadyState::HaveMetadata && duration().toDouble() > 0) {
+        m_buffered.add(MediaTime::zeroTime(), duration());
     }
-    return ranges;
+    return m_buffered;
 }
 
 bool MediaPlayerPrivate::didLoadingProgress() const
@@ -346,16 +357,26 @@ void MediaPlayerPrivate::paint(GraphicsContext& context, const FloatRect& r)
 
 void MediaPlayerPrivate::IdentifyTracks(const String& url)
 {
-    // TODO something here is blocking inside the Media Kit. We should rework
-    // things so that this is run in a separate thread (Media Thread?). This
-    // would avoid the annoying freeze whenever a media is being loaded.
 #if B_HAIKU_VERSION <= B_HAIKU_VERSION_1_BETA_5
-    m_mediaFile = new BMediaFile(BUrl(url.utf8().data()));
+    BMediaFile* mediaFile = new BMediaFile(BUrl(url.utf8().data()));
 #else
-    m_mediaFile = new BMediaFile(BUrl(url.utf8().data(), false));
+    BMediaFile* mediaFile = new BMediaFile(BUrl(url.utf8().data(), false));
 #endif
 
-    if (m_mediaFile->InitCheck() == B_OK) {
+    // We can't access member variables directly without locking or ensuring safety
+    // But since this is run once and sets up the file, we need to be careful.
+    // The previous code assigned to m_mediaFile immediately.
+    // We should probably lock here when assigning to members.
+
+    // However, BMediaFile construction is the blocking part.
+
+    status_t err = mediaFile->InitCheck();
+
+    m_mediaLock.Lock();
+    m_mediaFile = mediaFile;
+    m_mediaLock.Unlock();
+
+    if (err == B_OK) {
         for (int i = m_mediaFile->CountTracks() - 1; i >= 0; i--)
         {
             BMediaTrack* track = m_mediaFile->TrackAt(i);
@@ -363,35 +384,52 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
             media_format format;
             track->DecodedFormat(&format);
 
+            m_mediaLock.Lock();
             if (format.IsVideo()) {
-                if (m_videoTrack)
-                    continue;
-                m_videoTrack = track;
-
-                m_frameBuffer = new BBitmap(
-                    BRect(0, 0, format.Width() - 1, format.Height() - 1),
-                    B_RGB32);
-
-                if (m_audioTrack)
-                    break;
+                if (!m_videoTrack) {
+                    m_videoTrack = track;
+                    m_frameBuffer = new BBitmap(
+                        BRect(0, 0, format.Width() - 1, format.Height() - 1),
+                        B_RGB32);
+                }
             }
 
             if (format.IsAudio()) {
-                if (m_audioTrack)
-                    continue;
-                m_audioTrack = track;
-
-                m_soundPlayer = new BSoundPlayer(&format.u.raw_audio,
-                    "HTML5 Audio", playCallback, NULL, this);
-                m_soundPlayer->SetVolume(m_volume);
-                if (!m_paused)
-                    m_soundPlayer->Start();
-
-                if (m_videoTrack)
-                    break;
+                if (!m_audioTrack) {
+                    m_audioTrack = track;
+                    m_soundPlayer = new BSoundPlayer(&format.u.raw_audio,
+                        "HTML5 Audio", playCallback, NULL, this);
+                    m_soundPlayer->SetVolume(m_volume);
+                    if (!m_paused)
+                        m_soundPlayer->Start();
+                }
             }
+            m_mediaLock.Unlock();
         }
     }
+
+    // Notify main thread
+    WeakPtr<MediaPlayerPrivate> p = WeakPtr(this);
+    callOnMainThread([p, err] {
+        if (!p) return;
+        if (err == B_OK) {
+            p->m_player.characteristicChanged();
+            p->m_player.durationChanged();
+            p->m_player.sizeChanged();
+            if (p->m_videoTrack)
+                p->m_player.firstVideoFrameAvailable();
+
+            p->m_readyState = MediaPlayer::ReadyState::HaveEnoughData;
+            p->m_networkState = MediaPlayer::NetworkState::Loaded;
+        } else {
+            p->m_readyState = MediaPlayer::ReadyState::HaveMetadata;
+            p->m_networkState = MediaPlayer::NetworkState::FormatError;
+        }
+        p->m_player.networkStateChanged();
+        p->m_player.readyStateChanged();
+    });
+
+    m_identifyThread = -1;
 }
 
 // #pragma mark - static methods

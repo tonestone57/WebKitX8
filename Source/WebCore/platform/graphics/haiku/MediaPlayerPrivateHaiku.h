@@ -110,6 +110,8 @@ private:
 
         mutable bool m_didReceiveData;
         BMediaFile* m_mediaFile;
+    thread_id m_identifyThread;
+        mutable PlatformTimeRanges m_buffered;
         BMediaTrack* m_audioTrack;
         BMediaTrack* m_videoTrack;
         BSoundPlayer* m_soundPlayer;

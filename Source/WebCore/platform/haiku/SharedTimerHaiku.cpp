@@ -39,99 +39,6 @@
 
 namespace WebCore {
 
-class TimerThread : public BLocker {
-public:
-	TimerThread(const BMessenger& timer)
-		: m_timer(timer)
-		, m_timerThread(B_BAD_THREAD_ID)
-		, m_timerSem(B_BAD_SEM_ID)
-		, m_nextFireTime(0)
-		, m_threadWaitUntil(0)
-		, m_terminating(false)
-	{
-		m_timerSem = create_sem(0, "timer thread control");
-		if (m_timerSem >= 0) {
-			m_timerThread = spawn_thread(timerThreadEntry, "timer thread",
-				B_URGENT_DISPLAY_PRIORITY, this);
-			if (m_timerThread >= 0)
-				resume_thread(m_timerThread);
-		}
-	}
-
-	~TimerThread()
-	{
-		m_terminating = true;
-		if (delete_sem(m_timerSem) == B_OK) {
-			int32 dummy;
-			wait_for_thread(m_timerThread, &dummy);
-		}
-	}
-
-	bool isValid() const
-	{
-		return m_timerThread >= 0 && m_timerSem >= 0;
-	}
-
-	void setNextEventTime(bigtime_t time)
-	{
-		Lock();
-		m_nextFireTime = time;
-		if (m_nextFireTime < m_threadWaitUntil)
-			release_sem(m_timerSem);
-		Unlock();
-	}
-
-private:
-	static int32 timerThreadEntry(void *data)
-	{
-		return ((TimerThread*)data)->timerThread();
-	}
-
-	int32 timerThread()
-	{
-		bool running = true;
-		while (running) {
-			bigtime_t waitUntil = B_INFINITE_TIMEOUT;
-			if (Lock()) {
-				if (m_nextFireTime > 0)
-				    waitUntil = m_nextFireTime;
-				m_threadWaitUntil = waitUntil;
-				Unlock();
-			}
-			status_t err = acquire_sem_etc(m_timerSem, 1, B_ABSOLUTE_TIMEOUT, waitUntil);
-			switch (err) {
-				case B_TIMED_OUT:
-					// do events, that are supposed to go off
-					if (!m_terminating && Lock() && system_time() >= m_nextFireTime) {
-						bool sendMessage = m_nextFireTime > 0;
-						m_nextFireTime = 0;
-						Unlock();
-						if (sendMessage)
-                            m_timer.SendMessage(FIRE_MESSAGE);
-					}
-					if (IsLocked())
-						Unlock();
-					break;
-				case B_BAD_SEM_ID:
-					running = false;
-					break;
-				case B_OK:
-				default:
-					break;
-			}
-		}
-		return 0;
-	}
-
-private:
-	BMessenger m_timer;
-	thread_id m_timerThread;
-	sem_id m_timerSem;
-	volatile bigtime_t m_nextFireTime;
-	volatile bigtime_t m_threadWaitUntil;
-	volatile bool m_terminating;
-};
-
 class SharedTimerHaiku : public BHandler {
     friend void setSharedTimerFiredFunction(void (*f)());
 public:
@@ -139,11 +46,6 @@ public:
 
     void start(double);
     void stop();
-
-	void setTimerThread(TimerThread* thread)
-	{
-		m_timerThread = thread;
-	}
 
 protected:
     virtual void MessageReceived(BMessage*);
@@ -153,21 +55,19 @@ private:
     ~SharedTimerHaiku();
 
     void (*m_timerFunction)();
-    bool m_shouldRun;
-    TimerThread* m_timerThread;
+    BMessageRunner* m_runner;
 };
 
 SharedTimerHaiku::SharedTimerHaiku()
     : BHandler("WebKit shared timer")
     , m_timerFunction(0)
-    , m_shouldRun(false)
-    , m_timerThread(0)
+    , m_runner(0)
 {
 }
 
 SharedTimerHaiku::~SharedTimerHaiku()
 {
-	delete m_timerThread;
+	delete m_runner;
 }
 
 SharedTimerHaiku* SharedTimerHaiku::instance()
@@ -179,8 +79,6 @@ SharedTimerHaiku* SharedTimerHaiku::instance()
         BAutolock lock(looper);
         timer = new SharedTimerHaiku();
         looper->AddHandler(timer);
-        // Only at this time, the timer can be a valid BMessenger.
-        timer->setTimerThread(new TimerThread(BMessenger(timer)));
     }
 
     return timer;
@@ -188,21 +86,23 @@ SharedTimerHaiku* SharedTimerHaiku::instance()
 
 void SharedTimerHaiku::start(double interval)
 {
-    m_shouldRun = true;
-    m_timerThread->setNextEventTime(system_time() + (bigtime_t)(interval * 1000000));
+    stop();
+    BMessage msg(FIRE_MESSAGE);
+    m_runner = new BMessageRunner(BMessenger(this), &msg, (bigtime_t)(interval * 1000000), 1);
 }
 
 void SharedTimerHaiku::stop()
 {
-    m_shouldRun = false;
-// FIXME: Stopping the timer thread here seems to cause issues with event loop processing, potentially affecting scrolling.
-//    m_timerThread->setNextEventTime(0);
+    delete m_runner;
+    m_runner = nullptr;
 }
 
-void SharedTimerHaiku::MessageReceived(BMessage*)
+void SharedTimerHaiku::MessageReceived(BMessage* message)
 {
-    if (m_shouldRun && m_timerFunction)
+    if (message->what == FIRE_MESSAGE && m_timerFunction)
         m_timerFunction();
+    else
+        BHandler::MessageReceived(message);
 }
 
 // WebCore functions

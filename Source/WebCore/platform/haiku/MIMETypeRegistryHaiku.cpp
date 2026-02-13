@@ -66,25 +66,36 @@ static const ExtensionMap extensionMap[] = {
 
 String MIMETypeRegistry::mimeTypeForExtension(const StringView ext)
 {
-    String str = ext.convertToASCIILowercase();
+    String str = ext.toString();
 
-    // Try WebCore built-in types.
+    // WebCore built-in types usually cover a lot, but let's check Haiku system DB first
+    // or as a robust fallback. The previous code checked built-in first.
+    // Let's stick to built-in first for consistency with other ports,
+    // but the map was very small.
+
+    // Improve lookup by using Haiku's BMimeType::GuessMimeType properly
+    // It works well with extensions if we provide a filename.
+
+    BString fakeFileName("filename.");
+    fakeFileName.Append(str.utf8().data());
+
+    BMimeType type;
+    if (BMimeType::GuessMimeType(fakeFileName.String(), &type) == B_OK) {
+        // Haiku might return "application/octet-stream" if unknown, which we might want to avoid
+        // if we want to fallback to other mechanisms?
+        if (strcmp(type.Type(), "application/octet-stream") != 0)
+             return String::fromUTF8(type.Type());
+    }
+
+    // Try WebCore built-in types if system failed or returned generic
+    String lowerExt = ext.convertToASCIILowercase();
     const ExtensionMap* extMap = extensionMap;
     while (extMap->extension) {
-        if (str == StringView::fromLatin1(extMap->extension))
+        if (lowerExt == StringView::fromLatin1(extMap->extension))
             return String::fromUTF8(extMap->mimeType);
         ++extMap;
     }
 
-    // Try system mime database.
-    BString fakeFileName("filename.");
-    fakeFileName.Append(str);
-
-    BMimeType type;
-    if (BMimeType::GuessMimeType(fakeFileName.String(), &type) == B_OK)
-        return String::fromUTF8(type.Type());
-
-    // unknown
     return String();
 }
 

@@ -101,19 +101,38 @@ Vector<FontSelectionCapabilities> FontCache::getFontSelectionCapabilitiesInFamil
 {
     Vector<FontSelectionCapabilities> result;
 
-#if 0
-    int32 count = count_font_styles(familyName);
+    int32 count = count_font_styles(familyName.string().utf8().data());
 
     result.reserveInitialCapacity(count);
 
-    font_style nativeStyle;
-
     for (int index = 0; index < count; index++)
     {
-        get_font_style(familyName, index, &nativeStyle);
-        result.uncheckedAppend(nativeStyle);
+        font_style nativeStyle;
+        uint32 flags = 0;
+        if (get_font_style(familyName.string().utf8().data(), index, &nativeStyle, &flags) == B_OK) {
+            // Map Haiku font style to FontSelectionCapabilities
+            // Haiku doesn't expose weight/stretch/slope directly in a standard way except via name or flags
+            // But for now, we can try to guess or just return default capabilities if we can't parse it.
+            // Actually, FontSelectionCapabilities expects weight/width/slope ranges.
+
+            // FIXME: Properly parse style name or flags to Determine weight/width/slope.
+            // For now, we will add a default capability which implies the font is available.
+            // Or we can try to use BFont to inspect it if possible.
+
+            FontSelectionCapabilities capabilities;
+
+            // Simple heuristics based on style name
+            String style = String::fromUTF8(nativeStyle);
+            if (style.containsIgnoringASCIICase("Bold"_s)) {
+                capabilities.weight = { FontSelectionValue(700), FontSelectionValue(700), FontSelectionValue(700) };
+            }
+            if (style.containsIgnoringASCIICase("Italic"_s) || style.containsIgnoringASCIICase("Oblique"_s)) {
+                capabilities.slope = { FontSelectionValue::italic(), FontSelectionValue::italic(), FontSelectionValue::italic() };
+            }
+
+            result.append(capabilities);
+        }
     }
-#endif
     return result;
 }
 
