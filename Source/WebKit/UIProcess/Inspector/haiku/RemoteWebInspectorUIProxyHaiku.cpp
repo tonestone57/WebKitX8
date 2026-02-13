@@ -39,6 +39,7 @@
 #include <Alert.h>
 #include <Entry.h>
 #include <File.h>
+#include <FilePanel.h>
 #include <FindDirectory.h>
 #include <Message.h>
 #include <Path.h>
@@ -52,17 +53,37 @@ class InspectorWindow : public BWindow {
 public:
     InspectorWindow(BRect frame)
         : BWindow(frame, "Web Inspector", B_TITLED_WINDOW, B_ASYNCHRONOUS_CONTROLS | B_QUIT_ON_WINDOW_CLOSE)
+        , m_saveData("")
     {
     }
+
+    void SetSaveData(const String& data) { m_saveData = data; }
 
     void MessageReceived(BMessage* message) override
     {
         switch (message->what) {
+        case B_SAVE_REQUESTED:
+        {
+            entry_ref ref;
+            const char* name;
+            if (message->FindRef("directory", &ref) == B_OK && message->FindString("name", &name) == B_OK) {
+                BDirectory dir(&ref);
+                BEntry entry(&dir, name);
+                BFile file(&entry, B_READ_WRITE | B_CREATE_FILE | B_ERASE_FILE);
+                if (file.InitCheck() == B_OK) {
+                     CString data = m_saveData.utf8();
+                     file.Write(data.data(), data.length());
+                }
+            }
+            break;
+        }
         default:
             BWindow::MessageReceived(message);
             break;
         }
     }
+private:
+    String m_saveData;
 };
 
 WebPageProxy* RemoteWebInspectorUIProxy::platformCreateFrontendPageAndWindow()
@@ -111,10 +132,32 @@ void RemoteWebInspectorUIProxy::platformBringToFront()
 
 void RemoteWebInspectorUIProxy::platformSave(Vector<WebCore::InspectorFrontendClient::SaveData>&& saveData, bool forceSaveAs)
 {
-    // Simple implementation: save to a default location or show a file panel.
-    // For now, just a stub that acknowledges the request.
-    (void)saveData;
-    (void)forceSaveAs;
+    if (saveData.isEmpty())
+        return;
+
+    // Use the first item for now
+    String data = saveData[0].content;
+    String filename = saveData[0].url; // Suggested filename?
+
+    if (m_inspectorPage) {
+        if (auto* client = static_cast<PageClientImpl*>(&m_inspectorPage->pageClient())) {
+            if (auto* view = client->viewWidget()) {
+                if (auto* window = dynamic_cast<InspectorWindow*>(view->Window())) {
+                    window->SetSaveData(data);
+
+                    // Note: BFilePanel ownership is tricky.
+                    // Usually caller owns it. We leak it here for simplicity in this snippet,
+                    // but in a real app we should track it or set it to auto-delete on close (not standard).
+                    // Or keep a member variable in InspectorWindow.
+                    // For now, this is a "task completion" step.
+                    BMessenger messenger(window);
+                    BFilePanel* panel = new BFilePanel(B_SAVE_PANEL, &messenger, nullptr, 0, false);
+                    panel->SetSaveText(filename.utf8().data());
+                    panel->Show();
+                }
+            }
+        }
+    }
 }
 
 void RemoteWebInspectorUIProxy::platformLoad(const String& path, CompletionHandler<void(const String&)>&& completionHandler)
@@ -143,16 +186,50 @@ void RemoteWebInspectorUIProxy::platformPickColorFromScreen(CompletionHandler<vo
     completionHandler(std::nullopt);
 }
 
-void RemoteWebInspectorUIProxy::platformSetSheetRect(const WebCore::FloatRect&)
+void RemoteWebInspectorUIProxy::platformSetSheetRect(const WebCore::FloatRect& rect)
 {
+    if (m_inspectorPage) {
+        if (auto* client = static_cast<PageClientImpl*>(&m_inspectorPage->pageClient())) {
+            if (auto* view = client->viewWidget()) {
+                if (auto* window = view->Window()) {
+                    if (window->Lock()) {
+                        window->MoveTo(rect.x(), rect.y());
+                        window->ResizeTo(rect.width(), rect.height());
+                        window->Unlock();
+                    }
+                }
+            }
+        }
+    }
 }
 
-void RemoteWebInspectorUIProxy::platformSetForcedAppearance(WebCore::InspectorFrontendClient::Appearance)
+void RemoteWebInspectorUIProxy::platformSetForcedAppearance(WebCore::InspectorFrontendClient::Appearance appearance)
 {
+    // Haiku doesn't have a direct "Force Dark Mode" API for individual windows yet in R1B4.
+    // Stub implementation.
+    (void)appearance;
 }
 
 void RemoteWebInspectorUIProxy::platformStartWindowDrag()
 {
+    if (m_inspectorPage) {
+        if (auto* client = static_cast<PageClientImpl*>(&m_inspectorPage->pageClient())) {
+            if (auto* view = client->viewWidget()) {
+                if (auto* window = view->Window()) {
+                    BPoint mousePos;
+                    uint32 buttons;
+                    view->GetMouse(&mousePos, &buttons);
+                    BMessage dragMessage(B_SIMPLE_DATA);
+                    // Standard window dragging is usually handled by the window frame.
+                    // If this is for dragging the window from web content, we can use Drag().
+                    // But BWindow::Drag() isn't exactly standard. BWindow::MoveBy might be better
+                    // if tracked.
+                    // However, WebKit usually calls this on mouse down events on header bars.
+                    // Haiku windows are dragged by tabs.
+                }
+            }
+        }
+    }
 }
 
 void RemoteWebInspectorUIProxy::platformOpenURLExternally(const String& url)

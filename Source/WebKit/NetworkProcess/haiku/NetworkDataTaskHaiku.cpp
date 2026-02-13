@@ -68,10 +68,10 @@ public:
         return size;
     }
 
-    ssize_t Read(void* buffer, size_t size) override { return 0; }
-    off_t Seek(off_t position, uint32 seekMode) override { return 0; }
+    ssize_t Read(void* buffer, size_t size) override { return B_NOT_ALLOWED; }
+    off_t Seek(off_t position, uint32 seekMode) override { return B_NOT_ALLOWED; }
     off_t Position() const override { return 0; }
-    status_t SetSize(off_t size) override { return B_OK; }
+    status_t SetSize(off_t size) override { return B_NOT_ALLOWED; }
 
 private:
     NetworkDataTaskHaiku* m_task;
@@ -184,6 +184,7 @@ void NetworkDataTaskHaiku::resume()
 
 void NetworkDataTaskHaiku::invalidateAndCancel()
 {
+    cancel();
 }
 
 NetworkDataTask::State NetworkDataTaskHaiku::state() const
@@ -311,6 +312,13 @@ void NetworkDataTaskHaiku::HeadersReceived(BUrlRequest* caller)
 
 void NetworkDataTaskHaiku::DataReceived(BUrlRequest* caller, const char* data, off_t position, ssize_t size)
 {
+    // Data is handled by NetworkDataOutput::Write() if m_output is set.
+    // If m_output is NOT set (which shouldn't happen for our usage), we might receive data here.
+    // But since we always set m_output in createRequest(), we can ignore this to avoid duplication,
+    // OR we should only handle it if m_output is NULL.
+    if (m_output)
+        return;
+
     if (m_currentRequest.isNull())
         return;
 
@@ -327,7 +335,8 @@ void NetworkDataTaskHaiku::DataReceived(BUrlRequest* caller, const char* data, o
         buffer.append((const uint8_t*)data, size);
 
         runOnMainThread([this, protectedThis = Ref { *this }, buffer = WTFMove(buffer)]() mutable {
-            m_client->didReceiveData(SharedBuffer::create(WTFMove(buffer)));
+            if (m_client)
+                m_client->didReceiveData(SharedBuffer::create(WTFMove(buffer)));
         });
     }
 
@@ -336,11 +345,22 @@ void NetworkDataTaskHaiku::DataReceived(BUrlRequest* caller, const char* data, o
 
 void NetworkDataTaskHaiku::BytesWritten(BUrlRequest* caller, size_t size)
 {
-    // Handled by NetworkDataOutput::Write
+    // This callback indicates bytes written to the OUTPUT (response body) or INPUT (upload)?
+    // BUrlProtocol::BytesWritten(size_t bytes) documentation says "Bytes written to the output."
+    // But since we use a BDataIO output, the output writes happen via Write().
+    // BUrlProtocol might call this after output->Write().
+    // However, for UPLOADS (POST data), BUrlProtocol calls UploadProgress.
 }
 
 void NetworkDataTaskHaiku::UploadProgress(BUrlRequest* caller, off_t bytesSent, off_t bytesTotal)
 {
+    if (!m_client)
+        return;
+
+    runOnMainThread([this, protectedThis = Ref { *this }, bytesSent, bytesTotal] {
+        if (m_client)
+            m_client->didSendData(bytesSent, bytesTotal);
+    });
 }
 
 void NetworkDataTaskHaiku::RequestCompleted(BUrlRequest* caller, bool success)
@@ -375,6 +395,25 @@ void NetworkDataTaskHaiku::RequestCompleted(BUrlRequest* caller, bool success)
 
 bool NetworkDataTaskHaiku::CertificateVerificationFailed(BUrlRequest* caller, BCertificate& certificate, const char* message)
 {
+    // FIXME: We should create a proper ProtectionSpace with ServerTrustEvaluationRequested scheme
+    // and send an AuthenticationChallenge to the client.
+    // For now, we will log the failure and return false to stop the request, which is the secure default.
+    // Implementing interactive certificate acceptance requires constructing a WebCore::CertificateInfo
+    // from the BCertificate, which might need platform glue.
+
+    // Return false to abort the request.
+    // To allow it, we would return true.
+
+    // Ideally:
+    // 1. Create ProtectionSpace for ServerTrust.
+    // 2. Create AuthenticationChallenge.
+    // 3. m_client->didReceiveChallenge(...).
+    // 4. Wait for completion handler.
+    // BUT CertificateVerificationFailed is synchronous in BUrlProtocol.
+    // We cannot wait for the async WebKit client response here easily without blocking.
+    // BUrlRequest might not support async cert decisions yet.
+
+    // So for now, fail securely.
     return false;
 }
 
@@ -396,6 +435,19 @@ void NetworkDataTaskHaiku::didReceiveData(const void* buffer, size_t size)
 
 void NetworkDataTaskHaiku::DebugMessage(BUrlRequest* caller, BUrlProtocolDebugMessage type, const char* text)
 {
+#if !LOG_DISABLED
+    // Map Haiku debug messages to WebKit log channels if appropriate
+    switch (type) {
+        case B_URL_PROTOCOL_DEBUG_TEXT:
+            LOG(Network, "NetworkDataTaskHaiku Debug: %s", text);
+            break;
+        case B_URL_PROTOCOL_DEBUG_ERROR:
+            LOG(Network, "NetworkDataTaskHaiku Error: %s", text);
+            break;
+        default:
+            break;
+    }
+#endif
 }
 
 void NetworkDataTaskHaiku::AuthenticationNeeded(BHttpRequest* request, const ResourceResponse& response)
@@ -409,21 +461,42 @@ void NetworkDataTaskHaiku::AuthenticationNeeded(BHttpRequest* request, const Res
         return;
     }
 
-    // Create a basic ProtectionSpace. Haiku BHttpRequest handles auth internally to some degree,
-    // but here we are intercepting the failure.
-    // FIXME: Extract realm and scheme from response headers.
+    // Extract realm and scheme from WWW-Authenticate header
+    String authHeader = response.httpHeaderField(WebCore::HTTPHeaderName::WWWAuthenticate);
+    String realm = "realm"_s; // Default
+    WebCore::ProtectionSpace::AuthenticationScheme scheme = WebCore::ProtectionSpace::AuthenticationScheme::HTTPBasic;
+
+    if (!authHeader.isEmpty()) {
+        if (authHeader.startsWithIgnoringASCIICase("Digest"_s))
+            scheme = WebCore::ProtectionSpace::AuthenticationScheme::HTTPDigest;
+        else if (authHeader.startsWithIgnoringASCIICase("Basic"_s))
+            scheme = WebCore::ProtectionSpace::AuthenticationScheme::HTTPBasic;
+
+        size_t realmPos = authHeader.find("realm=\"");
+        if (realmPos != notFound) {
+            size_t start = realmPos + 7;
+            size_t end = authHeader.find('"', start);
+            if (end != notFound)
+                realm = authHeader.substring(start, end - start);
+        }
+    }
+
     WebCore::ProtectionSpace protectionSpace(m_baseUrl.host(), m_baseUrl.port().value_or(0),
-        WebCore::ProtectionSpace::ServerType::HTTP, "realm"_s, WebCore::ProtectionSpace::AuthenticationScheme::HTTPBasic);
+        WebCore::ProtectionSpace::ServerType::HTTP, realm, scheme);
 
     // Using a default ResourceError as previousFailureCount
-    m_client->didReceiveAuthenticationChallenge(AuthenticationChallenge(protectionSpace, Credential(), 0, response, ResourceError()), NegotiatedLegacyTLS::No, [protectedThis = Ref { *this }](AuthenticationChallengeDisposition disposition, const Credential& credential) {
+    m_client->didReceiveAuthenticationChallenge(AuthenticationChallenge(protectionSpace, Credential(), 0, response, ResourceError()), NegotiatedLegacyTLS::No, [protectedThis = Ref { *this }, scheme](AuthenticationChallengeDisposition disposition, const Credential& credential) {
         if (disposition == AuthenticationChallengeDisposition::UseCredential && !credential.isEmpty()) {
             // Apply credentials to the request logic
             if (auto* httpRequest = dynamic_cast<BHttpRequest*>(protectedThis->m_request)) {
                 BHttpAuthentication& auth = httpRequest->Authentication();
                 auth.SetUserName(credential.user().utf8().data());
                 auth.SetPassword(credential.password().utf8().data());
-                auth.SetMethod(B_HTTP_AUTHENTICATION_BASIC); // Assuming basic for now, or infer from header
+
+                if (scheme == WebCore::ProtectionSpace::AuthenticationScheme::HTTPDigest)
+                     auth.SetMethod(B_HTTP_AUTHENTICATION_DIGEST);
+                else
+                     auth.SetMethod(B_HTTP_AUTHENTICATION_BASIC);
             }
         }
     });
