@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 Haiku, Inc. All rights reserved.
+ * Copyright (C) 2019 Haiku, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -22,56 +22,44 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
-#pragma once
 
-#include "APIObject.h"
+#include "config.h"
+#include "MemoryPressureHandler.h"
 
-#include <Rect.h>
-#include <View.h>
-#include <wtf/WeakPtr.h>
-
-class BWindow;
-
-namespace API {
-class PageConfiguration;
-}
+#include <OS.h>
+#include <wtf/MainThread.h>
+#include <wtf/RunLoop.h>
 
 namespace WebCore {
-class IntRect;
+
+void MemoryPressureHandler::platformReleaseMemory(Critical)
+{
 }
 
-namespace WebKit {
-
-class PageClientImpl;
-class WebPageProxy;
-
-class WebViewBase: public API::ObjectImpl<API::Object::Type::View>, public BView, public CanMakeWeakPtr<WebViewBase> {
-public:
-    static RefPtr<WebViewBase> create(const char* name, BRect rect,
-        BWindow* parentWindow, const API::PageConfiguration& config)
-    {
-        auto fWebView = adoptRef(*new WebViewBase(name, rect, parentWindow, config));
-        return fWebView;
-    }
-    WebPageProxy* page() const { return fPage.get(); }
-    const char* currentURL() const;
-
-    virtual void MessageReceived(BMessage*);
-    // hook methods
-    virtual void FrameResized(float, float);
-    virtual void Draw(BRect);
-    virtual void MakeFocus(bool focused);
-
-    void setCursor(const WebCore::Cursor&);
-    void setToolTip(const char*);
-
-private:
-    WebViewBase(const char*, BRect, BWindow*, const API::PageConfiguration&);
-
-    void paint(const WebCore::IntRect&);
-
-    RefPtr<WebPageProxy> fPage;
-    std::unique_ptr<PageClientImpl> fPageClient;
-};
-
+std::optional<MemoryPressureHandler::ReliefLogger::MemoryUsage> MemoryPressureHandler::ReliefLogger::platformMemoryUsage()
+{
+    return std::nullopt;
 }
+
+void MemoryPressureHandler::install()
+{
+    if (m_installed)
+        return;
+
+    m_installed = true;
+
+    RunLoop::main().dispatchRepeating([] {
+        system_info info;
+        if (get_system_info(&info) == B_OK) {
+            uint64_t freeMemory = (uint64_t)info.free_memory * B_PAGE_SIZE;
+            uint64_t totalMemory = (uint64_t)info.max_pages * B_PAGE_SIZE;
+
+            // Trigger if less than 64MB or 5% memory free
+            if (freeMemory < 64 * 1024 * 1024 || (totalMemory > 0 && (double)freeMemory / totalMemory < 0.05)) {
+                MemoryPressureHandler::singleton().triggerMemoryPressureEvent(false);
+            }
+        }
+    }, 10_s);
+}
+
+} // namespace WebCore

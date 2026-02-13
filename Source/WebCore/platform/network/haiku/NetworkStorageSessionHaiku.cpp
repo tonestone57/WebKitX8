@@ -186,7 +186,18 @@ void NetworkStorageSession::deleteAllCookies(WTF::CompletionHandler<void()>&& co
 
 void NetworkStorageSession::deleteAllCookiesModifiedSince(WallTime since, WTF::CompletionHandler<void()>&& completionHandler)
 {
-    // FIXME: Implement time-based deletion
+    BPrivate::Network::BNetworkCookieJar::Iterator it(platformSession().GetCookieJar().GetIterator());
+    const BPrivate::Network::BNetworkCookie* c;
+    Vector<const BPrivate::Network::BNetworkCookie*> cookiesToRemove;
+
+    while ((c = it.Next())) {
+        if (c->LastAccessTime() >= since.secondsSinceEpoch().seconds())
+            cookiesToRemove.append(c);
+    }
+
+    for (auto* cookie : cookiesToRemove)
+        platformSession().GetCookieJar().RemoveCookie(cookie);
+
     completionHandler();
 }
 

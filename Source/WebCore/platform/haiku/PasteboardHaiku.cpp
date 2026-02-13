@@ -47,6 +47,9 @@
 #include <String.h>
 #include <wtf/text/CString.h>
 
+#include <BitmapStream.h>
+#include <TranslatorRoster.h>
+
 
 namespace WebCore {
 
@@ -191,9 +194,13 @@ void WebCore::Pasteboard::write(WebCore::PasteboardImage const& pasteboardImage)
     if (!data)
         return;
 
-    BMessage archive;
-    if (platformImage->Archive(&archive) == B_OK)
-        data->AddMessage("image/bitmap", &archive);
+    BTranslatorRoster* roster = BTranslatorRoster::Default();
+    if (roster) {
+        BBitmapStream stream(new BBitmap(platformImage));
+        BMallocIO output;
+        if (roster->Translate(&stream, nullptr, nullptr, &output, B_PNG_FORMAT) == B_OK)
+            data->AddData("image/png", B_MIME_TYPE, output.Buffer(), output.BufferLength());
+    }
 
     be_clipboard->Commit();
 }

@@ -112,11 +112,11 @@ void TextChecker::ignoreWord(SpellDocumentTag, const String& word)
     TextCheckerEnchant::singleton().ignoreWord(word);
 }
 
-void TextChecker::requestCheckingOfString(Ref<TextCheckerCompletion>&& completion, int32_t)
+void TextChecker::requestCheckingOfString(Ref<TextCheckerCompletion>&& completion, int32_t insertionPoint)
 {
     // FIXME: Implement background checking
-    notImplemented();
-    completion->didFinishCheckingText({ });
+    Vector<TextCheckingResult> results = TextCheckerEnchant::singleton().checkTextOfParagraph(completion->text(), { TextCheckingType::Spelling }, insertionPoint);
+    completion->didFinishCheckingText(WTFMove(results));
 }
 
 void TextChecker::setTestingMode(bool)

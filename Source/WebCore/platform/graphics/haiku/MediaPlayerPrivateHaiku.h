@@ -85,6 +85,8 @@ public:
         bool paused() const override;
 
         void setVolume(float) override;
+        void setMuted(bool) override;
+        void setRate(float) override;
 
         MediaPlayer::NetworkState networkState() const override;
         MediaPlayer::ReadyState readyState() const override;
@@ -100,6 +102,8 @@ public:
     constexpr MediaPlayerType mediaPlayerType() const final { return MediaPlayerType::Haiku; }
 private:
         void IdentifyTracks(const String& url);
+        void didLoad();
+        static int32 loaderThread(void*);
 
         static void playCallback(void*, void*, size_t,
             const media_raw_audio_format&);
@@ -115,14 +119,18 @@ private:
         BSoundPlayer* m_soundPlayer;
         BBitmap* m_frameBuffer;
         BLocker m_mediaLock;
+        thread_id m_loaderThread;
+        mutable PlatformTimeRanges m_buffered;
 
         MediaPlayer& m_player;
         MediaPlayer::NetworkState m_networkState;
         MediaPlayer::ReadyState m_readyState;
 
         float m_volume;
+        float m_rate { 1.0f };
         float m_currentTime;
         bool m_paused;
+        bool m_muted { false };
 };
 
 }

@@ -35,6 +35,7 @@
 #include <GroupLayout.h>
 #include <GroupLayoutBuilder.h>
 #include <Button.h>
+#include <Slider.h>
 
 namespace WebKit {
 using namespace WebCore;
@@ -54,11 +55,16 @@ public:
         m_colorControl = new BColorControl(B_ORIGIN, B_CELLS_32x8, 8, "picker", new BMessage('chng'));
         m_colorControl->SetValue(toHaikuColor(color));
 
+        m_alphaSlider = new BSlider("alpha", "Alpha", new BMessage('alph'), 0, 255, B_HORIZONTAL);
+        m_alphaSlider->SetModificationMessage(new BMessage('alph'));
+        m_alphaSlider->SetValue(color.toSRGB<uint8_t>().alpha);
+
         BGroupLayout* root = new BGroupLayout(B_VERTICAL);
         SetLayout(root);
 
         BGroupLayoutBuilder(root)
             .Add(m_colorControl)
+            .Add(m_alphaSlider)
             .AddGlue();
 
         CenterOnScreen();
@@ -66,9 +72,11 @@ public:
 
     void MessageReceived(BMessage* message) override {
         switch(message->what) {
-            case 'chng': {
+            case 'chng':
+            case 'alph': {
                 rgb_color rgb = m_colorControl->ValueAsColor();
-                Color color(SRGBA<uint8_t> { rgb.red, rgb.green, rgb.blue, rgb.alpha });
+                uint8 alpha = (uint8)m_alphaSlider->Value();
+                Color color(SRGBA<uint8_t> { rgb.red, rgb.green, rgb.blue, alpha });
                 RunLoop::main().dispatch([picker = &m_picker, color]() {
                     picker->didChooseColor(color);
                 });
@@ -89,6 +97,7 @@ public:
 private:
     WebColorPickerHaiku& m_picker;
     BColorControl* m_colorControl;
+    BSlider* m_alphaSlider;
 };
 
 Ref<WebColorPickerHaiku> WebColorPickerHaiku::create(WebPageProxy& page, const Color& initialColor)
@@ -127,6 +136,9 @@ void WebColorPickerHaiku::setSelectedColor(const Color& color)
     if (m_window && m_window->Lock()) {
         if (BView* view = m_window->FindView("picker")) {
              static_cast<BColorControl*>(view)->SetValue(toHaikuColor(color));
+        }
+        if (BView* view = m_window->FindView("alpha")) {
+             static_cast<BSlider*>(view)->SetValue(color.toSRGB<uint8_t>().alpha);
         }
         m_window->Unlock();
     }

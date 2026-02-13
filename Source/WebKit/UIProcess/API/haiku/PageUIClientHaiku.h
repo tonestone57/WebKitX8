@@ -41,6 +41,12 @@ public:
 
     void printFrame(WebPageProxy&, WebFrameProxy&, const WebCore::FloatSize& pdfFirstPageSize, CompletionHandler<void()>&&) override;
 
+    void runOpenPanel(WebPageProxy&, WebFrameProxy&, const WebCore::SecurityOriginData&, API::OpenPanelParameters&, WebOpenPanelResultListenerProxy&) override;
+    void showNotification(WebPageProxy&, const WebCore::NotificationData&, RefPtr<WebCore::NotificationResources>&&, CompletionHandler<void()>&&) override;
+    void runJavaScriptAlert(WebPageProxy&, const String&, WebFrameProxy&, const WebCore::SecurityOriginData&, CompletionHandler<void()>&&) override;
+    void runJavaScriptConfirm(WebPageProxy&, const String&, WebFrameProxy&, const WebCore::SecurityOriginData&, CompletionHandler<void(bool)>&&) override;
+    void runJavaScriptPrompt(WebPageProxy&, const String&, const String&, WebFrameProxy&, const WebCore::SecurityOriginData&, CompletionHandler<void(const String&)>&&) override;
+
 private:
     WebViewBase& m_webView;
 };
