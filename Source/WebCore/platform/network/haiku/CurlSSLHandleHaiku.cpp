@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021 Sony Interactive Entertainment Inc.
+ * Copyright (C) 2014 Haiku, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,12 +26,15 @@
 #include "config.h"
 #include "CurlSSLHandle.h"
 
+#if USE(CURL)
+
 namespace WebCore {
 
-void CurlSSLHandle::platformInitialize()
+long CurlSSLHandle::platformSSLOptions()
 {
-    //m_caCertInfo = String("/system/data/ssl/CARootCertificates.pem"_s);
-    setIgnoreSSLErrors(true);
+    return 0;
 }
 
 } // namespace WebCore
+
+#endif // USE(CURL)

@@ -52,6 +52,8 @@ namespace WebCore {
 namespace WebKit {
 using namespace WebCore;
 
+class NetworkDataOutput;
+
 class NetworkDataTaskHaiku final : public NetworkDataTask,
     public BUrlProtocolAsynchronousListener
 {
@@ -69,7 +71,12 @@ public:
     }
 
     ~NetworkDataTaskHaiku();
+
+    void didReceiveData(const void* buffer, size_t size);
+
 private:
+    friend class NetworkDataOutput;
+
     NetworkDataTaskHaiku(NetworkSession&, NetworkDataTaskClient&, const WebCore::ResourceRequest&,
         WebCore::StoredCredentialsPolicy, WebCore::ContentSniffingPolicy,
         WebCore::ContentEncodingSniffingPolicy, bool shouldClearReferrerOnHTTPSToHTTPRedirect,
@@ -92,6 +99,8 @@ private:
     bool CertificateVerificationFailed(BUrlRequest* caller, BCertificate& certificate, const char* message) override;
     void DebugMessage(BUrlRequest* caller,BUrlProtocolDebugMessage type,const char* text) override;
 
+    void AuthenticationNeeded(BHttpRequest* request, const WebCore::ResourceResponse& response);
+
     WebCore::ResourceResponse m_response;
     WebCore::ResourceRequest m_currentRequest;
     WebCore::NetworkLoadMetrics m_networkLoadMetrics;
@@ -100,6 +109,7 @@ private:
     MonotonicTime m_startTime;
     BUrlRequest* m_request;
     BFormDataIO* m_postData;
+    NetworkDataOutput* m_output;
     URL m_baseUrl;
     bool m_responseDataSent;
     bool m_redirected;

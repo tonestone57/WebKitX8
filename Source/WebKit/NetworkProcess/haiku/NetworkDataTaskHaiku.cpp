@@ -30,6 +30,7 @@
 #include "NetworkResourceLoader.h"
 
 #include <WebCore/AuthenticationChallenge.h>
+#include <WebCore/ProtectionSpace.h>
 #include <WebCore/CookieJar.h>
 #include <WebCore/HTTPParsers.h>
 #include <WebCore/NetworkStorageSession.h>
@@ -53,6 +54,29 @@ namespace WebKit {
 
 using namespace WebCore;
 
+class NetworkDataOutput : public BDataIO {
+public:
+    NetworkDataOutput(NetworkDataTaskHaiku* task)
+        : m_task(task)
+    {
+    }
+
+    ssize_t Write(const void* buffer, size_t size) override
+    {
+        if (m_task)
+            m_task->didReceiveData(buffer, size);
+        return size;
+    }
+
+    ssize_t Read(void* buffer, size_t size) override { return 0; }
+    off_t Seek(off_t position, uint32 seekMode) override { return 0; }
+    off_t Position() const override { return 0; }
+    status_t SetSize(off_t size) override { return B_OK; }
+
+private:
+    NetworkDataTaskHaiku* m_task;
+};
+
 NetworkDataTaskHaiku::NetworkDataTaskHaiku(NetworkSession& session, NetworkDataTaskClient& client,
     const ResourceRequest& requestWithCredentials, StoredCredentialsPolicy storedCredentialsPolicy,
     ContentSniffingPolicy shouldContentSniff, ContentEncodingSniffingPolicy,
@@ -60,6 +84,7 @@ NetworkDataTaskHaiku::NetworkDataTaskHaiku(NetworkSession& session, NetworkDataT
     : NetworkDataTask(session, client, requestWithCredentials, storedCredentialsPolicy,
         shouldClearReferrerOnHTTPSToHTTPRedirect, dataTaskIsForMainFrameNavigation)
     , m_postData(NULL)
+    , m_output(NULL)
     , m_responseDataSent(false)
     , m_redirected(false)
     , m_position(0)
@@ -84,6 +109,7 @@ NetworkDataTaskHaiku::~NetworkDataTaskHaiku()
     if (m_request)
         m_request->SetListener(NULL);
     delete m_request;
+    delete m_output;
 }
 
 void NetworkDataTaskHaiku::createRequest(ResourceRequest&& request)
@@ -97,6 +123,9 @@ void NetworkDataTaskHaiku::createRequest(ResourceRequest&& request)
 
     if (m_request == NULL)
         return;
+
+    m_output = new NetworkDataOutput(this);
+    m_request->SetOutput(m_output);
 
     m_baseUrl = URL(m_request->Url());
 
@@ -226,9 +255,7 @@ void NetworkDataTaskHaiku::HeadersReceived(BUrlRequest* caller)
         }
 
         if (statusCode == 401) {
-            //TODO
-
-            //AuthenticationNeeded((BHttpRequest*)m_request, response);
+            AuthenticationNeeded(dynamic_cast<BHttpRequest*>(m_request), response);
             // AuthenticationNeeded may have aborted the request
             // so we need to make sure we can continue.
 
@@ -309,7 +336,7 @@ void NetworkDataTaskHaiku::DataReceived(BUrlRequest* caller, const char* data, o
 
 void NetworkDataTaskHaiku::BytesWritten(BUrlRequest* caller, size_t size)
 {
-    // Implemented via DataReceived
+    // Handled by NetworkDataOutput::Write
 }
 
 void NetworkDataTaskHaiku::UploadProgress(BUrlRequest* caller, off_t bytesSent, off_t bytesTotal)
@@ -318,21 +345,32 @@ void NetworkDataTaskHaiku::UploadProgress(BUrlRequest* caller, off_t bytesSent, 
 
 void NetworkDataTaskHaiku::RequestCompleted(BUrlRequest* caller, bool success)
 {
-    if (success) {
+    if (m_state == State::Canceling || m_state == State::Completed)
+        return;
+
+    m_state = State::Completed;
+
+    if (!success) {
+        ResourceError error(m_baseUrl.host().toString(), caller->Result().StatusCode(), m_baseUrl,
+            String::fromUTF8(caller->Result().StatusText()));
+
         m_networkLoadMetrics.responseEnd = MonotonicTime::now();
         m_networkLoadMetrics.markComplete();
 
-        runOnMainThread([this, protectedThis = Ref { *this }] {
-             m_client->didCompleteWithError(ResourceError(), m_networkLoadMetrics);
+        runOnMainThread([this, protectedThis = Ref { *this }, error] {
+            if (m_client)
+                m_client->didCompleteWithError(error, m_networkLoadMetrics);
         });
-    } else {
-        ResourceError error("BUrlProtocol", caller->Result().StatusCode(), m_baseUrl, "Request failed");
-        m_networkLoadMetrics.responseEnd = MonotonicTime::now();
-        m_networkLoadMetrics.markComplete();
-         runOnMainThread([this, protectedThis = Ref { *this }, error] {
-             m_client->didCompleteWithError(error, m_networkLoadMetrics);
-        });
+        return;
     }
+
+    m_networkLoadMetrics.responseEnd = MonotonicTime::now();
+    m_networkLoadMetrics.markComplete();
+
+    runOnMainThread([this, protectedThis = Ref { *this }] {
+        if (m_client)
+            m_client->didFinishLoading(m_networkLoadMetrics);
+    });
 }
 
 bool NetworkDataTaskHaiku::CertificateVerificationFailed(BUrlRequest* caller, BCertificate& certificate, const char* message)
@@ -340,8 +378,55 @@ bool NetworkDataTaskHaiku::CertificateVerificationFailed(BUrlRequest* caller, BC
     return false;
 }
 
+void NetworkDataTaskHaiku::didReceiveData(const void* buffer, size_t size)
+{
+    if (!m_client || m_state == State::Canceling || m_state == State::Completed)
+        return;
+
+    if (size == 0) return;
+
+    Vector<uint8_t> dataVector;
+    dataVector.append((const uint8_t*)buffer, size);
+
+    runOnMainThread([protectedThis = Ref { *this }, dataVector = WTFMove(dataVector)] {
+        if (protectedThis->m_client)
+            protectedThis->m_client->didReceiveData(SharedBuffer::create(WTFMove(dataVector)));
+    });
+}
+
 void NetworkDataTaskHaiku::DebugMessage(BUrlRequest* caller, BUrlProtocolDebugMessage type, const char* text)
 {
+}
+
+void NetworkDataTaskHaiku::AuthenticationNeeded(BHttpRequest* request, const ResourceResponse& response)
+{
+    if (!m_client)
+        return;
+
+    m_authFailureCount++;
+    if (m_authFailureCount > 3) {
+        // Give up after too many tries
+        return;
+    }
+
+    // Create a basic ProtectionSpace. Haiku BHttpRequest handles auth internally to some degree,
+    // but here we are intercepting the failure.
+    // FIXME: Extract realm and scheme from response headers.
+    WebCore::ProtectionSpace protectionSpace(m_baseUrl.host(), m_baseUrl.port().value_or(0),
+        WebCore::ProtectionSpace::ServerType::HTTP, "realm"_s, WebCore::ProtectionSpace::AuthenticationScheme::HTTPBasic);
+
+    // Using a default ResourceError as previousFailureCount
+    m_client->didReceiveAuthenticationChallenge(AuthenticationChallenge(protectionSpace, Credential(), 0, response, ResourceError()), NegotiatedLegacyTLS::No, [protectedThis = Ref { *this }](AuthenticationChallengeDisposition disposition, const Credential& credential) {
+        if (disposition == AuthenticationChallengeDisposition::UseCredential && !credential.isEmpty()) {
+            // Apply credentials to the request logic
+            if (auto* httpRequest = dynamic_cast<BHttpRequest*>(protectedThis->m_request)) {
+                BHttpAuthentication& auth = httpRequest->Authentication();
+                auth.SetUserName(credential.user().utf8().data());
+                auth.SetPassword(credential.password().utf8().data());
+                auth.SetMethod(B_HTTP_AUTHENTICATION_BASIC); // Assuming basic for now, or infer from header
+            }
+        }
+    });
 }
 
 void NetworkDataTaskHaiku::runOnMainThread(Function<void()>&& task)

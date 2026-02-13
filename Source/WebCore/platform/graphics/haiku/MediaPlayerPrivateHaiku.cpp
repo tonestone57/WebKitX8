@@ -240,8 +240,15 @@ bool MediaPlayerPrivate::hasVideo() const
     return m_videoTrack;
 }
 
-void MediaPlayerPrivate::setPageIsVisible(bool)
+void MediaPlayerPrivate::setPageIsVisible(bool visible)
 {
+    if (visible) {
+        if (!m_paused)
+            play();
+    } else {
+        if (!m_paused && m_soundPlayer)
+            m_soundPlayer->Stop(false);
+    }
 }
 
 WTF::MediaTime MediaPlayerPrivate::duration() const
@@ -307,8 +314,12 @@ MediaPlayer::ReadyState MediaPlayerPrivate::readyState() const
 
 PlatformTimeRanges& MediaPlayerPrivate::buffered() const
 {
+    // FIXME: Return actual buffered ranges based on network cache or BMediaFile state.
+    // For now, if we have a media file and are playing, assume we have content.
     static PlatformTimeRanges ranges;
-    // FIXME: Return ranges from BMediaFile
+    if (m_readyState >= MediaPlayer::ReadyState::HaveEnoughData && duration().toDouble() > 0) {
+        ranges.add(MediaTime::zeroTime(), duration());
+    }
     return ranges;
 }
 

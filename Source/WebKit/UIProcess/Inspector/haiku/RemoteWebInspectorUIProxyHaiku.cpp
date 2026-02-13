@@ -28,45 +28,126 @@
 
 #if ENABLE(REMOTE_INSPECTOR)
 
+#include "APIPageConfiguration.h"
+#include "PageClientImplHaiku.h"
+#include "WebViewBase.h"
+#include "WebPageProxy.h"
+#include <WebCore/CertificateInfo.h>
+#include <WebCore/InspectorFrontendClient.h>
 #include <WebCore/NotImplemented.h>
+
+#include <Alert.h>
+#include <Entry.h>
+#include <File.h>
+#include <FindDirectory.h>
+#include <Message.h>
+#include <Path.h>
+#include <Rect.h>
+#include <Roster.h>
+#include <Window.h>
 
 namespace WebKit {
 
+class InspectorWindow : public BWindow {
+public:
+    InspectorWindow(BRect frame)
+        : BWindow(frame, "Web Inspector", B_TITLED_WINDOW, B_ASYNCHRONOUS_CONTROLS | B_QUIT_ON_WINDOW_CLOSE)
+    {
+    }
+
+    void MessageReceived(BMessage* message) override
+    {
+        switch (message->what) {
+        default:
+            BWindow::MessageReceived(message);
+            break;
+        }
+    }
+};
+
 WebPageProxy* RemoteWebInspectorUIProxy::platformCreateFrontendPageAndWindow()
 {
-    // FIXME: Implement creation of inspector window
-    return nullptr;
+    BRect rect(100, 100, 900, 700);
+    InspectorWindow* window = new InspectorWindow(rect);
+
+    Ref<API::PageConfiguration> configuration = API::PageConfiguration::create();
+    auto webView = WebViewBase::create("InspectorView", window->Bounds(), window, configuration.get());
+    auto* page = webView->page();
+    window->AddChild(webView.leakRef());
+    window->Show();
+
+    return page;
+}
+
+void RemoteWebInspectorUIProxy::platformCloseFrontendPageAndWindow()
+{
+    if (m_inspectorPage)
+        m_inspectorPage->close();
 }
 
 void RemoteWebInspectorUIProxy::platformResetState()
 {
+    BPath path;
+    if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) != B_OK)
+        return;
+    path.Append("WebKit/WebInspector");
+
+    BEntry entry(path.Path());
+    if (entry.Exists())
+        entry.Remove();
 }
 
 void RemoteWebInspectorUIProxy::platformBringToFront()
 {
-    // FIXME: Bring inspector window to front
+    if (m_inspectorPage) {
+        if (auto* client = static_cast<PageClientImpl*>(&m_inspectorPage->pageClient())) {
+            if (auto* view = client->viewWidget()) {
+                if (auto* window = view->Window())
+                    window->Activate();
+            }
+        }
+    }
 }
 
-void RemoteWebInspectorUIProxy::platformSave(Vector<WebCore::InspectorFrontendClient::SaveData>&&, bool /* forceSaveAs */)
+void RemoteWebInspectorUIProxy::platformSave(Vector<WebCore::InspectorFrontendClient::SaveData>&& saveData, bool forceSaveAs)
 {
-    // FIXME: Implement save dialog
+    // Simple implementation: save to a default location or show a file panel.
+    // For now, just a stub that acknowledges the request.
+    (void)saveData;
+    (void)forceSaveAs;
 }
 
-void RemoteWebInspectorUIProxy::platformLoad(const String&, CompletionHandler<void(const String&)>&& completionHandler)
+void RemoteWebInspectorUIProxy::platformLoad(const String& path, CompletionHandler<void(const String&)>&& completionHandler)
 {
-    completionHandler(nullString());
+    BFile file(path.utf8().data(), B_READ_ONLY);
+    if (file.InitCheck() != B_OK) {
+        completionHandler(String());
+        return;
+    }
+
+    off_t size;
+    file.GetSize(&size);
+
+    auto buffer = makeUniqueArray<char>(size + 1);
+    if (file.Read(buffer.get(), size) != size) {
+        completionHandler(String());
+        return;
+    }
+    buffer[size] = '\0';
+
+    completionHandler(String::fromUTF8(buffer.get()));
 }
 
 void RemoteWebInspectorUIProxy::platformPickColorFromScreen(CompletionHandler<void(const std::optional<WebCore::Color>&)>&& completionHandler)
 {
-    completionHandler({ });
+    completionHandler(std::nullopt);
 }
 
-void RemoteWebInspectorUIProxy::platformSetSheetRect(const FloatRect&)
+void RemoteWebInspectorUIProxy::platformSetSheetRect(const WebCore::FloatRect&)
 {
 }
 
-void RemoteWebInspectorUIProxy::platformSetForcedAppearance(InspectorFrontendClient::Appearance)
+void RemoteWebInspectorUIProxy::platformSetForcedAppearance(WebCore::InspectorFrontendClient::Appearance)
 {
 }
 
@@ -74,23 +155,27 @@ void RemoteWebInspectorUIProxy::platformStartWindowDrag()
 {
 }
 
-void RemoteWebInspectorUIProxy::platformOpenURLExternally(const String&)
+void RemoteWebInspectorUIProxy::platformOpenURLExternally(const String& url)
 {
-    // FIXME: BWorkspace::Launch
+    CString urlString = url.utf8();
+    const char* argv[] = { urlString.data(), nullptr };
+    be_roster->Launch("text/html", 1, const_cast<char**>(argv));
 }
 
-void RemoteWebInspectorUIProxy::platformRevealFileExternally(const String&)
+void RemoteWebInspectorUIProxy::platformRevealFileExternally(const String& path)
 {
-    // FIXME: BWorkspace::Launch
+    entry_ref ref;
+    if (get_ref_for_path(path.utf8().data(), &ref) == B_OK) {
+        BMessage msg(B_REFS_RECEIVED);
+        msg.AddRef("refs", &ref);
+        be_roster->Launch("application/x-vnd.Be-TRAK", &msg);
+    }
 }
 
-void RemoteWebInspectorUIProxy::platformShowCertificate(const CertificateInfo&)
+void RemoteWebInspectorUIProxy::platformShowCertificate(const WebCore::CertificateInfo&)
 {
-}
-
-void RemoteWebInspectorUIProxy::platformCloseFrontendPageAndWindow()
-{
-    // FIXME: Close window
+    BAlert* alert = new BAlert("Certificate Info", "Certificate viewing is not yet implemented.", "OK");
+    alert->Go(nullptr);
 }
 
 } // namespace WebKit

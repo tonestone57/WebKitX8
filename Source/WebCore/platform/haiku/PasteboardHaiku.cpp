@@ -34,7 +34,6 @@
 #include "Frame.h"
 #include "LocalFrameInlines.h"
 #include "wtf/URL.h"
-#include "NotImplemented.h"
 #include "SimpleRange.h"
 #include "TextResourceDecoder.h"
 #include "markup.h"
@@ -168,9 +167,34 @@ void Pasteboard::writePlainText(const String& text, SmartReplaceOption smartRepl
 }
 
 
-void WebCore::Pasteboard::write(WebCore::PasteboardImage const& image)
+void WebCore::Pasteboard::write(WebCore::PasteboardImage const& pasteboardImage)
 {
-    // FIXME: Write bitmap data to clipboard
+    auto image = pasteboardImage.image;
+    if (!image)
+        return;
+
+    auto nativeImage = image->nativeImage();
+    if (!nativeImage)
+        return;
+
+    auto platformImage = nativeImage->platformImage();
+    if (!platformImage)
+        return;
+
+    AutoClipboardLocker locker(be_clipboard);
+    if (!locker.isLocked())
+        return;
+
+    be_clipboard->Clear();
+    BMessage* data = be_clipboard->Data();
+    if (!data)
+        return;
+
+    BMessage archive;
+    if (platformImage->Archive(&archive) == B_OK)
+        data->AddMessage("image/bitmap", &archive);
+
+    be_clipboard->Commit();
 }
 
 void Pasteboard::write(const PasteboardBuffer&)
