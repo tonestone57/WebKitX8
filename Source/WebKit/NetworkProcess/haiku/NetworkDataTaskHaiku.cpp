@@ -352,8 +352,14 @@ void NetworkDataTaskHaiku::BytesWritten(BUrlRequest* caller, size_t size)
 void NetworkDataTaskHaiku::UploadProgress(BUrlRequest* caller, off_t bytesSent, off_t bytesTotal)
 {
     if (m_client && bytesTotal > 0) {
-        // FIXME: Calculate delta bytes sent and call m_client->didSendData.
-        // This requires tracking previous bytesSent in a member variable.
+        if (bytesSent < m_lastBytesSent)
+            m_lastBytesSent = 0; // Reset if progress restarts
+
+        off_t delta = bytesSent - m_lastBytesSent;
+        if (delta > 0) {
+            m_client->didSendData(delta, bytesTotal);
+            m_lastBytesSent = bytesSent;
+        }
     }
 }
 

@@ -114,6 +114,7 @@ private:
     bool m_responseDataSent;
     bool m_redirected;
     off_t m_position;
+    off_t m_lastBytesSent { 0 };
 
     int m_redirectionTries;
 };
