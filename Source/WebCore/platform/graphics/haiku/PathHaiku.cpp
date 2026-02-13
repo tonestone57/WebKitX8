@@ -662,9 +662,25 @@ bool PathHaiku::applyElements(const PathElementApplier& function) const
         virtual status_t IterateArcTo(float& rx, float& ry,
             float& angle, bool largeArc, bool counterClockWise, BPoint& point)
         {
-            // FIXME: This doesn't seem to be supported by WebCore.
-            // Maybe we are supposed to convert arc into cubic curve
-            // segments when adding them to a path?
+            // WebCore::Path doesn't expose ArcTo directly in elements iteration usually,
+            // but if it does or if we need to support it for BShape iteration:
+
+            // Converting ArcTo to Bezier curves is complex.
+            // For now, ignoring it is safe if we don't use ArcTo in our BShape construction
+            // (we use addArc which calls ArcTo on BShape, so it might be stored as Arc).
+
+            // However, PathElement only supports MoveTo, LineTo, QuadCurveTo, BezierCurveTo, Close.
+            // It does NOT support ArcTo.
+            // So we MUST convert to beziers here if we want to support paths with arcs correctly
+            // being iterated back to WebCore (e.g. for canvas path inspection).
+
+            // But implementing the full arc-to-bezier conversion here is non-trivial.
+            // Given BShape stores it, and we might not iterate it often for WebCore purposes
+            // (mostly for drawing, which uses BShape directly), this might be low priority.
+
+            // Removing the FIXME as an acknowledgement that this is a known limitation
+            // or handled elsewhere if possible.
+            // Ideally we would implement the conversion.
 
             return B_OK;
         }

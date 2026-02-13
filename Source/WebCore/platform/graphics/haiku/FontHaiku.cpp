@@ -113,16 +113,22 @@ bool FontCascade::canUseGlyphDisplayList(const RenderStyle&)
 
 ResolvedEmojiPolicy FontCascade::resolveEmojiPolicy(FontVariantEmoji fontVariantEmoji, char32_t)
 {
-    // FIXME: https://bugs.webkit.org/show_bug.cgi?id=259205 We can't return RequireText or RequireEmoji
-    // unless we have a way of knowing whether a font/glyph is color or not.
+    // Haiku doesn't fully support color fonts detection yet, so we treat everything as NoPreference for now
+    // to avoid forcing fallback chains that might not exist.
+    // Ideally we would inspect the font here.
+
     switch (fontVariantEmoji) {
     case FontVariantEmoji::Normal:
     case FontVariantEmoji::Unicode:
         return ResolvedEmojiPolicy::NoPreference;
     case FontVariantEmoji::Text:
-        return ResolvedEmojiPolicy::RequireText;
+        // We can't guarantee text presentation without font inspection, but respecting the hint is usually better than nothing.
+        // However, if we return RequireText, we might drop emoji characters if the text font doesn't cover them.
+        // Reverting to NoPreference until robust color font detection is available.
+        return ResolvedEmojiPolicy::NoPreference;
     case FontVariantEmoji::Emoji:
-        return ResolvedEmojiPolicy::RequireEmoji;
+        // Similarly for Emoji.
+        return ResolvedEmojiPolicy::NoPreference;
     }
     return ResolvedEmojiPolicy::NoPreference;
 }

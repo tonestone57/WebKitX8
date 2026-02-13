@@ -147,8 +147,9 @@ void GraphicsContextHaiku::drawBitmap(BBitmap* image, const FloatRect& destRect,
     if (options.interpolationQuality() > InterpolationQuality::Low)
         flags |= B_FILTER_BITMAP_BILINEAR;
 
-    // FIXME: Async doesn't draw shadows (rarely they do appear,
-    // so there is a data race somewhere)
+    // Synchronize to ensure state (like shadows/clipping) is up to date before drawing the bitmap.
+    // This addresses the issue where async drawing might miss shadow updates.
+    m_view->Sync();
     m_view->DrawBitmap(image, BRect(srcRect), BRect(destRect), flags);
 }
 

@@ -72,11 +72,12 @@ void ScrollbarThemeHaiku::unregisterScrollbar(Scrollbar& scrollbar)
 
 int ScrollbarThemeHaiku::scrollbarThickness(ScrollbarWidth scrollbarWidth, OverlayScrollbarSizeRelevancy overlayRelavancy)
 {
-    // FIXME: Should we make a distinction between a Small and a Regular Scrollbar?
-
     int width = B_V_SCROLL_BAR_WIDTH;
     if (be_control_look)
         width = (int)be_control_look->GetScrollBarWidth();
+
+    if (scrollbarWidth == ScrollbarWidth::Thin)
+        width = (width * 2) / 3;
 
     if (m_drawOuterFrame)
        return width + 1;
