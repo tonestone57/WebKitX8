@@ -35,8 +35,15 @@
 #include "../../haiku/WebDateTimePickerHaiku.h"
 #include "../../haiku/WebPopupMenuProxyHaiku.h"
 
+#include "WebCore/BitmapImage.h"
+#include "WebCore/Image.h"
+#include "WebCore/NativeImage.h"
 #include "WebCore/Region.h"
+#include "WebCore/ShareableBitmap.h"
+#include "PrintInfo.h"
 
+#include <Bitmap.h>
+#include <PrintJob.h>
 #include <View.h>
 #include <Window.h>
 
@@ -326,31 +333,121 @@ void PageClientImpl::didFirstVisuallyNonEmptyLayoutForMainFrame()
 {
 }
 
-void PageClientImpl::printFrame(WebFrameProxy&)
-{
-    if (fWebView.LockLooper()) {
-        BPrintJob printJob("WebKit Page");
-        if (printJob.ConfigJob() == B_OK) {
-            // FIXME: Implement proper printing using WebPageProxy::computePagesForPrinting.
-            // Currently we only print the visible view which is insufficient for proper document printing.
-            // We need to:
-            // 1. Get page settings from printJob.Settings()
-            // 2. Call frame.page()->computePagesForPrinting(...)
-            // 3. In the callback, draw each page to a bitmap/rect and spool it.
-
-            printJob.BeginJob();
-            BRect printableRect = printJob.PrintableRect();
-            int32 firstPage = printJob.FirstPage();
-            int32 lastPage = printJob.LastPage();
-
-            for (int32 page = firstPage; page <= lastPage; ++page) {
-                printJob.DrawView(&fWebView, printableRect, BPoint(0, 0));
-                printJob.SpoolPage();
-            }
-            printJob.CommitJob();
-        }
-        fWebView.UnlockLooper();
+class BitmapPrintView : public BView {
+public:
+    BitmapPrintView(BRect frame, BBitmap* bitmap)
+        : BView(frame, "print_view", B_FOLLOW_NONE, B_WILL_DRAW)
+        , m_bitmap(bitmap)
+    {
     }
+
+    void Draw(BRect) override
+    {
+        if (m_bitmap)
+            DrawBitmap(m_bitmap, Bounds());
+    }
+
+private:
+    BBitmap* m_bitmap;
+};
+
+void PageClientImpl::printFrame(WebFrameProxy& frame)
+{
+    // Printing is a blocking operation on Haiku's BPrintJob, but WebKit requires async page computation.
+    // We start the config here, then trigger the async process.
+    if (!fWebView.LockLooper())
+        return;
+
+    auto printJob = new BPrintJob("WebKit Page");
+    if (printJob->ConfigJob() != B_OK) {
+        delete printJob;
+        fWebView.UnlockLooper();
+        return;
+    }
+
+    BRect paper = printJob->PaperRect();
+    BRect printable = printJob->PrintableRect();
+    fWebView.UnlockLooper();
+
+    float marginLeft = printable.left - paper.left;
+    float marginTop = printable.top - paper.top;
+    float marginRight = paper.right - printable.right;
+    float marginBottom = paper.bottom - printable.bottom;
+
+    // Convert BRect to PrintInfo. Note: BRect is pixel based, PrintInfo expects points?
+    // Haiku BPrintJob rects are usually 72dpi points.
+    WebKit::PrintInfo printInfo(1.0f, printable.Width(), printable.Height(),
+        WebCore::FloatBoxExtent(marginTop, marginRight, marginBottom, marginLeft));
+
+    auto page = fWebView.page();
+    if (!page) {
+        delete printJob;
+        return;
+    }
+
+    page->beginPrinting(&frame, printInfo);
+
+    page->computePagesForPrinting(frame.frameID(), printInfo,
+        [printJob, page, frameID = frame.frameID()](const Vector<WebCore::IntRect>& pageRects, double, const WebCore::FloatBoxExtent&) {
+            auto snapshotQueue = std::make_shared<Vector<WebCore::IntRect>>(pageRects);
+            auto bitmaps = std::make_shared<Vector<BBitmap*>>();
+
+            // Recursive lambda to process snapshots sequentially
+            auto chain = [printJob, page, frameID, snapshotQueue, bitmaps](auto&& self, size_t index) -> void {
+                if (index >= snapshotQueue->size()) {
+                    // All snapshots taken, perform actual printing
+                    if (printJob->BeginJob()) {
+                        int32 firstPage = printJob->FirstPage();
+                        int32 lastPage = printJob->LastPage();
+
+                        if (firstPage < 1) firstPage = 1;
+                        if (lastPage > (int32)snapshotQueue->size()) lastPage = snapshotQueue->size();
+
+                        BRect printableRect = printJob->PrintableRect();
+
+                        for (int32 i = firstPage; i <= lastPage; ++i) {
+                            BBitmap* bmp = (*bitmaps)[i - 1];
+                            if (bmp) {
+                                BitmapPrintView printView(printableRect, bmp);
+                                printJob->DrawView(&printView, printableRect, BPoint(0, 0));
+                                printJob->SpoolPage();
+                            }
+                        }
+                        printJob->CommitJob();
+                    }
+                    page->endPrinting();
+                    delete printJob;
+                    for (auto* b : *bitmaps)
+                        delete b;
+                    return;
+                }
+
+                WebCore::IntRect rect = (*snapshotQueue)[index];
+                WebCore::IntSize size = rect.size();
+                // Use SnapshotOptionsNone or similar. 0 is default.
+                WebCore::SnapshotOptions options = 0;
+
+                page->takeSnapshot(rect, size, options,
+                    [printJob, page, frameID, snapshotQueue, bitmaps, index, self = std::forward<decltype(self)>(self)](std::optional<WebCore::ShareableBitmapHandle>&& handle) {
+                        BBitmap* bmp = nullptr;
+                        if (handle) {
+                            if (auto sb = WebCore::ShareableBitmap::create(*handle)) {
+                                if (auto img = sb->createImage()) {
+                                    if (auto native = img->nativeImage()) {
+                                        const BBitmap* platformImg = native->platformImage();
+                                        if (platformImg)
+                                            bmp = new BBitmap(platformImg);
+                                    }
+                                }
+                            }
+                        }
+                        bitmaps->append(bmp);
+                        self(self, index + 1);
+                    });
+            };
+
+            chain(chain, 0);
+        });
 }
 
 void PageClientImpl::didFinishNavigation(API::Navigation*)

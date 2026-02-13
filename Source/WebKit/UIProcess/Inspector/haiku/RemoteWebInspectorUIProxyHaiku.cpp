@@ -129,6 +129,18 @@ void RemoteWebInspectorUIProxy::platformSave(Vector<WebCore::InspectorFrontendCl
 
         filePath.Append(filename.utf8().data());
 
+        // If file exists, append a number to avoid overwriting
+        BEntry entry(filePath.Path());
+        if (entry.Exists()) {
+            int counter = 1;
+            while (entry.Exists()) {
+                filePath = BPath(path);
+                String newName = makeString(filename, '-', counter++);
+                filePath.Append(newName.utf8().data());
+                entry.SetTo(filePath.Path());
+            }
+        }
+
         BFile file(filePath.Path(), B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
         if (file.InitCheck() == B_OK) {
              CString content = data.content.utf8();
