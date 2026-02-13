@@ -209,7 +209,8 @@ public:
             {
                 BString str;
                 BLanguage language("en");
-                BFormattingConventions conventions("en_US");
+                // Use en_GB to get ISO-8601 compatible week numbers (Monday first)
+                BFormattingConventions conventions("en_GB");
 
                 if (m_calendar) {
                     conventions.SetExplicitDateFormat(B_LONG_DATE_FORMAT, m_format);

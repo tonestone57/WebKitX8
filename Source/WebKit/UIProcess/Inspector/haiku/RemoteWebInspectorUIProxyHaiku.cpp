@@ -35,6 +35,7 @@
 #include <WebCore/CertificateInfo.h>
 #include <WebCore/InspectorFrontendClient.h>
 #include <WebCore/NotImplemented.h>
+#include <wtf/URL.h>
 
 #include <Alert.h>
 #include <Entry.h>
@@ -111,10 +112,29 @@ void RemoteWebInspectorUIProxy::platformBringToFront()
 
 void RemoteWebInspectorUIProxy::platformSave(Vector<WebCore::InspectorFrontendClient::SaveData>&& saveData, bool forceSaveAs)
 {
-    // Simple implementation: save to a default location or show a file panel.
-    // For now, just a stub that acknowledges the request.
-    (void)saveData;
-    (void)forceSaveAs;
+    BPath path;
+    if (find_directory(B_DESKTOP_DIRECTORY, &path) != B_OK)
+        return;
+
+    for (const auto& data : saveData) {
+        // TODO: Handle forceSaveAs by showing a BFilePanel.
+        // For now, simple save to Desktop.
+        BPath filePath(path);
+
+        // Extract filename from URL or use default
+        WTF::URL url(data.url);
+        String filename = url.lastPathComponent();
+        if (filename.isEmpty())
+            filename = String::fromUTF8("InspectorSavedData.txt");
+
+        filePath.Append(filename.utf8().data());
+
+        BFile file(filePath.Path(), B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
+        if (file.InitCheck() == B_OK) {
+             CString content = data.content.utf8();
+             file.Write(content.data(), content.length());
+        }
+    }
 }
 
 void RemoteWebInspectorUIProxy::platformLoad(const String& path, CompletionHandler<void(const String&)>&& completionHandler)
@@ -140,19 +160,23 @@ void RemoteWebInspectorUIProxy::platformLoad(const String& path, CompletionHandl
 
 void RemoteWebInspectorUIProxy::platformPickColorFromScreen(CompletionHandler<void(const std::optional<WebCore::Color>&)>&& completionHandler)
 {
+    notImplemented();
     completionHandler(std::nullopt);
 }
 
 void RemoteWebInspectorUIProxy::platformSetSheetRect(const WebCore::FloatRect&)
 {
+    notImplemented();
 }
 
 void RemoteWebInspectorUIProxy::platformSetForcedAppearance(WebCore::InspectorFrontendClient::Appearance)
 {
+    notImplemented();
 }
 
 void RemoteWebInspectorUIProxy::platformStartWindowDrag()
 {
+    notImplemented();
 }
 
 void RemoteWebInspectorUIProxy::platformOpenURLExternally(const String& url)

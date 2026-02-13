@@ -331,13 +331,17 @@ void PageClientImpl::printFrame(WebFrameProxy&)
     if (fWebView.LockLooper()) {
         BPrintJob printJob("WebKit Page");
         if (printJob.ConfigJob() == B_OK) {
+            // FIXME: Implement proper printing using WebPageProxy::computePagesForPrinting.
+            // Currently we only print the visible view which is insufficient for proper document printing.
+            // We need to:
+            // 1. Get page settings from printJob.Settings()
+            // 2. Call frame.page()->computePagesForPrinting(...)
+            // 3. In the callback, draw each page to a bitmap/rect and spool it.
+
             printJob.BeginJob();
             BRect printableRect = printJob.PrintableRect();
             int32 firstPage = printJob.FirstPage();
             int32 lastPage = printJob.LastPage();
-
-            // This is a simplified implementation that prints the current view content.
-            // Ideally, we should ask WebCore to layout for printing.
 
             for (int32 page = firstPage; page <= lastPage; ++page) {
                 printJob.DrawView(&fWebView, printableRect, BPoint(0, 0));

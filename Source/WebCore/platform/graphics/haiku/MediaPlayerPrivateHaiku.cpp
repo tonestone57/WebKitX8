@@ -83,6 +83,9 @@ MediaPlayerPrivate::MediaPlayerPrivate(MediaPlayer& player)
     , m_volume(1.0)
     , m_currentTime(0.f)
     , m_paused(true)
+    , m_muted(false)
+    , m_rate(1.0)
+    , m_preload(MediaPlayer::Preload::Auto)
 {
 }
 
@@ -266,14 +269,8 @@ WTF::MediaTime MediaPlayerPrivate::currentTime() const
 
 void MediaPlayerPrivate::seekToTarget(const SeekTarget& time)
 {
-    // TODO we should make sure the cache is ready to serve this. The idea is:
-    // * Seek the tracks using SeekToTime
-    // * The decoder will try to read "somewhere" in the cache. The Read call
-    // should block, and check if the data is already downloaded
-    // * If not, it should wait for it (and a sufficient buffer)
-    //
-    // Generally, we shouldn't let the reads to the cache return uninitialized
-    // data. Note that we will probably need HTTP range requests support.
+    if (!m_mediaLock.Lock())
+        return;
 
     bigtime_t newTime = (bigtime_t)(time.time.toDouble() * 1000000);
     // Usually, seeking the video is rounded to the nearest keyframe. This
@@ -283,6 +280,9 @@ void MediaPlayerPrivate::seekToTarget(const SeekTarget& time)
         m_videoTrack->SeekToTime(&newTime);
     if (m_audioTrack)
         m_audioTrack->SeekToTime(&newTime);
+
+    m_currentTime = newTime / 1000000.f;
+    m_mediaLock.Unlock();
 }
 
 bool MediaPlayerPrivate::seeking() const
@@ -299,7 +299,24 @@ void MediaPlayerPrivate::setVolume(float volume)
 {
     m_volume = volume;
     if (m_soundPlayer)
-        m_soundPlayer->SetVolume(volume);
+        m_soundPlayer->SetVolume(m_muted ? 0.0f : m_volume);
+}
+
+void MediaPlayerPrivate::setMuted(bool muted)
+{
+    m_muted = muted;
+    if (m_soundPlayer)
+        m_soundPlayer->SetVolume(m_muted ? 0.0f : m_volume);
+}
+
+void MediaPlayerPrivate::setRate(double rate)
+{
+    m_rate = rate;
+}
+
+void MediaPlayerPrivate::setPreload(MediaPlayer::Preload preload)
+{
+    m_preload = preload;
 }
 
 MediaPlayer::NetworkState MediaPlayerPrivate::networkState() const
@@ -316,11 +333,11 @@ PlatformTimeRanges& MediaPlayerPrivate::buffered() const
 {
     // FIXME: Return actual buffered ranges based on network cache or BMediaFile state.
     // For now, if we have a media file and are playing, assume we have content.
-    static PlatformTimeRanges ranges;
-    if (m_readyState >= MediaPlayer::ReadyState::HaveEnoughData && duration().toDouble() > 0) {
-        ranges.add(MediaTime::zeroTime(), duration());
+    m_buffered.clear();
+    if (m_readyState >= MediaPlayer::ReadyState::HaveEnoughData && duration() > MediaTime::zeroTime()) {
+        m_buffered.add(MediaTime::zeroTime(), duration());
     }
-    return ranges;
+    return m_buffered;
 }
 
 bool MediaPlayerPrivate::didLoadingProgress() const
@@ -328,6 +345,21 @@ bool MediaPlayerPrivate::didLoadingProgress() const
     bool progress = m_didReceiveData;
     m_didReceiveData = false;
     return progress;
+}
+
+uint64_t MediaPlayerPrivate::bytesLoaded() const
+{
+    return 0;
+}
+
+uint64_t MediaPlayerPrivate::totalBytes() const
+{
+    return 0;
+}
+
+MediaPlayer::MovieLoadType MediaPlayerPrivate::movieLoadType() const
+{
+    return MediaPlayer::MovieLoadType::Unknown;
 }
 
 void MediaPlayerPrivate::paint(GraphicsContext& context, const FloatRect& r)

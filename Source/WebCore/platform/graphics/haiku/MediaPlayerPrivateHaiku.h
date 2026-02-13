@@ -85,6 +85,9 @@ public:
         bool paused() const override;
 
         void setVolume(float) override;
+        void setMuted(bool) override;
+        void setRate(double) override;
+        void setPreload(MediaPlayer::Preload) override;
 
         MediaPlayer::NetworkState networkState() const override;
         MediaPlayer::ReadyState readyState() const override;
@@ -93,6 +96,14 @@ public:
 
         PlatformTimeRanges& buffered() const override;
         bool didLoadingProgress() const override;
+
+        uint64_t bytesLoaded() const override;
+        uint64_t totalBytes() const override;
+
+        bool acceleratedRendering() const override { return false; }
+        MediaPlayer::MovieLoadType movieLoadType() const override;
+        String engineDescription() const override { return "Haiku Media Kit"_s; }
+        bool platformVolumeConfigurationRequired() const override { return false; }
 
         void paint(GraphicsContext&, const FloatRect&) override;
         DestinationColorSpace colorSpace() override;
@@ -123,6 +134,10 @@ private:
         float m_volume;
         float m_currentTime;
         bool m_paused;
+        bool m_muted;
+        double m_rate;
+        MediaPlayer::Preload m_preload;
+        mutable PlatformTimeRanges m_buffered;
 };
 
 }
