@@ -28,6 +28,7 @@
 #include "config.h"
 #include "Pasteboard.h"
 
+#include "Color.h"
 #include "DocumentFragment.h"
 #include "DragData.h"
 #include "Editor.h"
@@ -197,8 +198,9 @@ void WebCore::Pasteboard::write(WebCore::PasteboardImage const& pasteboardImage)
     be_clipboard->Commit();
 }
 
-void Pasteboard::write(const PasteboardBuffer&)
+void Pasteboard::write(const PasteboardBuffer& buffer)
 {
+    // Not implemented for now as PasteboardBuffer structure is not verified.
 }
 
 void WebCore::Pasteboard::write(WebCore::PasteboardWebContent const& content)
@@ -256,8 +258,26 @@ void Pasteboard::write(const PasteboardURL& url)
     be_clipboard->Commit();
 }
 
-void Pasteboard::write(const Color&)
+void Pasteboard::write(const Color& color)
 {
+    AutoClipboardLocker locker(be_clipboard);
+    if (!locker.isLocked())
+        return;
+
+    be_clipboard->Clear();
+    BMessage* data = be_clipboard->Data();
+    if (!data)
+        return;
+
+    auto srgba = color.toColorTypeLossy<SRGBA<uint8_t>>();
+    rgb_color rgb = { srgba.red, srgba.green, srgba.blue, srgba.alpha };
+    data->AddData("RGBColor", B_RGB_COLOR_TYPE, &rgb, sizeof(rgb_color));
+
+    String hex = color.nameForRenderTheme();
+    BString hexStr(hex.utf8().data());
+    data->AddData("text/plain", B_MIME_TYPE, hexStr.String(), hexStr.Length());
+
+    be_clipboard->Commit();
 }
 
 Pasteboard::FileContentState Pasteboard::fileContentState()
@@ -308,6 +328,13 @@ void Pasteboard::read(PasteboardWebContentReader& reader, WebContentReadingPolic
         String text = String::fromUTF8(std::span<const char>(buffer, bufferLength));
         if (reader.readPlainText(text))
             return;
+    }
+
+    // Also try reading general text if specific MIME types failed but we have something
+    if (data->HasData("text/plain", B_MIME_TYPE)) {
+         // Already handled above
+    } else {
+        // Fallback for other types?
     }
 }
 
@@ -404,7 +431,8 @@ void Pasteboard::clear(const String& type)
 
 String Pasteboard::readOrigin()
 {
-    return { };
+    // Haiku clipboard doesn't store origin.
+    return String();
 }
 
 String Pasteboard::readString(const String& type)
@@ -462,8 +490,11 @@ Vector<String> Pasteboard::typesForLegacyUnsafeBindings()
             uint32 type;
             int32 count;
 
-            for (int32 i = 0; data->GetInfo(B_ANY_TYPE, i, &name, &type, &count) == B_OK; i++)
+            for (int32 i = 0; data->GetInfo(B_ANY_TYPE, i, &name, &type, &count) == B_OK; i++) {
+                if (strncmp(name, "be:", 3) == 0)
+                    continue;
                 result.append(String::fromUTF8(name));
+            }
         }
 
         be_clipboard->Unlock();

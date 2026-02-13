@@ -37,6 +37,19 @@ String logLevelString()
     return String::fromUTF8(getenv("WEBKIT_DEBUG"));
 }
 
+void log(WTFLogChannel* channel, WTFLogLevel level, const char* format, ...)
+{
+    if (channel->level > level)
+        return;
+
+    va_list args;
+    va_start(args, format);
+    vfprintf(stderr, format, args);
+    va_end(args);
+    if (format[strlen(format) - 1] != '\n')
+        fputc('\n', stderr);
+}
+
 } // namespace WebCore
 
 #endif // !LOG_DISABLED

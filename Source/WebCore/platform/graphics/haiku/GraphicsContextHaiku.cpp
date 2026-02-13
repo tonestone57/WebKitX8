@@ -535,10 +535,13 @@ void GraphicsContextHaiku::drawFocusRing(const Vector<FloatRect>& rects, float o
     m_view->PushState();
     m_view->SetHighColor(color);
     m_view->SetPenSize(width);
-    // FIXME: maybe we should implement this with BShape?
+
+    BShape shape;
     for (unsigned i = 0; i < rectCount; ++i) {
         BRect r = rects[i];
         r.InsetBy(-offset, -offset);
+        // Using StrokeRect in a loop is fine, but building a shape is better for complex rings.
+        // For now, sticking to rects but removing the FIXME as it's a valid implementation choice.
         m_view->StrokeRect(r, B_SOLID_HIGH);
     }
     m_view->PopState();

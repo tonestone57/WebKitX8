@@ -35,6 +35,8 @@
 #include "PaintInfo.h"
 #include "RenderBox.h"
 #include "RenderElement.h"
+#include "RenderMeter.h"
+#include "RenderProgress.h"
 #include "RenderStyle+SettersInlines.h"
 #include "UserAgentScripts.h"
 #include "UserAgentStyleSheets.h"
@@ -189,6 +191,134 @@ bool RenderThemeHaiku::paintTextArea(const RenderElement& object, const PaintInf
     return paintTextField(object, info, intRect);
 }
 
+bool RenderThemeHaiku::paintMenuList(const RenderElement& object, const PaintInfo& info, const FloatRect& rect)
+{
+    if (!be_control_look)
+        return true;
+
+    // A MenuList is just a button in Haiku (BMenuField)
+    return paintButton(object, info, rect);
+}
+
+bool RenderThemeHaiku::paintMeter(const RenderElement& object, const PaintInfo& info, const FloatRect& intRect)
+{
+    if (!be_control_look)
+        return true;
+
+    if (!is<RenderMeter>(object))
+        return true;
+
+    // Meter is similar to progress bar
+    const auto& renderMeter = downcast<RenderMeter>(object);
+    // TODO: Use different colors based on meter value/optimality?
+    double position = renderMeter.valueRatio();
+
+    rgb_color base = colorForValue(B_CONTROL_BACKGROUND_COLOR, object.useDarkAppearance());
+    rgb_color barColor = colorForValue(B_CONTROL_HIGHLIGHT_COLOR, object.useDarkAppearance());
+
+    BRect rect(intRect);
+    BView* view = info.context().platformContext();
+
+    view->PushState();
+    be_control_look->DrawBorder(view, rect, view->Bounds(), base, B_PLAIN_BORDER);
+    rect.InsetBy(1, 1);
+
+    view->SetHighColor(base);
+    view->FillRect(rect);
+
+    if (position > 0) {
+        BRect barRect = rect;
+        barRect.right = barRect.left + barRect.Width() * position;
+        view->SetHighColor(barColor);
+        view->FillRect(barRect);
+    }
+    view->PopState();
+
+    return false;
+}
+
+bool RenderThemeHaiku::paintCapsLockIndicator(const RenderElement&, const PaintInfo&, const FloatRect&)
+{
+    // Not implemented visually on Haiku usually
+    return true;
+}
+
+bool RenderThemeHaiku::paintSearchFieldCancelButton(const RenderElement&, const PaintInfo& info, const FloatRect& intRect)
+{
+    if (!be_control_look)
+        return true;
+
+    // Draw a simple 'x' or similar?
+    // Or simpler: just let WebCore handle it or draw standard button?
+    // Let's draw a small X in a circle.
+
+    BView* view = info.context().platformContext();
+    view->PushState();
+
+    // TODO: Use BControlLook if possible, but there isn't a standard cancel button there.
+    // For now simple drawing.
+    BRect rect(intRect);
+    view->SetHighColor(ui_color(B_CONTROL_TEXT_COLOR));
+    view->SetPenSize(2);
+
+    rect.InsetBy(2, 2);
+    view->StrokeLine(rect.LeftTop(), rect.RightBottom());
+    view->StrokeLine(rect.LeftBottom(), rect.RightTop());
+
+    view->PopState();
+    return false;
+}
+
+bool RenderThemeHaiku::paintSearchFieldResultsDecoration(const RenderElement&, const PaintInfo& info, const FloatRect& intRect)
+{
+    if (!be_control_look)
+        return true;
+
+    // Magnifier glass
+    BView* view = info.context().platformContext();
+    view->PushState();
+    BRect rect(intRect);
+    view->SetHighColor(ui_color(B_CONTROL_TEXT_COLOR));
+    view->SetPenSize(2);
+
+    // Simple circle and handle
+    float size = std::min(rect.Width(), rect.Height());
+    BPoint center = rect.Center();
+    view->StrokeEllipse(center, size/3, size/3);
+    BPoint start = center;
+    start.x += size/3 * 0.7;
+    start.y += size/3 * 0.7;
+    BPoint end = center;
+    end.x += size/2;
+    end.y += size/2;
+    view->StrokeLine(start, end);
+
+    view->PopState();
+    return false;
+}
+
+void RenderThemeHaiku::adjustSearchFieldStyle(RenderStyle& style, const Element* element) const
+{
+    adjustTextFieldStyle(style, element);
+    style.setBoxShadow(CSS::Keyword::None { });
+}
+
+void RenderThemeHaiku::adjustSearchFieldCancelButtonStyle(RenderStyle& style, const Element*) const
+{
+    style.resetBorder();
+    style.resetBorderRadius();
+    style.setPadding(WebCore::Style::PaddingEdge::Fixed { 0 }, WebCore::Style::PaddingEdge::Fixed { 0 }, WebCore::Style::PaddingEdge::Fixed { 0 }, WebCore::Style::PaddingEdge::Fixed { 0 });
+    // Keep it square
+    // style.setWidth...
+}
+
+void RenderThemeHaiku::adjustSearchFieldDecorationStyle(RenderStyle& style, const Element*) const
+{
+    style.resetBorder();
+    style.resetBorderRadius();
+    style.setPadding(WebCore::Style::PaddingEdge::Fixed { 0 }, WebCore::Style::PaddingEdge::Fixed { 0 }, WebCore::Style::PaddingEdge::Fixed { 0 }, WebCore::Style::PaddingEdge::Fixed { 0 });
+}
+
 void RenderThemeHaiku::adjustMenuListStyle(RenderStyle& style, const Element* element) const
 {
     adjustMenuListButtonStyle(style, element);
@@ -281,6 +411,74 @@ bool RenderThemeHaiku::paintButton(const RenderElement& object, const PaintInfo&
     return false;
 }
 
+bool RenderThemeHaiku::paintProgressBar(const RenderElement& object, const PaintInfo& info, const FloatRect& intRect)
+{
+    if (!be_control_look)
+        return true;
+
+    if (!is<RenderProgress>(object))
+        return true;
+
+    const auto& renderProgress = downcast<RenderProgress>(object);
+    double position = renderProgress.position();
+
+    rgb_color base = colorForValue(B_CONTROL_BACKGROUND_COLOR, object.useDarkAppearance());
+    rgb_color barColor = colorForValue(B_CONTROL_HIGHLIGHT_COLOR, object.useDarkAppearance());
+
+    BRect rect(intRect);
+    BView* view = info.context().platformContext();
+
+    view->PushState();
+    be_control_look->DrawBorder(view, rect, view->Bounds(), base, B_PLAIN_BORDER);
+    rect.InsetBy(1, 1);
+
+    view->SetHighColor(base);
+    view->FillRect(rect);
+
+    if (position > 0) {
+        BRect barRect = rect;
+        barRect.right = barRect.left + barRect.Width() * position;
+        view->SetHighColor(barColor);
+        view->FillRect(barRect);
+    }
+    view->PopState();
+
+    return false;
+}
+
+bool RenderThemeHaiku::paintSearchField(const RenderElement& object, const PaintInfo& info, const FloatRect& intRect)
+{
+    return paintTextField(object, info, intRect);
+}
+
+bool RenderThemeHaiku::paintInnerSpinButton(const RenderElement& object, const PaintInfo& info, const FloatRect& intRect)
+{
+    if (!be_control_look)
+        return true;
+
+    rgb_color base = colorForValue(B_CONTROL_BACKGROUND_COLOR, object.useDarkAppearance());
+    BRect rect(intRect);
+    BView* view = info.context().platformContext();
+    uint32 flags = flagsForObject(object);
+
+    BRect topRect = rect;
+    topRect.bottom = topRect.top + topRect.Height() / 2;
+    BRect bottomRect = rect;
+    bottomRect.top = topRect.bottom + 1;
+
+    view->PushState();
+    be_control_look->DrawButtonFrame(view, topRect, view->Bounds(), base, view->ViewColor(), flags);
+    be_control_look->DrawButtonBackground(view, topRect, view->Bounds(), base, flags);
+    be_control_look->DrawArrowShape(view, topRect, view->Bounds(), base, BControlLook::B_UP_ARROW, flags, B_DARKEN_MAX_TINT);
+
+    be_control_look->DrawButtonFrame(view, bottomRect, view->Bounds(), base, view->ViewColor(), flags);
+    be_control_look->DrawButtonBackground(view, bottomRect, view->Bounds(), base, flags);
+    be_control_look->DrawArrowShape(view, bottomRect, view->Bounds(), base, BControlLook::B_DOWN_ARROW, flags, B_DARKEN_MAX_TINT);
+    view->PopState();
+
+    return false;
+}
+
 Style::PreferredSizePair RenderThemeHaiku::controlSize(StyleAppearance appearance,
     const FontCascade& font, const Style::PreferredSizePair& minimum, float zoom) const
 {
@@ -299,12 +497,6 @@ Style::PreferredSizePair RenderThemeHaiku::controlSize(StyleAppearance appearanc
         default:
             return RenderTheme::controlSize(appearance, font, minimum, zoom);
     }
-}
-
-bool RenderThemeHaiku::paintMenuList(const RenderElement&, const PaintInfo&, const FloatRect&)
-{
-    // This is never called: the list is handled natively as a BMenu.
-    return true;
 }
 
 uint32 RenderThemeHaiku::flagsForObject(const RenderElement& object) const
@@ -346,8 +538,19 @@ String RenderThemeHaiku::mediaControlsBase64StringForIconNameAndType(const Strin
 
 String RenderThemeHaiku::mediaControlsFormattedStringForDuration(double durationInSeconds)
 {
-    // FIXME: Format this somehow, maybe through BDateTime?
-    return makeString(durationInSeconds);
+    // Format MM:SS or HH:MM:SS
+    if (std::isinf(durationInSeconds))
+        return "infinite"_s;
+
+    int seconds = static_cast<int>(durationInSeconds);
+    int hours = seconds / 3600;
+    int minutes = (seconds % 3600) / 60;
+    seconds = seconds % 60;
+
+    if (hours > 0)
+        return makeString(hours, ":", minutes < 10 ? "0" : "", minutes, ":", seconds < 10 ? "0" : "", seconds);
+
+    return makeString(minutes, ":", seconds < 10 ? "0" : "", seconds);
 }
 
 

@@ -35,12 +35,101 @@
 #include "NotImplemented.h"
 #include <wtf/text/CString.h>
 #include <Font.h>
+#include <Shape.h>
 #include <String.h>
 #include <UnicodeChar.h>
 #include <View.h>
 
+#include "PathHaiku.h"
 
 namespace WebCore {
+
+void Font::platformInit()
+{
+    const BFont* font = m_platformData.font();
+    if (!font)
+        return;
+
+    font_height height;
+    font->GetHeight(&height);
+    m_fontMetrics.setAscent(height.ascent);
+    m_fontMetrics.setDescent(height.descent);
+    m_fontMetrics.setLineSpacing(height.ascent + height.descent);
+    m_fontMetrics.setLineGap(height.leading);
+
+    BRect rect;
+    font->GetBoundingBoxesAsGlyphs("x", 1, B_SCREEN_METRIC, &rect);
+
+    m_fontMetrics.setXHeight(rect.Height() / 1.25);
+        // FIXME we shouldn't need to divide here, but it passes this test:
+        // css2.1/20110323/c541-word-sp-000.htm
+}
+
+void Font::platformCharWidthInit()
+{
+    m_avgCharWidth = 0.f;
+    m_maxCharWidth = 0.f;
+    initCharWidths();
+}
+
+void Font::platformDestroy()
+{
+}
+
+RefPtr<Font> Font::platformCreateScaledFont(const FontDescription& fontDescription, float scaleFactor) const
+{
+    const float scaledSize = lroundf(fontDescription.computedSize() * scaleFactor);
+    return Font::create(FontPlatformData::cloneWithSize(m_platformData, scaledSize));
+}
+
+RefPtr<Font> Font::platformCreateHalfWidthFont() const
+{
+    // FIXME: https://bugs.webkit.org/show_bug.cgi?id=281333 : implement half width font for this platform.
+    return nullptr;
+}
+
+void Font::determinePitch()
+{
+    m_treatAsFixedPitch = m_platformData.font() && m_platformData.font()->IsFixed();
+}
+
+FloatRect Font::platformBoundsForGlyph(Glyph glyph) const
+{
+    const BFont* font = m_platformData.font();
+    if (!font)
+        return FloatRect();
+
+    if (glyph == 0)
+        glyph = 0xfdd1;
+
+    BRect rect;
+    char string[5] = { 0 };
+    char* ptr = string;
+    BUnicodeChar::ToUTF8((uint32)glyph, &ptr);
+    font->GetBoundingBoxesAsGlyphs(string, 1, B_SCREEN_METRIC, &rect);
+    return rect;
+}
+
+float Font::platformWidthForGlyph(Glyph glyph) const
+{
+    if (!platformData().size())
+        return 0;
+
+    if (glyph == 0)
+        glyph = 0xfdd1;
+
+    float escapements[1];
+    char string[5] = { 0 };
+    char* ptr = string;
+    BUnicodeChar::ToUTF8((uint32)glyph, &ptr);
+    m_platformData.font()->GetEscapements(string, 1, escapements);
+    return escapements[0] * m_platformData.font()->Size();
+}
+
+bool Font::platformSupportsCodePoint(char32_t character, std::optional<char32_t> variation) const
+{
+    return variation ? false : glyphForCharacter(character);
+}
 
 void FontCascade::drawGlyphs(GraphicsContext& graphicsContext, const Font& font,
     std::span<const GlyphBufferGlyph> glyphs, std::span<const GlyphBufferAdvance> advances,
@@ -56,12 +145,9 @@ void FontCascade::drawGlyphs(GraphicsContext& graphicsContext, const Font& font,
     else
         view->SetDrawingMode(B_OP_OVER);
     view->SetHighColor(color);
-    BFont bfont;
-    // Sometimes we will end up here with a reference to a NULL font… oh well.
-    if (&font == NULL)
-        bfont = be_plain_font;
-    else
-        bfont = *font.platformData().font();
+
+    // We assume 'font' is valid reference as per C++ semantics.
+    BFont bfont = *font.platformData().font();
 
     if (smoothing == FontSmoothingMode::None)
         bfont.SetFlags(B_DISABLE_ANTIALIASING);
@@ -101,9 +187,22 @@ void FontCascade::drawGlyphs(GraphicsContext& graphicsContext, const Font& font,
 
 Path Font::platformPathForGlyph(Glyph glyph) const
 {
-	UNUSED_PARAM(glyph);
-	
-	return Path();
+    const BFont* font = platformData().font();
+    if (!font)
+        return Path();
+
+    BFont bfont = *font;
+    BShape shape;
+    char buffer[4];
+    char* tmp = buffer;
+    BUnicodeChar::ToUTF8(glyph, &tmp);
+
+    // Note: GetGlyphShapes takes char array and BShape* array.
+    BShape* shapes[1] = { &shape };
+    if (bfont.GetGlyphShapes(buffer, 1, shapes) != B_OK)
+        return Path();
+
+    return Path(PathHaiku::create(shape));
 }
 
 bool FontCascade::canUseGlyphDisplayList(const RenderStyle&)

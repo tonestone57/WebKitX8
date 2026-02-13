@@ -250,4 +250,124 @@ String fileButtonReplaceButtonLabel() { return "Replace"_s; }
 
 String unsupportedPluginText() { return "Unsupported Plug-in"_s; }
 
+String contextMenuItemTagBold()
+{
+    return "Bold"_s;
+}
+
+String contextMenuItemTagItalic()
+{
+    return "Italic"_s;
+}
+
+String contextMenuItemTagUnderline()
+{
+    return "Underline"_s;
+}
+
+String contextMenuItemTagOutline()
+{
+    return "Outline"_s;
+}
+
+String contextMenuItemTagLeftToRight()
+{
+    return "Left to Right"_s;
+}
+
+String contextMenuItemTagRightToLeft()
+{
+    return "Right to Left"_s;
+}
+
+String contextMenuItemTagDefaultDirection()
+{
+    return "Default Direction"_s;
+}
+
+String mediaElementPlayButtonHelpText()
+{
+    return "Play"_s;
+}
+
+String mediaElementPauseButtonHelpText()
+{
+    return "Pause"_s;
+}
+
+String mediaElementMuteButtonHelpText()
+{
+    return "Mute"_s;
+}
+
+String mediaElementUnmuteButtonHelpText()
+{
+    return "Unmute"_s;
+}
+
+String mediaElementVolumeUpButtonHelpText()
+{
+    return "Volume Up"_s;
+}
+
+String mediaElementVolumeDownButtonHelpText()
+{
+    return "Volume Down"_s;
+}
+
+String fileButtonChooseFileLabel()
+{
+    return "Choose File"_s;
+}
+
+String fileButtonChooseFilesLabel()
+{
+    return "Choose Files"_s;
+}
+
+String fileButtonNoFileSelectedLabel()
+{
+    return "No file selected"_s;
+}
+
+String searchMenuNoRecentSearchesText()
+{
+    return "No recent searches"_s;
+}
+
+String searchMenuRecentSearchesText()
+{
+    return "Recent searches"_s;
+}
+
+String searchMenuClearRecentSearchesText()
+{
+    return "Clear recent searches"_s;
+}
+
+String AXWebAreaText()
+{
+    return "Web Area"_s;
+}
+
+String AXLinkText()
+{
+    return "Link"_s;
+}
+
+String AXListMarkerText()
+{
+    return "List Marker"_s;
+}
+
+String AXImageMapText()
+{
+    return "Image Map"_s;
+}
+
+String AXHeadingText()
+{
+    return "Heading"_s;
+}
+
 } // namespace WebCore

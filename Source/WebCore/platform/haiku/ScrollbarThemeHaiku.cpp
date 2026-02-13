@@ -61,11 +61,12 @@ ScrollbarThemeHaiku::~ScrollbarThemeHaiku()
 
 int ScrollbarThemeHaiku::scrollbarThickness(ScrollbarWidth scrollbarWidth, OverlayScrollbarSizeRelevancy overlayRelavancy)
 {
-    // FIXME: Should we make a distinction between a Small and a Regular Scrollbar?
-
     int width = B_V_SCROLL_BAR_WIDTH;
     if (be_control_look)
         width = (int)be_control_look->GetScrollBarWidth();
+
+    if (scrollbarWidth == ScrollbarWidth::Thin)
+        width = std::max(10, width * 2 / 3);
 
     if (m_drawOuterFrame)
        return width + 1;
@@ -191,6 +192,31 @@ void ScrollbarThemeHaiku::paintScrollbarBackground(GraphicsContext& context, Scr
     be_control_look->DrawScrollBarBackground(view, rect, view->Bounds(), base, flags, orientation);
 }
 
+void ScrollbarThemeHaiku::paintTrackBackground(GraphicsContext& context, Scrollbar& scrollbar, const IntRect& rect)
+{
+    // Reuse the background painting logic or customize if track needs distinct look
+    paintScrollbarBackground(context, scrollbar);
+}
+
+void ScrollbarThemeHaiku::paintTickmarks(GraphicsContext& context, Scrollbar& scrollbar, const IntRect& rect)
+{
+    // Tickmarks for scrollbars (e.g. search results)
+    // Haiku doesn't have standard scrollbar tickmarks, but we can draw simple lines
+    if (scrollbar.orientation() != ScrollbarOrientation::Vertical && scrollbar.orientation() != ScrollbarOrientation::Horizontal)
+        return;
+
+    BView* view = (BView*)context.platformContext();
+    if (!view)
+        return;
+
+    // TODO: Implementation depends on how tickmarks are passed (usually via custom painting or overlay)
+    // WebCore usually handles painting individual tickmarks if we expose them?
+    // This function is for painting the *container* of tickmarks or all of them?
+    // Actually paintTickmarks usually iterates and paints provided rects?
+    // Wait, ScrollbarTheme::paintTickmarks is usually provided with the rect of the track to paint marks into?
+
+    // For now, no-op as standard Haiku scrollbars don't show tickmarks.
+}
 
 void ScrollbarThemeHaiku::paintButton(GraphicsContext& context, Scrollbar& scrollbar, const IntRect& intRect, ScrollbarPart part)
 {
