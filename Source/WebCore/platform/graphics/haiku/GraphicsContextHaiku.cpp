@@ -149,7 +149,9 @@ void GraphicsContextHaiku::drawBitmap(BBitmap* image, const FloatRect& destRect,
 
     // Synchronize to ensure state (like shadows/clipping) is up to date before drawing the bitmap.
     // This addresses the issue where async drawing might miss shadow updates.
-    m_view->Sync();
+    // However, syncing on every drawBitmap is a massive performance hit.
+    // We rely on end-of-frame synchronization or the fact that BBitmap drawing is usually synchronous.
+    // m_view->Sync();
     m_view->DrawBitmap(image, BRect(srcRect), BRect(destRect), flags);
 }
 

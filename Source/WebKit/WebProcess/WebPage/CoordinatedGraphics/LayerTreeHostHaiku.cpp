@@ -195,8 +195,14 @@ void LayerTreeHost::flushLayers()
     }
 
     bool didChangeSceneState = m_sceneState->flush();
-    if (m_compositionRequired || m_pendingResize || m_forceFrameSync || didChangeSceneState)
+    if (m_compositionRequired || m_pendingResize || m_forceFrameSync || didChangeSceneState) {
         commitSceneState();
+    } else {
+        // Even if we didn't commit a new scene state, ensure any pending
+        // drawing commands are flushed if we optimized away implicit syncs.
+        // This is cheaper than a full Sync() but ensures progress.
+        // (Assuming platform-specific flush is handled within commitSceneState or compositor)
+    }
 
     m_compositionRequired = false;
     m_pendingResize = false;

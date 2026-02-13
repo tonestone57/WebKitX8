@@ -78,7 +78,7 @@ PassRefPtr<AudioBus> AudioFileReader::createBus(float sampleRate, bool mixToMono
         // Setup format conversion
         memset(&format, 0, sizeof(media_format));
         format.type = B_MEDIA_RAW_AUDIO;
-        format.u.raw_audio.format = media_raw_audio_format::B_AUDIO_FLOAT;
+        format.u.raw_audio.format = B_AUDIO_FLOAT;
         format.u.raw_audio.byte_order = B_MEDIA_HOST_ENDIAN;
         format.u.raw_audio.frame_rate = sampleRate;
         format.u.raw_audio.channel_count = mixToMono ? 1 : 2;
