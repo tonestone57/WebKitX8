@@ -20,39 +20,35 @@ The WebKit2 port for Haiku is in an **advanced functional stage**. Most core com
 - **Implementation**: Uses `posix_spawn` in `ProcessLauncherHaiku.cpp`.
 - **Environment**: System environment variables are correctly passed to child processes.
 
-### 4. Networking (PARTIALLY DONE)
-- **Current State**: Relies on `curl` (`USE_CURL`).
-- **Native Implementation**: Native Haiku network implementation exists but is currently disabled.
+### 4. Networking (MOSTLY COMPLETE)
+- **Current State**: Native Haiku network implementation (`NetworkDataTaskHaiku`) is functional and handles certificate verification failures securely.
+- **Features**: `BUrlRequest` and `BHttpRequest` are used. Authentication challenges and redirection are supported.
 
 ### 5. Graphics & Rendering (COMPLETE)
 - **Architecture**: `CoordinatedGraphics` is fully integrated via `LayerTreeHostHaiku.cpp`.
 - **Drawing Area**: `DrawingAreaProxyCoordinatedGraphics` is used with a Haiku-specific `BackingStore` implementation that ensures thread safety (`m_backingStoreLock`) when painting to `BView`.
 - **Context**: `GraphicsContextHaiku.cpp` implements drawing operations using `BView`.
 
-### 6. UI Process & API (MOSTLY COMPLETE)
+### 6. UI Process & API (COMPLETE)
 - **WebView**: `BWebView` and `WebViewBase` provide the hosting view.
-- **Page Client**: `PageClientImplHaiku.cpp` implements:
-    -   `createPopupMenuProxy` (Menus)
-    -   `createContextMenuProxy` (Context Menus)
-    -   `setCursor`
-    -   `toolTipChanged`
+- **Page Client**: `PageClientImplHaiku.cpp` implements menus, cursors, and tooltips.
 - **Input Events**: `PlatformKeyboardEvent`, `PlatformMouseEvent`, and `PlatformWheelEvent` are implemented and mapped from `BMessage`.
+- **Inspector**: Local Web Inspector is implemented via `WebInspectorUIProxyHaiku` and `InspectorWindow`.
 
-### 7. WebCore Platform Support (MOSTLY COMPLETE)
+### 7. WebCore Platform Support (COMPLETE)
 - **Clipboard**: `PasteboardHaiku.cpp` implemented using `BClipboard` (Read/Write for Text/HTML).
-- **Drag and Drop**: `DragDataHaiku.cpp` implemented using `BMessage` inspection.
+- **Drag and Drop**: `DragDataHaiku.cpp` and `DragControllerHaiku.cpp` implemented for Files, Text, and Colors.
 - **Theme**: `ThemeHaiku.cpp` and `ScrollbarThemeHaiku.cpp` implemented using `BControlLook`.
 - **Cursors**: `CursorHaiku.cpp` implemented using standard `BCursor` types.
 - **Resources**: `LocalizedStringsHaiku.cpp` provides default English strings. `MIMETypeRegistryHaiku.cpp` uses `BMimeType`.
-- **Fonts**: `FontHaiku.cpp` implements basic glyph drawing.
+- **Fonts**: `FontHaiku.cpp` implements glyph drawing and half-width font fallbacks.
+- **Media**: `AudioFileReaderHaiku` implements audio decoding. `MediaPlayerPrivateHaiku` implements playback and buffering.
 
 ### 8. Remaining Tasks & Improvements
-- **Native Networking**: Finish and enable the native network process to remove `curl` dependency.
-- **Media Support**: Ensure video/audio playback works reliably.
-- **Inspector**: Fully verify Web Inspector integration.
-- **Printing**: Implement printing support.
-- **Advanced UI**: Implement Color Picker, DateTime Picker, and sophisticated drag-and-drop visuals.
+- **Printing**: Viewport printing is implemented. Full-page printing requires WebProcess coordination.
+- **Advanced UI**: Color Picker and DateTime Picker are implemented.
+- **Optimization**: Continued refinement of memory pressure handling and drawing performance.
 
 ## Conclusion
 
-The port has crossed the threshold from "building" to "running". The browser view should now be able to load pages, render content, handle input, show menus, and interact with the clipboard.
+The port has crossed the threshold from "building" to "running" and is now feature-complete for general browsing, debugging, and media playback.
