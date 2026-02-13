@@ -92,7 +92,7 @@ public:
         MediaPlayer::NetworkState networkState() const override;
         MediaPlayer::ReadyState readyState() const override;
 
-        WTF::MediaTime maxTimeSeekable() const override { return currentTime(); }
+        WTF::MediaTime maxTimeSeekable() const override { return duration(); }
 
         PlatformTimeRanges& buffered() const override;
         bool didLoadingProgress() const override;
@@ -111,8 +111,7 @@ public:
     constexpr MediaPlayerType mediaPlayerType() const final { return MediaPlayerType::Haiku; }
 private:
         void IdentifyTracks(const String& url);
-        void didLoad();
-        static int32 loaderThread(void*);
+        static int32 videoPlayThread(void* cookie);
 
         static void playCallback(void*, void*, size_t,
             const media_raw_audio_format&);
@@ -129,6 +128,7 @@ private:
         BBitmap* m_frameBuffer;
         BLocker m_mediaLock;
         thread_id m_identifyThread;
+        thread_id m_videoPlayThread;
         mutable PlatformTimeRanges m_buffered;
 
         MediaPlayer& m_player;

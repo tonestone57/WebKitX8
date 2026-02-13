@@ -23,10 +23,10 @@
 #if ENABLE(VIDEO)
 
 #include "GraphicsContext.h"
-#include "NotImplemented.h"
 #include "wtf/text/CString.h"
 #include "wtf/NeverDestroyed.h"
 
+#include <support/Autolock.h>
 #include <support/Locker.h>
 #include <Bitmap.h>
 #include <DataIO.h>
@@ -78,6 +78,7 @@ MediaPlayerPrivate::MediaPlayerPrivate(MediaPlayer& player)
     , m_soundPlayer(nullptr)
     , m_frameBuffer(nullptr)
     , m_identifyThread(-1)
+    , m_videoPlayThread(-1)
     , m_player(player)
     , m_networkState(MediaPlayer::NetworkState::Empty)
     , m_readyState(MediaPlayer::ReadyState::HaveNothing)
@@ -97,11 +98,13 @@ MediaPlayerPrivate::~MediaPlayerPrivate()
     if (m_identifyThread >= 0)
         wait_for_thread(m_identifyThread, NULL);
 
-    m_mediaLock.Lock();
+    if (m_videoPlayThread >= 0)
+        wait_for_thread(m_videoPlayThread, NULL);
+
+    BAutolock lock(m_mediaLock);
 
     cancelLoad();
     delete m_frameBuffer;
-    m_mediaLock.Unlock();
 }
 
 #if ENABLE(MEDIA_SOURCE)
@@ -121,6 +124,10 @@ void MediaPlayerPrivate::load(const String& url)
 
     if (m_identifyThread >= 0)
         wait_for_thread(m_identifyThread, NULL);
+
+    if (m_videoPlayThread >= 0)
+        wait_for_thread(m_videoPlayThread, NULL);
+    m_videoPlayThread = -1;
 
     m_mediaLock.Lock();
     cancelLoad();
@@ -143,11 +150,6 @@ void MediaPlayerPrivate::load(const String& url)
 
     m_networkState = MediaPlayer::NetworkState::Loading;
     m_player.networkStateChanged();
-}
-
-void MediaPlayerPrivate::didLoad()
-{
-    // This is now handled inside IdentifyTracks callback to main thread
 }
 
 void MediaPlayerPrivate::cancelLoad()
@@ -175,7 +177,6 @@ void MediaPlayerPrivate::playCallback(void* cookie, void* buffer,
 
     // Deleting the BMediaFile release the tracks
     if (player->m_audioTrack) {
-        // TODO handle the case where there is a video, but no audio track.
         player->m_currentTime = player->m_audioTrack->CurrentTime() / 1000000.f;
 
         int64 size64;
@@ -218,18 +219,60 @@ void MediaPlayerPrivate::playCallback(void* cookie, void* buffer,
     player->m_mediaLock.Unlock();
 }
 
+int32 MediaPlayerPrivate::videoPlayThread(void* cookie)
+{
+    MediaPlayerPrivate* player = (MediaPlayerPrivate*)cookie;
+
+    while (!player->m_paused) {
+        {
+            BAutolock lock(player->m_mediaLock);
+            if (lock.IsLocked() && player->m_videoTrack) {
+                int64 frames = 0;
+                media_header header;
+                if (player->m_videoTrack->ReadFrames(player->m_frameBuffer->Bits(), &frames, &header) == B_OK) {
+                    player->m_currentTime = header.start_time / 1000000.f;
+
+                    WeakPtr<MediaPlayerPrivate> p = WeakPtr(player);
+                    callOnMainThread([p] {
+                        if (p) {
+                            p->m_player.timeChanged();
+                            p->m_player.repaint();
+                        }
+                    });
+                } else {
+                    // End of stream or error
+                    player->m_paused = true;
+                }
+            }
+        }
+        // Simple 30fps throttle for now
+        snooze(33000);
+    }
+    return 0;
+}
+
 void MediaPlayerPrivate::play()
 {
-    if (m_soundPlayer)
-        m_soundPlayer->Start();
     m_paused = false;
+
+    if (m_soundPlayer) {
+        m_soundPlayer->Start();
+    } else if (m_videoTrack && m_videoPlayThread < 0) {
+        m_videoPlayThread = spawn_thread(videoPlayThread, "Video Playback", B_NORMAL_PRIORITY, this);
+        resume_thread(m_videoPlayThread);
+    }
 }
 
 void MediaPlayerPrivate::pause()
 {
     if (m_soundPlayer)
         m_soundPlayer->Stop(false);
+
     m_paused = true;
+    if (m_videoPlayThread >= 0) {
+        wait_for_thread(m_videoPlayThread, NULL);
+        m_videoPlayThread = -1;
+    }
 }
 
 FloatSize MediaPlayerPrivate::naturalSize() const
@@ -264,10 +307,11 @@ void MediaPlayerPrivate::setPageIsVisible(bool visible)
 
 WTF::MediaTime MediaPlayerPrivate::duration() const
 {
-    // TODO handle the case where there is a video, but no audio track.
-    if (!m_audioTrack)
-        return WTF::MediaTime();
-    return WTF::MediaTime::createWithDouble(m_audioTrack->Duration() / 1000000.f);
+    if (m_audioTrack)
+        return WTF::MediaTime::createWithDouble(m_audioTrack->Duration() / 1000000.f);
+    if (m_videoTrack)
+        return WTF::MediaTime::createWithDouble(m_videoTrack->Duration() / 1000000.f);
+    return WTF::MediaTime();
 }
 
 WTF::MediaTime MediaPlayerPrivate::currentTime() const
@@ -277,6 +321,7 @@ WTF::MediaTime MediaPlayerPrivate::currentTime() const
 
 void MediaPlayerPrivate::seekToTarget(const SeekTarget& time)
 {
+    BAutolock lock(m_mediaLock);
     // Seeking logic:
     // BMediaTrack::SeekToTime handles the underlying seek.
     // If the media is streaming, BMediaFile/BMediaTrack handles the buffering or blocking.
@@ -292,7 +337,6 @@ void MediaPlayerPrivate::seekToTarget(const SeekTarget& time)
         m_audioTrack->SeekToTime(&newTime);
 
     m_currentTime = newTime / 1000000.f;
-    m_mediaLock.Unlock();
 }
 
 bool MediaPlayerPrivate::seeking() const
