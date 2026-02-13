@@ -34,6 +34,7 @@
 #include "../../haiku/WebContextMenuProxyHaiku.h"
 #include "../../haiku/WebDateTimePickerHaiku.h"
 #include "../../haiku/WebPopupMenuProxyHaiku.h"
+#include "../../haiku/WebContextMenuProxyHaiku.h"
 
 #include "WebCore/Region.h"
 
