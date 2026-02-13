@@ -41,6 +41,28 @@ public:
 
     void printFrame(WebPageProxy&, WebFrameProxy&, const WebCore::FloatSize& pdfFirstPageSize, CompletionHandler<void()>&&) override;
 
+    void createNewPage(WebPageProxy&, Ref<API::PageConfiguration>&&, Ref<API::NavigationAction>&&, CompletionHandler<void(RefPtr<WebPageProxy>&&)>&&) override;
+    void showPage(WebPageProxy*) override;
+    void close(WebPageProxy*) override;
+
+    void runJavaScriptAlert(WebPageProxy&, const WTF::String&, WebFrameProxy*, FrameInfoData&&, Function<void()>&&) override;
+    void runJavaScriptConfirm(WebPageProxy&, const WTF::String&, WebFrameProxy*, FrameInfoData&&, Function<void(bool)>&&) override;
+    void runJavaScriptPrompt(WebPageProxy&, const WTF::String&, const WTF::String&, WebFrameProxy*, FrameInfoData&&, Function<void(const WTF::String&)>&&) override;
+
+    void setStatusText(WebPageProxy*, const WTF::String&) override;
+    void mouseDidMoveOverElement(WebPageProxy&, const WebHitTestResultData&, OptionSet<WebEventModifier>) override;
+
+    void toolbarsAreVisible(WebPageProxy&, Function<void(bool)>&&) override;
+    void setToolbarsAreVisible(WebPageProxy&, bool) override;
+    void menuBarIsVisible(WebPageProxy&, Function<void(bool)>&&) override;
+    void setMenuBarIsVisible(WebPageProxy&, bool) override;
+    void statusBarIsVisible(WebPageProxy&, Function<void(bool)>&&) override;
+    void setStatusBarIsVisible(WebPageProxy&, bool) override;
+    void setIsResizable(WebPageProxy&, bool) override;
+
+    void setWindowFrame(WebPageProxy&, const WebCore::FloatRect&) override;
+    void windowFrame(WebPageProxy&, Function<void(WebCore::FloatRect)>&&) override;
+
 private:
     WebViewBase& m_webView;
 };

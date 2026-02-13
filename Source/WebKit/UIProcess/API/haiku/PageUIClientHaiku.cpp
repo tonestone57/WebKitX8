@@ -27,7 +27,18 @@
 #include "PageUIClientHaiku.h"
 
 #include "WebViewBase.h"
+#include "WebViewConstants.h"
+
+#include "APIFrameInfo.h"
+#include "APINavigationAction.h"
+#include "APIPageConfiguration.h"
+#include "WebEvent.h"
+#include "WebHitTestResultData.h"
+#include "WebPageProxy.h"
+
+#include <WebCore/FloatRect.h>
 #include <WebCore/FloatSize.h>
+#include <Alert.h>
 #include <PrintJob.h>
 #include <Rect.h>
 #include <Window.h>
@@ -42,6 +53,154 @@ PageUIClientHaiku::PageUIClientHaiku(WebViewBase& webView)
 
 PageUIClientHaiku::~PageUIClientHaiku()
 {
+}
+
+void PageUIClientHaiku::createNewPage(WebPageProxy& page, Ref<API::PageConfiguration>&& configuration, Ref<API::NavigationAction>&& navigationAction, CompletionHandler<void(RefPtr<WebPageProxy>&&)>&& completionHandler)
+{
+    if (BWindow* window = m_webView.Window()) {
+        BMessage message(CREATE_NEW_PAGE);
+        window->PostMessage(&message);
+    }
+    completionHandler(nullptr);
+}
+
+void PageUIClientHaiku::showPage(WebPageProxy* page)
+{
+    if (BWindow* window = m_webView.Window())
+        window->PostMessage(SHOW_PAGE);
+}
+
+void PageUIClientHaiku::close(WebPageProxy* page)
+{
+    if (BWindow* window = m_webView.Window())
+        window->PostMessage(CLOSE_PAGE);
+}
+
+void PageUIClientHaiku::runJavaScriptAlert(WebPageProxy& page, const WTF::String& message, WebFrameProxy* frame, FrameInfoData&& frameInfo, Function<void()>&& completionHandler)
+{
+    if (BWindow* window = m_webView.Window()) {
+        // Ensure we don't block the window thread if we are on it?
+        // BAlert::Go() blocks.
+        // But this is expected behavior for alerts.
+        BAlert* alert = new BAlert("JavaScript Alert", message.utf8().data(), "OK");
+        alert->Go();
+    }
+    completionHandler();
+}
+
+void PageUIClientHaiku::runJavaScriptConfirm(WebPageProxy& page, const WTF::String& message, WebFrameProxy* frame, FrameInfoData&& frameInfo, Function<void(bool)>&& completionHandler)
+{
+    bool result = false;
+    if (BWindow* window = m_webView.Window()) {
+        BAlert* alert = new BAlert("JavaScript Confirm", message.utf8().data(), "Cancel", "OK");
+        result = (alert->Go() == 1);
+    }
+    completionHandler(result);
+}
+
+void PageUIClientHaiku::runJavaScriptPrompt(WebPageProxy& page, const WTF::String& message, const WTF::String& defaultValue, WebFrameProxy* frame, FrameInfoData&& frameInfo, Function<void(const WTF::String&)>&& completionHandler)
+{
+    // FIXME: Implement a prompt dialog
+    completionHandler(WTF::String());
+}
+
+void PageUIClientHaiku::setStatusText(WebPageProxy* page, const WTF::String& text)
+{
+    if (BWindow* window = m_webView.Window()) {
+        BMessage message(SET_STATUS_TEXT);
+        message.AddString("text", text.utf8().data());
+        window->PostMessage(&message);
+    }
+}
+
+void PageUIClientHaiku::mouseDidMoveOverElement(WebPageProxy& page, const WebHitTestResultData& hitTestResult, OptionSet<WebEventModifier> modifiers)
+{
+    if (BWindow* window = m_webView.Window()) {
+        BMessage message(MOUSE_DID_MOVE_OVER_ELEMENT);
+        message.AddString("url", hitTestResult.absoluteImageURL.string().utf8().data());
+        message.AddString("linkUrl", hitTestResult.absoluteLinkURL.string().utf8().data());
+        window->PostMessage(&message);
+    }
+}
+
+void PageUIClientHaiku::toolbarsAreVisible(WebPageProxy&, Function<void(bool)>&& completionHandler)
+{
+    completionHandler(true);
+}
+
+void PageUIClientHaiku::setToolbarsAreVisible(WebPageProxy&, bool visible)
+{
+    if (BWindow* window = m_webView.Window()) {
+        BMessage message(TOOLBARS_VISIBILITY_CHANGED);
+        message.AddBool("visible", visible);
+        window->PostMessage(&message);
+    }
+}
+
+void PageUIClientHaiku::menuBarIsVisible(WebPageProxy&, Function<void(bool)>&& completionHandler)
+{
+    completionHandler(true);
+}
+
+void PageUIClientHaiku::setMenuBarIsVisible(WebPageProxy&, bool visible)
+{
+    if (BWindow* window = m_webView.Window()) {
+        BMessage message(MENU_BAR_VISIBILITY_CHANGED);
+        message.AddBool("visible", visible);
+        window->PostMessage(&message);
+    }
+}
+
+void PageUIClientHaiku::statusBarIsVisible(WebPageProxy&, Function<void(bool)>&& completionHandler)
+{
+    completionHandler(true);
+}
+
+void PageUIClientHaiku::setStatusBarIsVisible(WebPageProxy&, bool visible)
+{
+    if (BWindow* window = m_webView.Window()) {
+        BMessage message(STATUS_BAR_VISIBILITY_CHANGED);
+        message.AddBool("visible", visible);
+        window->PostMessage(&message);
+    }
+}
+
+void PageUIClientHaiku::setIsResizable(WebPageProxy&, bool resizable)
+{
+    if (BWindow* window = m_webView.Window()) {
+        BMessage message(RESIZABLE_CHANGED);
+        message.AddBool("resizable", resizable);
+        window->PostMessage(&message);
+    }
+}
+
+void PageUIClientHaiku::setWindowFrame(WebPageProxy&, const WebCore::FloatRect& frame)
+{
+    if (BWindow* window = m_webView.Window()) {
+        BMessage message(WINDOW_FRAME_CHANGED);
+        message.AddRect("frame", BRect(frame));
+        window->PostMessage(&message);
+
+        if (window->Lock()) {
+            window->MoveTo(frame.x(), frame.y());
+            window->ResizeTo(frame.width(), frame.height());
+            window->Unlock();
+        }
+    }
+}
+
+void PageUIClientHaiku::windowFrame(WebPageProxy&, Function<void(WebCore::FloatRect)>&& completionHandler)
+{
+    WebCore::FloatRect frame;
+    if (BWindow* window = m_webView.Window()) {
+        if (window->Lock()) {
+            frame = WebCore::FloatRect(window->Frame());
+            window->Unlock();
+        } else {
+             frame = WebCore::FloatRect(window->Frame());
+        }
+    }
+    completionHandler(frame);
 }
 
 void PageUIClientHaiku::printFrame(WebPageProxy& page, WebFrameProxy& frame, const WebCore::FloatSize& pdfFirstPageSize, CompletionHandler<void()>&& completionHandler)
