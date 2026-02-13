@@ -41,7 +41,7 @@ namespace WebCore {
 
 bool DragData::canSmartReplace() const
 {
-    return true;
+    return false;
 }
 
 bool DragData::containsColor() const
@@ -139,12 +139,7 @@ String DragData::asURL(FilenameConversionPolicy, String* title) const
     if (m_platformDragData->FindData("text/url", B_MIME_TYPE, (const void**)&url, &length) == B_OK)
         return String::fromUTF8(std::span<const char>(url, length));
 
-    if (m_platformDragData->FindData("text/plain", B_MIME_TYPE, (const void**)&url, &length) == B_OK) {
-        String text = String::fromUTF8(std::span<const char>(url, length));
-        if (text.contains("://"))
-            return text;
-    }
-
+    // Fallback to text/plain if it looks like a URL?
     return String();
 }
 

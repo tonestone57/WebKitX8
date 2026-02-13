@@ -255,6 +255,10 @@ void NetworkDataTaskHaiku::HeadersReceived(BUrlRequest* caller)
         }
 
         if (statusCode == 401) {
+            if (m_storedCredentialsPolicy == StoredCredentialsPolicy::Use) {
+                // If we have stored credentials, we might have used them?
+                // Or we should ask the client.
+            }
             AuthenticationNeeded(dynamic_cast<BHttpRequest*>(m_request), response);
             // AuthenticationNeeded may have aborted the request
             // so we need to make sure we can continue.
@@ -284,6 +288,10 @@ void NetworkDataTaskHaiku::HeadersReceived(BUrlRequest* caller)
         ResourceRequest request = m_currentRequest;
         ResourceResponse responseCopy = response;
         request.setURL(url);
+
+        if (m_shouldClearReferrerOnHTTPSToHTTPRedirect && responseCopy.url().protocolIs("https"_s) && request.url().protocolIs("http"_s))
+            request.clearHTTPReferrer();
+
         m_client->willPerformHTTPRedirection(WTFMove(responseCopy),WTFMove(request),
             [this](const ResourceRequest& newRequest)
             {
@@ -337,21 +345,21 @@ void NetworkDataTaskHaiku::DataReceived(BUrlRequest* caller, const char* data, o
 void NetworkDataTaskHaiku::BytesWritten(BUrlRequest* caller, size_t size)
 {
     // Handled by NetworkDataOutput::Write
+    if (m_client)
+        m_client->didSendData(size, 0); // Total bytes to be sent unknown here?
 }
 
 void NetworkDataTaskHaiku::UploadProgress(BUrlRequest* caller, off_t bytesSent, off_t bytesTotal)
 {
-    if (m_state == State::Canceling || m_state == State::Completed)
-        return;
+    if (m_client && bytesTotal > 0) {
+        if (bytesSent < m_lastBytesSent)
+            m_lastBytesSent = 0; // Reset if progress restarts
 
-    off_t delta = bytesSent - m_lastBytesSent;
-    m_lastBytesSent = bytesSent;
-
-    if (delta > 0 && m_client) {
-        runOnMainThread([this, protectedThis = Ref { *this }, delta, bytesSent, bytesTotal]() {
-             if (m_client)
-                 m_client->didSendData(delta, bytesSent, bytesTotal);
-        });
+        off_t delta = bytesSent - m_lastBytesSent;
+        if (delta > 0) {
+            m_client->didSendData(delta, bytesTotal);
+            m_lastBytesSent = bytesSent;
+        }
     }
 }
 
@@ -387,6 +395,10 @@ void NetworkDataTaskHaiku::RequestCompleted(BUrlRequest* caller, bool success)
 
 bool NetworkDataTaskHaiku::CertificateVerificationFailed(BUrlRequest* caller, BCertificate& certificate, const char* message)
 {
+    // Return true to continue, false to abort.
+    // Ideally we should ask the client.
+    // For now, fail securely.
+    // FIXME: Implement proper verification via client using didReceiveAuthenticationChallenge
     return false;
 }
 
@@ -423,57 +435,9 @@ void NetworkDataTaskHaiku::AuthenticationNeeded(BHttpRequest* request, const Res
 
     // Create a basic ProtectionSpace. Haiku BHttpRequest handles auth internally to some degree,
     // but here we are intercepting the failure.
-    String authHeader = response.httpHeaderField(HTTPHeaderName::WWWAuthenticate);
-    WebCore::ProtectionSpace::AuthenticationScheme scheme = WebCore::ProtectionSpace::AuthenticationScheme::HTTPBasic;
-    String realm = "realm"_s;
-
-    if (!authHeader.isEmpty()) {
-        if (authHeader.containsIgnoringASCIICase("Digest"))
-            scheme = WebCore::ProtectionSpace::AuthenticationScheme::HTTPDigest;
-
-        // Parse realm robustly
-        size_t realmPos = authHeader.findIgnoringASCIICase("realm");
-        while (realmPos != notFound) {
-             // Ensure it is a whole word
-             bool precedingCharOk = (realmPos == 0) || authHeader[realmPos - 1] == ' ' || authHeader[realmPos - 1] == '\t' || authHeader[realmPos - 1] == ',';
-             if (precedingCharOk)
-                 break;
-             realmPos = authHeader.findIgnoringASCIICase("realm", realmPos + 1);
-        }
-
-        if (realmPos != notFound) {
-            size_t ptr = realmPos + 5;
-            // Skip whitespace
-            while (ptr < authHeader.length() && (authHeader[ptr] == ' ' || authHeader[ptr] == '\t'))
-                ptr++;
-
-            if (ptr < authHeader.length() && authHeader[ptr] == '=') {
-                ptr++;
-                // Skip whitespace
-                while (ptr < authHeader.length() && (authHeader[ptr] == ' ' || authHeader[ptr] == '\t'))
-                    ptr++;
-
-                if (ptr < authHeader.length()) {
-                    if (authHeader[ptr] == '"') {
-                        // Quoted realm
-                        ptr++;
-                        size_t endPos = authHeader.find('"', ptr);
-                        if (endPos != notFound)
-                            realm = authHeader.substring(ptr, endPos - ptr);
-                    } else {
-                        // Token realm (unquoted)
-                        size_t endPos = ptr;
-                        while (endPos < authHeader.length() && authHeader[endPos] != ',' && authHeader[endPos] != ' ' && authHeader[endPos] != '\t')
-                            endPos++;
-                        realm = authHeader.substring(ptr, endPos - ptr);
-                    }
-                }
-            }
-        }
-    }
-
+    // FIXME: Extract realm and scheme from response headers.
     WebCore::ProtectionSpace protectionSpace(m_baseUrl.host(), m_baseUrl.port().value_or(0),
-        WebCore::ProtectionSpace::ServerType::HTTP, realm, scheme);
+        WebCore::ProtectionSpace::ServerType::HTTP, "realm"_s, WebCore::ProtectionSpace::AuthenticationScheme::HTTPBasic);
 
     // Using a default ResourceError as previousFailureCount
     m_client->didReceiveAuthenticationChallenge(AuthenticationChallenge(protectionSpace, Credential(), 0, response, ResourceError()), NegotiatedLegacyTLS::No, [protectedThis = Ref { *this }](AuthenticationChallengeDisposition disposition, const Credential& credential) {

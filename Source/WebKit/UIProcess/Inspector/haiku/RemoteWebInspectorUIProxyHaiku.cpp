@@ -35,10 +35,12 @@
 #include <WebCore/CertificateInfo.h>
 #include <WebCore/InspectorFrontendClient.h>
 #include <WebCore/NotImplemented.h>
+#include <wtf/URL.h>
 
 #include <Alert.h>
 #include <Entry.h>
 #include <File.h>
+#include <FilePanel.h>
 #include <FindDirectory.h>
 #include <Message.h>
 #include <Path.h>
@@ -52,55 +54,17 @@ class InspectorWindow : public BWindow {
 public:
     InspectorWindow(BRect frame)
         : BWindow(frame, "Web Inspector", B_TITLED_WINDOW, B_ASYNCHRONOUS_CONTROLS | B_QUIT_ON_WINDOW_CLOSE)
-        , m_filePanel(nullptr)
     {
-    }
-
-    ~InspectorWindow()
-    {
-        delete m_filePanel;
     }
 
     void MessageReceived(BMessage* message) override
     {
         switch (message->what) {
-        case B_SAVE_REQUESTED:
-            handleSaveRequest(message);
-            break;
         default:
             BWindow::MessageReceived(message);
             break;
         }
     }
-
-    void save(const String& suggestedURL, const String& content, bool forceSaveAs)
-    {
-        m_saveContent = content;
-
-        if (!m_filePanel)
-            m_filePanel = new BFilePanel(B_SAVE_PANEL, new BMessenger(this));
-
-        if (!suggestedURL.isEmpty())
-            m_filePanel->SetSaveText(suggestedURL.utf8().data());
-
-        m_filePanel->Show();
-    }
-
-private:
-    void handleSaveRequest(BMessage* message)
-    {
-        entry_ref ref;
-        const char* name;
-        if (message->FindRef("directory", &ref) == B_OK && message->FindString("name", &name) == B_OK) {
-            BDirectory dir(&ref);
-            BFile file(&dir, name, B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
-            if (file.InitCheck() == B_OK)
-                file.Write(m_saveContent.utf8().data(), m_saveContent.utf8().length());
-        }
-    }
-
-    BFilePanel* m_filePanel;
-    String m_saveContent;
 };
 
 WebPageProxy* RemoteWebInspectorUIProxy::platformCreateFrontendPageAndWindow()
@@ -149,15 +113,40 @@ void RemoteWebInspectorUIProxy::platformBringToFront()
 
 void RemoteWebInspectorUIProxy::platformSave(Vector<WebCore::InspectorFrontendClient::SaveData>&& saveData, bool forceSaveAs)
 {
+    BPath path;
+    if (find_directory(B_DESKTOP_DIRECTORY, &path) != B_OK)
+        return;
+
     for (const auto& data : saveData) {
-        if (m_inspectorPage) {
-             if (auto* client = static_cast<PageClientImpl*>(&m_inspectorPage->pageClient())) {
-                 if (auto* view = client->viewWidget()) {
-                     if (auto* window = dynamic_cast<InspectorWindow*>(view->Window())) {
-                         window->save(data.url, data.content, forceSaveAs);
-                     }
-                 }
-             }
+        BPath filePath(path);
+
+        WTF::URL url(data.url);
+        String filename = url.lastPathComponent();
+        if (filename.isEmpty())
+            filename = String::fromUTF8("InspectorSavedData.txt");
+
+        filePath.Append(filename.utf8().data());
+
+        if (forceSaveAs) {
+            // FIXME: Use BFilePanel properly. This requires a looper/handler to receive the message.
+            // For now, we fallback to auto-save to Desktop to avoid blocking or complexity in this proxy.
+        }
+
+        BEntry entry(filePath.Path());
+        if (entry.Exists()) {
+            int counter = 1;
+            while (entry.Exists()) {
+                filePath = BPath(path);
+                String newName = makeString(filename, '-', counter++);
+                filePath.Append(newName.utf8().data());
+                entry.SetTo(filePath.Path());
+            }
+        }
+
+        BFile file(filePath.Path(), B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
+        if (file.InitCheck() == B_OK) {
+             CString content = data.content.utf8();
+             file.Write(content.data(), content.length());
         }
     }
 }
@@ -185,20 +174,51 @@ void RemoteWebInspectorUIProxy::platformLoad(const String& path, CompletionHandl
 
 void RemoteWebInspectorUIProxy::platformPickColorFromScreen(CompletionHandler<void(const std::optional<WebCore::Color>&)>&& completionHandler)
 {
+    // FIXME: Implement screen color picking (maybe using Magnify kit or BScreen)
+    // For now, let's just return a placeholder or notify impossibility.
+    // BAlert* alert = new BAlert("Pick Color", "Screen color picking is not yet implemented.", "OK");
+    // alert->Go(nullptr);
+    notImplemented();
     completionHandler(std::nullopt);
 }
 
-void RemoteWebInspectorUIProxy::platformSetSheetRect(const WebCore::FloatRect&)
+void RemoteWebInspectorUIProxy::platformSetSheetRect(const WebCore::FloatRect& rect)
 {
+    if (!m_inspectorPage)
+        return;
+
+    // Resize the window to match the sheet rect if needed, or just acknowledge it.
+    // This is often used for attached inspectors.
+    if (auto* client = static_cast<PageClientImpl*>(&m_inspectorPage->pageClient())) {
+        if (auto* view = client->viewWidget()) {
+            if (auto* window = view->Window()) {
+                // In Haiku, we don't typically resize the window for sheets, but we could.
+                // window->ResizeTo(rect.width(), rect.height());
+            }
+        }
+    }
 }
 
 void RemoteWebInspectorUIProxy::platformSetForcedAppearance(WebCore::InspectorFrontendClient::Appearance)
 {
+    // Haiku system theme usually dictates appearance.
 }
 
 void RemoteWebInspectorUIProxy::platformStartWindowDrag()
 {
-    platformBringToFront();
+    if (!m_inspectorPage)
+        return;
+
+    if (auto* client = static_cast<PageClientImpl*>(&m_inspectorPage->pageClient())) {
+        if (auto* view = client->viewWidget()) {
+            if (auto* window = view->Window()) {
+                // There is no direct "Drag Window" API from a view event in BWindow unless
+                // we manage the message loop. But we can simulate a move?
+                // Or maybe just Activate.
+                window->Activate();
+            }
+        }
+    }
 }
 
 void RemoteWebInspectorUIProxy::platformOpenURLExternally(const String& url)

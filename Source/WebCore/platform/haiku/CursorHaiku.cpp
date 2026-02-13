@@ -33,7 +33,6 @@
 #include "IntPoint.h"
 #include <WebCore/NotImplemented.h>
 
-#include <cstring>
 #include <app/Cursor.h>
 #include <interface/Bitmap.h>
 #include <translation/TranslationUtils.h>
@@ -153,10 +152,8 @@ void Cursor::ensurePlatformCursor() const
         m_cursor = new BCursor(B_CURSOR_ID_RESIZE_NORTH_WEST_SOUTH_EAST);
         break;
     case Cursor::Type::ColumnResize:
-        m_cursor = new BCursor(B_CURSOR_ID_RESIZE_EAST_WEST);
-        break;
     case Cursor::Type::RowResize:
-        m_cursor = new BCursor(B_CURSOR_ID_RESIZE_NORTH_SOUTH);
+        m_cursor = new BCursor(B_CURSOR_ID_SYSTEM_DEFAULT);
         break;
     case Cursor::Type::Move:
         m_cursor = new BCursor(B_CURSOR_ID_MOVE);
@@ -164,31 +161,27 @@ void Cursor::ensurePlatformCursor() const
     case Cursor::Type::VerticalText:
         m_cursor = new BCursor(B_CURSOR_ID_I_BEAM); // Fallback
         break;
+    case Cursor::Type::Cell:
+        m_cursor = new BCursor(B_CURSOR_ID_CROSS_HAIR);
+        break;
+    case Cursor::Type::ContextMenu:
+        m_cursor = new BCursor(B_CURSOR_ID_SYSTEM_DEFAULT);
+        break;
+    case Cursor::Type::Alias:
+        m_cursor = new BCursor(B_CURSOR_ID_CREATE_LINK);
+        break;
     case Cursor::Type::Progress:
         m_cursor = new BCursor(B_CURSOR_ID_PROGRESS);
         break;
-    case Cursor::Type::Cell:
-    case Cursor::Type::ContextMenu:
-    case Cursor::Type::Alias:
-        m_cursor = new BCursor(B_CURSOR_ID_SYSTEM_DEFAULT);
-        break;
     case Cursor::Type::NoDrop:
+    case Cursor::Type::NotAllowed:
         m_cursor = new BCursor(B_CURSOR_ID_NO_DROP);
         break;
     case Cursor::Type::Copy:
         m_cursor = new BCursor(B_CURSOR_ID_COPY);
         break;
     case Cursor::Type::None:
-        {
-            // Transparent 1x1 cursor
-            BBitmap* bitmap = new BBitmap(BRect(0, 0, 0, 0), B_RGBA32);
-            memset(bitmap->Bits(), 0, bitmap->BitsLength());
-            m_cursor = new BCursor(bitmap, BPoint(0, 0));
-            delete bitmap;
-        }
-        break;
-    case Cursor::Type::NotAllowed:
-        m_cursor = new BCursor(B_CURSOR_ID_NOT_ALLOWED);
+        m_cursor = new BCursor(B_CURSOR_ID_SYSTEM_DEFAULT);
         break;
     case Cursor::Type::ZoomIn:
         m_cursor = new BCursor(B_CURSOR_ID_ZOOM_IN);

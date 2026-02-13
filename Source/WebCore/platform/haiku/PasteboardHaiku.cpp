@@ -28,7 +28,6 @@
 #include "config.h"
 #include "Pasteboard.h"
 
-#include "Color.h"
 #include "DocumentFragment.h"
 #include "DragData.h"
 #include "Editor.h"
@@ -45,10 +44,11 @@
 #include <Message.h>
 #include <Path.h>
 #include <String.h>
-#include <wtf/text/CString.h>
-
-#include <BitmapStream.h>
+#include <TranslationUtils.h>
 #include <TranslatorRoster.h>
+#include <BitmapStream.h>
+#include <DataIO.h>
+#include <wtf/text/CString.h>
 
 
 namespace WebCore {
@@ -194,20 +194,32 @@ void WebCore::Pasteboard::write(WebCore::PasteboardImage const& pasteboardImage)
     if (!data)
         return;
 
+    // 1. Archive as BBitmap (Haiku internal)
+    BMessage archive;
+    if (platformImage->Archive(&archive) == B_OK)
+        data->AddMessage("image/bitmap", &archive);
+
+    // 2. Export as PNG (Interoperability)
     BTranslatorRoster* roster = BTranslatorRoster::Default();
     if (roster) {
-        BBitmapStream stream(new BBitmap(platformImage));
-        BMallocIO output;
-        if (roster->Translate(&stream, nullptr, nullptr, &output, B_PNG_FORMAT) == B_OK)
-            data->AddData("image/png", B_MIME_TYPE, output.Buffer(), output.BufferLength());
+        // BBitmapStream takes the bitmap but we must detach it to prevent deletion
+        BBitmapStream stream(platformImage.get());
+        BMallocIO outStream;
+
+        // Translate to PNG
+        if (roster->Translate(&stream, NULL, NULL, &outStream, B_PNG_FORMAT) == B_OK) {
+             data->AddData("image/png", B_MIME_TYPE, outStream.Buffer(), outStream.BufferLength());
+        }
+
+        BBitmap* tmp = NULL;
+        stream.DetachBitmap(&tmp);
     }
 
     be_clipboard->Commit();
 }
 
-void Pasteboard::write(const PasteboardBuffer& buffer)
+void Pasteboard::write(const PasteboardBuffer&)
 {
-    // Not implemented for now as PasteboardBuffer structure is not verified.
 }
 
 void WebCore::Pasteboard::write(WebCore::PasteboardWebContent const& content)
@@ -265,26 +277,8 @@ void Pasteboard::write(const PasteboardURL& url)
     be_clipboard->Commit();
 }
 
-void Pasteboard::write(const Color& color)
+void Pasteboard::write(const Color&)
 {
-    AutoClipboardLocker locker(be_clipboard);
-    if (!locker.isLocked())
-        return;
-
-    be_clipboard->Clear();
-    BMessage* data = be_clipboard->Data();
-    if (!data)
-        return;
-
-    auto srgba = color.toColorTypeLossy<SRGBA<uint8_t>>();
-    rgb_color rgb = { srgba.red, srgba.green, srgba.blue, srgba.alpha };
-    data->AddData("RGBColor", B_RGB_COLOR_TYPE, &rgb, sizeof(rgb_color));
-
-    String hex = color.nameForRenderTheme();
-    BString hexStr(hex.utf8().data());
-    data->AddData("text/plain", B_MIME_TYPE, hexStr.String(), hexStr.Length());
-
-    be_clipboard->Commit();
 }
 
 Pasteboard::FileContentState Pasteboard::fileContentState()
@@ -335,13 +329,6 @@ void Pasteboard::read(PasteboardWebContentReader& reader, WebContentReadingPolic
         String text = String::fromUTF8(std::span<const char>(buffer, bufferLength));
         if (reader.readPlainText(text))
             return;
-    }
-
-    // Also try reading general text if specific MIME types failed but we have something
-    if (data->HasData("text/plain", B_MIME_TYPE)) {
-         // Already handled above
-    } else {
-        // Fallback for other types?
     }
 }
 
@@ -438,8 +425,7 @@ void Pasteboard::clear(const String& type)
 
 String Pasteboard::readOrigin()
 {
-    // Haiku clipboard doesn't store origin.
-    return String();
+    return { };
 }
 
 String Pasteboard::readString(const String& type)
@@ -497,11 +483,8 @@ Vector<String> Pasteboard::typesForLegacyUnsafeBindings()
             uint32 type;
             int32 count;
 
-            for (int32 i = 0; data->GetInfo(B_ANY_TYPE, i, &name, &type, &count) == B_OK; i++) {
-                if (strncmp(name, "be:", 3) == 0)
-                    continue;
+            for (int32 i = 0; data->GetInfo(B_ANY_TYPE, i, &name, &type, &count) == B_OK; i++)
                 result.append(String::fromUTF8(name));
-            }
         }
 
         be_clipboard->Unlock();

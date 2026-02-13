@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2011-2017 Apple Inc. All Rights Reserved.
  * Copyright (C) 2019 Haiku, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -10,56 +11,53 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS''
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
- * THE POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+ * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "config.h"
 #include "MemoryPressureHandler.h"
 
-#include <OS.h>
 #include <wtf/MainThread.h>
-#include <wtf/RunLoop.h>
+#include <wtf/OSAllocator.h>
 
 namespace WebCore {
 
+void MemoryPressureHandler::install()
+{
+}
+
+void MemoryPressureHandler::uninstall()
+{
+}
+
+void MemoryPressureHandler::holdOff(Seconds)
+{
+}
+
+void MemoryPressureHandler::respondToMemoryPressure(Critical critical, Synchronous synchronous)
+{
+    releaseMemory(critical, synchronous);
+}
+
 void MemoryPressureHandler::platformReleaseMemory(Critical)
 {
+    // On Haiku, we might want to release specific system resources if applicable.
+    // For now, standard cache releasing is handled by the cross-platform releaseMemory.
 }
 
 std::optional<MemoryPressureHandler::ReliefLogger::MemoryUsage> MemoryPressureHandler::ReliefLogger::platformMemoryUsage()
 {
     return std::nullopt;
-}
-
-void MemoryPressureHandler::install()
-{
-    if (m_installed)
-        return;
-
-    m_installed = true;
-
-    RunLoop::main().dispatchRepeating([] {
-        system_info info;
-        if (get_system_info(&info) == B_OK) {
-            uint64_t freeMemory = (uint64_t)info.free_memory * B_PAGE_SIZE;
-            uint64_t totalMemory = (uint64_t)info.max_pages * B_PAGE_SIZE;
-
-            // Trigger if less than 64MB or 5% memory free
-            if (freeMemory < 64 * 1024 * 1024 || (totalMemory > 0 && (double)freeMemory / totalMemory < 0.05)) {
-                MemoryPressureHandler::singleton().triggerMemoryPressureEvent(false);
-            }
-        }
-    }, 10_s);
 }
 
 } // namespace WebCore

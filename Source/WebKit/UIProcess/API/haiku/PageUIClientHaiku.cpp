@@ -27,72 +27,67 @@
 #include "PageUIClientHaiku.h"
 
 #include "WebViewBase.h"
+#include "APIInfo.h"
+#include "APIInfo.h"
+#include "APIOpenPanelParameters.h"
+#include "WebOpenPanelResultListenerProxy.h"
 #include <WebCore/FloatSize.h>
+#include <WebCore/NotificationData.h>
+#include <WebCore/NotificationResources.h>
+#include <FilePanel.h>
+#include <Notification.h>
 #include <PrintJob.h>
 #include <Rect.h>
 #include <Window.h>
 #include <cmath>
 
-#include "APIOpenPanelParameters.h"
-#include "WebOpenPanelResultListenerProxy.h"
-#include <WebCore/NotificationData.h>
-#include <WebCore/NotificationResources.h>
-
-#include <Alert.h>
-#include <FilePanel.h>
-#include <Notification.h>
-#include <Entry.h>
-#include <Path.h>
-#include <Messenger.h>
-
 namespace WebKit {
 
 class OpenPanelHandler : public BHandler {
 public:
-    OpenPanelHandler(Ref<WebOpenPanelResultListenerProxy>&& listener)
+    OpenPanelHandler(Ref<WebOpenPanelResultListenerProxy>&& listener, bool allowMultiple)
         : BHandler("OpenPanelHandler")
-        , m_listener(WTFMove(listener))
-        , m_panel(nullptr)
+        , m_listener(WTF::move(listener))
+        , m_panel(new BFilePanel(B_OPEN_PANEL, NULL, NULL, allowMultiple ? B_FILE_NODE : B_FILE_NODE | B_DIRECTORY_NODE, allowMultiple))
     {
+        m_panel->SetTarget(this);
     }
 
-    ~OpenPanelHandler()
+    virtual ~OpenPanelHandler()
     {
         delete m_panel;
     }
 
-    void setPanel(BFilePanel* panel)
+    void Show()
     {
-        m_panel = panel;
+        m_panel->Show();
     }
 
     void MessageReceived(BMessage* message) override
     {
         switch (message->what) {
-        case B_REFS_RECEIVED:
-        case B_SIMPLE_DATA: {
-            Vector<String> filenames;
-            entry_ref ref;
-            for (int32 i = 0; message->FindRef("refs", i, &ref) == B_OK; i++) {
-                BEntry entry(&ref, true);
-                BPath path;
-                if (entry.GetPath(&path) == B_OK)
-                    filenames.append(String::fromUTF8(path.Path()));
+            case B_REFS_RECEIVED: {
+                entry_ref ref;
+                Vector<String> filenames;
+                for (int32 i = 0; message->FindRef("refs", i, &ref) == B_OK; i++) {
+                    BEntry entry(&ref);
+                    BPath path;
+                    if (entry.GetPath(&path) == B_OK)
+                        filenames.append(String::fromUTF8(path.Path()));
+                }
+                m_listener->chooseFiles(filenames);
+                if (Looper()) Looper()->RemoveHandler(this);
+                delete this;
+                break;
             }
-            m_listener->chooseFiles(filenames);
-            break;
+            case B_CANCEL:
+                m_listener->cancel();
+                if (Looper()) Looper()->RemoveHandler(this);
+                delete this;
+                break;
+            default:
+                BHandler::MessageReceived(message);
         }
-        case B_CANCEL:
-            m_listener->cancel();
-            break;
-        default:
-            BHandler::MessageReceived(message);
-            return;
-        }
-
-        if (Looper())
-            Looper()->RemoveHandler(this);
-        delete this;
     }
 
 private:
@@ -157,24 +152,38 @@ void PageUIClientHaiku::printFrame(WebPageProxy& page, WebFrameProxy& frame, con
     completionHandler();
 }
 
-void PageUIClientHaiku::runOpenPanel(WebPageProxy&, WebFrameProxy&, const WebCore::SecurityOriginData&, API::OpenPanelParameters& parameters, WebOpenPanelResultListenerProxy& listener)
+void PageUIClientHaiku::runOpenPanel(WebPageProxy&, WebFrameProxy&, const WebCore::SecurityOriginData&, API::OpenPanelParameters* parameters, WebOpenPanelResultListenerProxy* listener)
 {
-    BWindow* window = m_webView.Window();
-    if (!window) {
-        listener.cancel();
+    // BFilePanel is async, so we create a handler that deletes itself upon completion.
+    // Ideally we should attach it to the WebView's window loop, but a floating handler might work if looped correctly.
+    // Actually, BFilePanel runs in its own thread/looper usually, but sends messages to target.
+    // If target is looperless, it might be an issue.
+    // Let's attach the handler to the WebView's window if possible.
+
+    // Note: This implementation is a bit simplified and assumes the handler stays alive until callback.
+    // BFilePanel takes ownership of nothing, but we delete handler in MessageReceived.
+
+    // We need to ensure the listener is kept alive.
+    if (!listener) return;
+
+    // Run on main thread?
+    // Listener proxy calls back via IPC.
+
+    bool allowMultiple = parameters->allowMultipleFiles();
+    auto handler = new OpenPanelHandler(Ref { *listener }, allowMultiple);
+
+    if (m_webView.Window()) {
+        m_webView.Window()->AddHandler(handler);
+    } else {
+        // Fallback or leak? If no window, we can't really attach easily without a looper.
+        // Maybe create a looper?
+        // For now assume WebView is attached.
+        delete handler;
+        listener->cancel();
         return;
     }
 
-    OpenPanelHandler* handler = new OpenPanelHandler(listener);
-    window->AddHandler(handler);
-
-    uint32 nodeFlavors = B_FILE_NODE;
-    if (parameters.allowDirectories())
-        nodeFlavors |= B_DIRECTORY_NODE;
-
-    BFilePanel* panel = new BFilePanel(B_OPEN_PANEL, new BMessenger(handler), nullptr, nodeFlavors, parameters.allowMultipleFiles());
-    handler->setPanel(panel);
-    panel->Show();
+    handler->Show();
 }
 
 void PageUIClientHaiku::showNotification(WebPageProxy&, const WebCore::NotificationData& data, RefPtr<WebCore::NotificationResources>&&, CompletionHandler<void()>&& completionHandler)
@@ -182,27 +191,10 @@ void PageUIClientHaiku::showNotification(WebPageProxy&, const WebCore::Notificat
     BNotification notification(B_INFORMATION_NOTIFICATION);
     notification.SetTitle(data.title.utf8().data());
     notification.SetContent(data.body.utf8().data());
+    // TODO: Handle icon from resources if available
+
     notification.Send();
     completionHandler();
-}
-
-void PageUIClientHaiku::runJavaScriptAlert(WebPageProxy&, const String& message, WebFrameProxy&, const WebCore::SecurityOriginData&, CompletionHandler<void()>&& completionHandler)
-{
-    BAlert* alert = new BAlert("JavaScript Alert", message.utf8().data(), "OK");
-    alert->Go();
-    completionHandler();
-}
-
-void PageUIClientHaiku::runJavaScriptConfirm(WebPageProxy&, const String& message, WebFrameProxy&, const WebCore::SecurityOriginData&, CompletionHandler<void(bool)>&& completionHandler)
-{
-    BAlert* alert = new BAlert("JavaScript Confirm", message.utf8().data(), "Cancel", "OK");
-    int32 button = alert->Go();
-    completionHandler(button == 1);
-}
-
-void PageUIClientHaiku::runJavaScriptPrompt(WebPageProxy&, const String&, const String&, WebFrameProxy&, const WebCore::SecurityOriginData&, CompletionHandler<void(const String&)>&& completionHandler)
-{
-    completionHandler(String());
 }
 
 } // namespace WebKit

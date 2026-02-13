@@ -37,11 +37,11 @@ public:
     ScrollbarThemeHaiku(bool drawOuterFrame);
     virtual ~ScrollbarThemeHaiku();
 
+    void registerScrollbar(Scrollbar&) override;
+    void unregisterScrollbar(Scrollbar&) override;
+
     bool hasButtons(Scrollbar&) override;
     bool hasThumb(Scrollbar&) override;
-
-    void paintTrackBackground(GraphicsContext&, Scrollbar&, const IntRect&) override;
-    void paintTickmarks(GraphicsContext&, Scrollbar&, const IntRect&) override;
 
     IntRect backButtonRect(Scrollbar&, ScrollbarPart, bool painting) override;
     IntRect forwardButtonRect(Scrollbar&, ScrollbarPart, bool painting) override;

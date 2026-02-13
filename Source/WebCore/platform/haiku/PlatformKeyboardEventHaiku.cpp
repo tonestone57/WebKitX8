@@ -144,9 +144,6 @@ int PlatformKeyboardEvent::windowsKeyCodeForKeyEvent(char singleByte, int keyCod
             return VK_F11;
         case B_F12_KEY:
             return VK_F12;
-        // Haiku doesn't map F13-F24 by default constants easily, but let's check
-        // if we can map them if we receive them (scan codes might differ).
-        // For now sticking to standard F1-F12.
         case B_PRINT_KEY:
             return VK_PRINT;
         case B_PAUSE_KEY:
@@ -439,14 +436,6 @@ String PlatformKeyboardEvent::KeyCodeForKeyEvent(int keyCode)
             return ASCIILiteral::fromLiteralUnsafe("F11");
         case 0x000D:
             return ASCIILiteral::fromLiteralUnsafe("F12");
-
-        case 0x006C:
-            return ASCIILiteral::fromLiteralUnsafe("F13");
-        case 0x006D:
-            return ASCIILiteral::fromLiteralUnsafe("F14");
-        case 0x006E:
-            return ASCIILiteral::fromLiteralUnsafe("F15");
-        // ... more F keys if needed, Haiku keymap dependent
 
         case 0x000E:
             return ASCIILiteral::fromLiteralUnsafe("PrintScreen");

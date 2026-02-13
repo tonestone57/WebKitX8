@@ -209,6 +209,7 @@ public:
             {
                 BString str;
                 BLanguage language("en");
+                // Use en_GB to get ISO-8601 compatible week numbers (Monday first)
                 BFormattingConventions conventions("en_GB");
 
                 if (m_calendar) {

@@ -57,9 +57,12 @@ bool screenHasInvertedColors()
     return false;
 }
 
-FloatRect screenRect(Widget*)
+FloatRect screenRect(Widget* widget)
 {
-    BScreen screen;
+    BView* view = widget ? widget->platformWidget() : nullptr;
+    BWindow* window = view ? view->Window() : nullptr;
+    BScreen screen(window);
+
     if (!screen.IsValid())
         return FloatRect();
     // BRect is inclusive, so add 1 to width and height
@@ -69,7 +72,10 @@ FloatRect screenRect(Widget*)
 
 FloatRect screenAvailableRect(Widget* widget)
 {
-    BScreen screen;
+    BView* view = widget ? widget->platformWidget() : nullptr;
+    BWindow* window = view ? view->Window() : nullptr;
+    BScreen screen(window);
+
     if (!screen.IsValid())
         return FloatRect();
 
@@ -134,9 +140,6 @@ int screenDepth(Widget*)
 int screenDepthPerComponent(Widget*)
 {
     BScreen screen(B_MAIN_SCREEN_ID);
-    if (!screen.IsValid())
-        return 8;
-
     switch (screen.ColorSpace()) {
         case B_RGBA32:
         case B_RGB32:
@@ -145,12 +148,6 @@ int screenDepthPerComponent(Widget*)
         case B_RGB16:
         case B_RGB15:
             return 5;
-        case B_CMAP8:
-        case B_GRAY8:
-            return 8;
-        case B_GRAY1:
-        case B_MONOCHROME_1_BIT:
-            return 1;
         default:
             return 8;
     }
@@ -167,6 +164,12 @@ bool screenIsMonochrome(Widget*)
 DestinationColorSpace screenColorSpace(Widget*)
 {
     return DestinationColorSpace::SRGB();
+}
+
+void screenColorProfile(WebCore::ColorProfile&)
+{
+    // Haiku does not currently expose ICC profiles for screens via BScreen.
+    // We assume sRGB.
 }
 
 } // namespace WebCore

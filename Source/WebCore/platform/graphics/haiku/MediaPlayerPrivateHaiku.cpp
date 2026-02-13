@@ -77,13 +77,15 @@ MediaPlayerPrivate::MediaPlayerPrivate(MediaPlayer& player)
     , m_videoTrack(nullptr)
     , m_soundPlayer(nullptr)
     , m_frameBuffer(nullptr)
-    , m_loaderThread(-1)
     , m_player(player)
     , m_networkState(MediaPlayer::NetworkState::Empty)
     , m_readyState(MediaPlayer::ReadyState::HaveNothing)
     , m_volume(1.0)
     , m_currentTime(0.f)
     , m_paused(true)
+    , m_muted(false)
+    , m_rate(1.0)
+    , m_preload(MediaPlayer::Preload::Auto)
 {
 }
 
@@ -105,58 +107,33 @@ void MediaPlayerPrivate::load(const String& url, WebCore::MediaSourcePrivateClie
 }
 #endif
 
-struct LoadContext {
-    RefPtr<MediaPlayerPrivate> player;
-    String url;
-};
-
 void MediaPlayerPrivate::load(const String& url)
 {
     // Cleanup from previous request (can this even happen?)
     if (m_soundPlayer)
         m_soundPlayer->Stop(false);
     delete m_soundPlayer;
-    m_soundPlayer = nullptr;
-
-    // Must call cancelLoad (which joins threads) WITHOUT holding the lock
-    // because the thread might be trying to acquire it.
-    cancelLoad();
 
     m_mediaLock.Lock();
-    // Reset state protected by lock if needed, though cancelLoad did most of it.
+    cancelLoad();
+
     m_mediaLock.Unlock();
 
-    // Spawn thread
-    LoadContext* context = new LoadContext{this, url};
-    m_loaderThread = spawn_thread(loaderThread, "Media Loader", B_NORMAL_PRIORITY, context);
-    resume_thread(m_loaderThread);
-}
-
-int32 MediaPlayerPrivate::loaderThread(void* cookie)
-{
-    LoadContext* context = (LoadContext*)cookie;
-    if (context->player) {
-         context->player->IdentifyTracks(context->url);
-         // Dispatch completion
-         RunLoop::main().dispatch([player = context->player] {
-             if (player) player->didLoad();
-         });
-    }
-    delete context;
-    return 0;
-}
-
-void MediaPlayerPrivate::didLoad()
-{
+    // TODO we need more detailed info from the BMediaFile to accurately report
+    // the m_readyState and the m_networkState to WebKit. The API will need to
+    // be extended on Haiku side to query the internal state (and probably
+    // BMediaFile should not block until data is ready?)
+    IdentifyTracks(url);
     if (m_mediaFile && m_mediaFile->InitCheck() == B_OK) {
         m_player.characteristicChanged();
         m_player.durationChanged();
         m_player.sizeChanged();
         m_player.firstVideoFrameAvailable();
 
+        //m_readyState = MediaPlayer::HaveMetadata;
+        //m_readyState = MediaPlayer::HaveFutureData;
         m_readyState = MediaPlayer::ReadyState::HaveEnoughData;
-        m_networkState = MediaPlayer::NetworkState::Loaded;
-        m_buffered.add(MediaTime::zeroTime(), duration());
+        m_networkState = MediaPlayer::NetworkState::Loaded; // Loading;
     } else {
         m_readyState = MediaPlayer::ReadyState::HaveMetadata;
         m_networkState = MediaPlayer::NetworkState::FormatError;
@@ -167,17 +144,12 @@ void MediaPlayerPrivate::didLoad()
 
 void MediaPlayerPrivate::cancelLoad()
 {
-    if (m_loaderThread >= 0) {
-        status_t exitValue;
-        wait_for_thread(m_loaderThread, &exitValue);
-        m_loaderThread = -1;
-    }
-
-    // m_mediaLock is expected to be held by caller
+    m_mediaLock.Lock();
     delete m_mediaFile;
     m_mediaFile = nullptr;
     m_audioTrack = nullptr;
     m_videoTrack = nullptr;
+    m_mediaLock.Unlock();
 }
 
 void MediaPlayerPrivate::prepareToPlay()
@@ -297,14 +269,8 @@ WTF::MediaTime MediaPlayerPrivate::currentTime() const
 
 void MediaPlayerPrivate::seekToTarget(const SeekTarget& time)
 {
-    // TODO we should make sure the cache is ready to serve this. The idea is:
-    // * Seek the tracks using SeekToTime
-    // * The decoder will try to read "somewhere" in the cache. The Read call
-    // should block, and check if the data is already downloaded
-    // * If not, it should wait for it (and a sufficient buffer)
-    //
-    // Generally, we shouldn't let the reads to the cache return uninitialized
-    // data. Note that we will probably need HTTP range requests support.
+    if (!m_mediaLock.Lock())
+        return;
 
     bigtime_t newTime = (bigtime_t)(time.time.toDouble() * 1000000);
     // Usually, seeking the video is rounded to the nearest keyframe. This
@@ -314,6 +280,9 @@ void MediaPlayerPrivate::seekToTarget(const SeekTarget& time)
         m_videoTrack->SeekToTime(&newTime);
     if (m_audioTrack)
         m_audioTrack->SeekToTime(&newTime);
+
+    m_currentTime = newTime / 1000000.f;
+    m_mediaLock.Unlock();
 }
 
 bool MediaPlayerPrivate::seeking() const
@@ -330,19 +299,24 @@ void MediaPlayerPrivate::setVolume(float volume)
 {
     m_volume = volume;
     if (m_soundPlayer)
-        m_soundPlayer->SetVolume(m_muted ? 0.0 : m_volume);
+        m_soundPlayer->SetVolume(m_muted ? 0.0f : m_volume);
 }
 
 void MediaPlayerPrivate::setMuted(bool muted)
 {
     m_muted = muted;
     if (m_soundPlayer)
-        m_soundPlayer->SetVolume(m_muted ? 0.0 : m_volume);
+        m_soundPlayer->SetVolume(m_muted ? 0.0f : m_volume);
 }
 
-void MediaPlayerPrivate::setRate(float rate)
+void MediaPlayerPrivate::setRate(double rate)
 {
     m_rate = rate;
+}
+
+void MediaPlayerPrivate::setPreload(MediaPlayer::Preload preload)
+{
+    m_preload = preload;
 }
 
 MediaPlayer::NetworkState MediaPlayerPrivate::networkState() const
@@ -357,6 +331,12 @@ MediaPlayer::ReadyState MediaPlayerPrivate::readyState() const
 
 PlatformTimeRanges& MediaPlayerPrivate::buffered() const
 {
+    // FIXME: Return actual buffered ranges based on network cache or BMediaFile state.
+    // For now, if we have a media file and are playing, assume we have content.
+    m_buffered.clear();
+    if (m_readyState >= MediaPlayer::ReadyState::HaveEnoughData && duration() > MediaTime::zeroTime()) {
+        m_buffered.add(MediaTime::zeroTime(), duration());
+    }
     return m_buffered;
 }
 
@@ -365,6 +345,21 @@ bool MediaPlayerPrivate::didLoadingProgress() const
     bool progress = m_didReceiveData;
     m_didReceiveData = false;
     return progress;
+}
+
+uint64_t MediaPlayerPrivate::bytesLoaded() const
+{
+    return 0;
+}
+
+uint64_t MediaPlayerPrivate::totalBytes() const
+{
+    return 0;
+}
+
+MediaPlayer::MovieLoadType MediaPlayerPrivate::movieLoadType() const
+{
+    return MediaPlayer::MovieLoadType::Unknown;
 }
 
 void MediaPlayerPrivate::paint(GraphicsContext& context, const FloatRect& r)
@@ -393,9 +388,6 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
 #endif
 
     if (m_mediaFile->InitCheck() == B_OK) {
-        // Lock while modifying members
-        Locker locker(m_mediaLock);
-
         for (int i = m_mediaFile->CountTracks() - 1; i >= 0; i--)
         {
             BMediaTrack* track = m_mediaFile->TrackAt(i);

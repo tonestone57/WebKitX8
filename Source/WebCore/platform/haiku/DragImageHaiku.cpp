@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2007 Apple Inc.  All rights reserved.
  * Copyright (C) 2007 Ryan Leavengood <leavengood@gmail.com>
+ * Copyright (C) 2019 Haiku, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,9 +28,17 @@
 #include "config.h"
 #include "DragImage.h"
 
-#include "CachedImage.h"
+#include "BitmapImage.h"
 #include "FontCascade.h"
 #include "Image.h"
+#include "NotImplemented.h"
+#include "TextRun.h"
+
+#include <Bitmap.h>
+#include <InterfaceDefs.h>
+#include <TranslationUtils.h>
+#include <View.h>
+#include <cstring>
 
 namespace WebCore {
 
@@ -46,31 +55,17 @@ const float MaxDragLabelStringWidth = (MaxDragLabelWidth - 2 * DragLabelBorderX)
 const float DragLinkLabelFontsize = 11;
 const float DragLinkUrlFontSize = 10;
 
-DragImageRef fitDragImageToMaxSize(DragImageRef image, const IntSize& layoutSize, const IntSize& maxSize)
+IntSize dragImageSize(DragImageRef image)
 {
     if (!image)
-        return nullptr;
+        return IntSize();
+    BRect r = image->Bounds();
+    return IntSize(r.IntegerWidth() + 1, r.IntegerHeight() + 1);
+}
 
-    float heightResizeRatio = 0.0f;
-    float widthResizeRatio = 0.0f;
-    float resizeRatio = -1.0f;
-    IntSize originalSize = dragImageSize(image);
-
-    if (layoutSize.width() > maxSize.width()) {
-        widthResizeRatio = maxSize.width() / (float)layoutSize.width();
-        resizeRatio = widthResizeRatio;
-    }
-
-    if (layoutSize.height() > maxSize.height()) {
-        heightResizeRatio = maxSize.height() / (float)layoutSize.height();
-        if ((resizeRatio < 0.0f) || (resizeRatio > heightResizeRatio))
-            resizeRatio = heightResizeRatio;
-    }
-
-    if (layoutSize == originalSize)
-        return resizeRatio > 0.0f ? scaleDragImage(image, FloatSize(resizeRatio, resizeRatio)) : image;
-
-    return image;
+void deleteDragImage(DragImageRef image)
+{
+    delete image;
 }
 
 DragImageRef scaleDragImage(DragImageRef image, FloatSize scale)
@@ -78,49 +73,52 @@ DragImageRef scaleDragImage(DragImageRef image, FloatSize scale)
     if (!image)
         return nullptr;
 
-    BBitmap* original = static_cast<BBitmap*>(image);
-    BRect bounds = original->Bounds();
-    BRect newBounds(0, 0, bounds.Width() * scale.width(), bounds.Height() * scale.height());
+    if (scale.width() == 1 && scale.height() == 1)
+        return image;
 
-    BBitmap* scaled = new BBitmap(newBounds, B_RGBA32, true);
-    if (scaled->Lock()) {
-        BView* view = new BView(newBounds, "drawing", 0, 0);
-        scaled->AddChild(view);
-        view->SetDrawingMode(B_OP_COPY);
-        view->DrawBitmap(original, newBounds);
-        scaled->RemoveChild(view);
-        delete view;
-        scaled->Unlock();
+    BRect oldRect = image->Bounds();
+    BRect newRect(0, 0, oldRect.Width() * scale.width(), oldRect.Height() * scale.height());
+
+    BBitmap* newBitmap = new BBitmap(newRect, image->ColorSpace(), true);
+    if (newBitmap->InitCheck() != B_OK) {
+        delete newBitmap;
+        delete image;
+        return nullptr;
     }
-    delete original;
-    return scaled;
+
+    BView* view = new BView(newRect, "drawing", B_FOLLOW_ALL, 0);
+    newBitmap->AddChild(view);
+    if (newBitmap->Lock()) {
+        view->DrawBitmap(image, newRect);
+        view->Sync();
+        newBitmap->RemoveChild(view);
+        newBitmap->Unlock();
+    }
+    delete view;
+    delete image;
+    return newBitmap;
 }
 
-DragImageRef dissolveDragImageToFraction(DragImageRef image, float fraction)
+DragImageRef dissolveDragImageToFraction(DragImageRef image, float delta)
 {
     if (!image)
         return nullptr;
 
-    BBitmap* bitmap = static_cast<BBitmap*>(image);
-    if (bitmap->Lock()) {
-        uint8* bits = (uint8*)bitmap->Bits();
-        int32 bpr = bitmap->BytesPerRow();
-        int32 height = bitmap->Bounds().IntegerHeight() + 1;
-        int32 width = bitmap->Bounds().IntegerWidth() + 1;
+    if (delta == 1.0f)
+        return image;
 
-        for (int y = 0; y < height; y++) {
-            uint8* row = bits + y * bpr;
-            for (int x = 0; x < width; x++) {
-                row[3] = (uint8)(row[3] * fraction);
-                row += 4;
-            }
-        }
-        bitmap->Unlock();
+    uint8* bits = (uint8*)image->Bits();
+    int32 length = image->BitsLength();
+
+    // Assume B_RGBA32 (BGRA)
+    for (int32 i = 0; i < length; i += 4) {
+        bits[i + 3] = (uint8)(bits[i + 3] * delta);
     }
-    return bitmap;
+
+    return image;
 }
 
-DragImageRef createDragImageFromImage(Image* image, ImageOrientation)
+DragImageRef createDragImageFromImage(Image* image, ImageOrientation orientation, GraphicsClient*, float deviceScaleFactor)
 {
     if (!image)
         return nullptr;
@@ -129,47 +127,97 @@ DragImageRef createDragImageFromImage(Image* image, ImageOrientation)
     if (!nativeImage)
         return nullptr;
 
-    return new BBitmap(nativeImage.get());
+    const BBitmap* source = nativeImage->platformImage();
+    if (!source)
+        return nullptr;
+
+    return new BBitmap(source);
+}
+
+DragImageData createDragImageForLink(Element&, URL& url, const String& label, float deviceScaleFactor)
+{
+    // Simple drag image for links: Label on top, URL on bottom
+    BFont font;
+    if (be_plain_font)
+        font = *be_plain_font;
+
+    font.SetSize(DragLinkLabelFontsize);
+
+    float labelWidth = font.StringWidth(label.utf8().data());
+    float urlWidth = font.StringWidth(url.string().utf8().data());
+    float width = std::max(labelWidth, urlWidth) + 10;
+    float height = DragLinkLabelFontsize + DragLinkUrlFontSize + 10;
+
+    BRect rect(0, 0, width, height);
+    BBitmap* bitmap = new BBitmap(rect, B_RGBA32, true);
+    if (bitmap->InitCheck() != B_OK) {
+        delete bitmap;
+        return { nullptr, nullptr };
+    }
+
+    BView* view = new BView(rect, "drag", B_FOLLOW_NONE, 0);
+    bitmap->AddChild(view);
+
+    if (bitmap->Lock()) {
+        view->SetHighColor(B_TRANSPARENT_COLOR);
+        view->FillRect(rect);
+
+        view->SetHighColor(0, 0, 0, 255); // Black text
+        view->SetFont(&font);
+
+        // Draw Label
+        font_height fh;
+        font.GetHeight(&fh);
+        float y = fh.ascent + 2;
+        view->DrawString(label.utf8().data(), BPoint(5, y));
+
+        // Draw URL
+        font.SetSize(DragLinkUrlFontSize);
+        font.GetHeight(&fh);
+        y += fh.ascent + fh.descent + fh.leading + 2;
+        view->SetHighColor(0, 0, 255, 255); // Blue URL
+        view->SetFont(&font);
+        view->DrawString(url.string().utf8().data(), BPoint(5, y));
+
+        view->Sync();
+        bitmap->RemoveChild(view);
+        bitmap->Unlock();
+    }
+    delete view;
+
+    return { bitmap, nullptr };
+}
+
+DragImageRef createDragImageIconForCachedImageFilename(const String& filename)
+{
+    BBitmap* bitmap = BTranslationUtils::GetBitmap(filename.utf8().data());
+    return bitmap;
+}
+
+DragImageRef platformAdjustDragImageForDeviceScaleFactor(DragImageRef image, float deviceScaleFactor)
+{
+    return image;
 }
 
 DragImageRef createDragImageForColor(const Color& color, const FloatRect& rect, float, Path&)
 {
-    BBitmap* bitmap = new BBitmap(rect, B_RGBA32, true);
-    if (bitmap->Lock()) {
-        BView* view = new BView(rect, "drag", 0, 0);
-        bitmap->AddChild(view);
-        view->SetHighColor(color);
-        view->FillRect(rect);
-        bitmap->RemoveChild(view);
-        delete view;
-        bitmap->Unlock();
+    BRect r(0, 0, rect.width(), rect.height());
+    BBitmap* bitmap = new BBitmap(r, B_RGBA32);
+    if (bitmap->InitCheck() == B_OK) {
+        auto srgba = color.toSRGB<uint8_t>();
+        uint8* bits = (uint8*)bitmap->Bits();
+        int32 length = bitmap->BitsLength();
+        for (int32 i = 0; i < length; i += 4) {
+            bits[i] = srgba.blue;
+            bits[i+1] = srgba.green;
+            bits[i+2] = srgba.red;
+            bits[i+3] = srgba.alpha;
+        }
+    } else {
+        delete bitmap;
+        return nullptr;
     }
     return bitmap;
 }
 
-void deleteDragImage(DragImageRef image)
-{
-    if (image)
-        delete static_cast<BBitmap*>(image);
 }
-
-IntSize dragImageSize(DragImageRef image)
-{
-    if (!image)
-        return IntSize();
-
-    BRect r = static_cast<BBitmap*>(image)->Bounds();
-    return IntSize(r.Width() + 1, r.Height() + 1);
-}
-
-DragImageRef createDragImageIconForCachedImageFilename(const String&)
-{
-    return nullptr;
-}
-
-DragImageRef createDragImageForLink(Element&, URL&, const String& label, TextIndicatorData&, FontCascade&, float)
-{
-    return nullptr;
-}
-
-} // namespace WebCore

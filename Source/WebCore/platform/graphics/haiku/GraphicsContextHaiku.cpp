@@ -243,8 +243,21 @@ void GraphicsContextHaiku::fillRect(const FloatRect& rect, const Color& color)
         HGTRACE(("hasDropShadow end\n"));
     }
     
-    // FillRect doesn't respect blending modes, DrawBitmap does
+    // FillRect doesn't respect blending modes, DrawBitmap does.
+    // However, if the color is opaque and we are in Copy or SourceOver mode (mostly),
+    // FillRect is much faster.
+    // Actually, BView::FillRect usually respects drawing mode if set correctly.
+    // The previous workaround suggests B_OP_ALPHA issues.
+    // Let's try to optimize for opaque colors.
+
     const auto [r, g, b, a] = color.toColorTypeLossy<SRGBA<uint8_t>>().resolved();
+
+    if (a == 255 && m_view->DrawingMode() == B_OP_COPY) {
+        m_view->SetHighColor(r, g, b, 255);
+        m_view->FillRect(rect);
+        return;
+    }
+
     const uint32_t c = ((a << 24) | (r << 16) | (g << 8) | b);
     m_fillBitmap->Lock();
     uint32_t *bits = reinterpret_cast<uint32_t *>(m_fillBitmap->Bits());
@@ -271,8 +284,16 @@ void GraphicsContextHaiku::fillRect(const FloatRect& rect, RequiresClipToRect re
         contextShadow.drawRectShadow(*this, FloatRoundedRect(rect));
         HGTRACE(("hasDropShadow end\n"));
     }
-    // FillRect doesn't respect blending modes, DrawBitmap does
+
     const auto [r, g, b, a] = state().fillBrush().color().toColorTypeLossy<SRGBA<uint8_t>>().resolved();
+
+    if (a == 255 && m_view->DrawingMode() == B_OP_COPY) {
+        m_view->SetHighColor(r, g, b, 255);
+        m_view->FillRect(rect);
+        return;
+    }
+
+    // FillRect doesn't respect blending modes, DrawBitmap does
     const uint32_t c = ((a << 24) | (r << 16) | (g << 8) | b);
     m_fillBitmap->Lock();
     uint32_t *bits = reinterpret_cast<uint32_t *>(m_fillBitmap->Bits());
@@ -535,13 +556,10 @@ void GraphicsContextHaiku::drawFocusRing(const Vector<FloatRect>& rects, float o
     m_view->PushState();
     m_view->SetHighColor(color);
     m_view->SetPenSize(width);
-
-    BShape shape;
+    // FIXME: maybe we should implement this with BShape?
     for (unsigned i = 0; i < rectCount; ++i) {
         BRect r = rects[i];
         r.InsetBy(-offset, -offset);
-        // Using StrokeRect in a loop is fine, but building a shape is better for complex rings.
-        // For now, sticking to rects but removing the FIXME as it's a valid implementation choice.
         m_view->StrokeRect(r, B_SOLID_HIGH);
     }
     m_view->PopState();

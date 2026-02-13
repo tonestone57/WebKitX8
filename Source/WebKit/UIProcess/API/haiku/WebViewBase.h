@@ -28,7 +28,6 @@
 
 #include <Rect.h>
 #include <View.h>
-#include <wtf/WeakPtr.h>
 
 class BWindow;
 
@@ -45,7 +44,7 @@ namespace WebKit {
 class PageClientImpl;
 class WebPageProxy;
 
-class WebViewBase: public API::ObjectImpl<API::Object::Type::View>, public BView, public CanMakeWeakPtr<WebViewBase> {
+class WebViewBase: public API::ObjectImpl<API::Object::Type::View>, public BView {
 public:
     static RefPtr<WebViewBase> create(const char* name, BRect rect,
         BWindow* parentWindow, const API::PageConfiguration& config)

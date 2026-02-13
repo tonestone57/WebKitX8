@@ -52,12 +52,13 @@ public:
         : BWindow(BRect(0, 0, 300, 200), "Color Picker", B_TITLED_WINDOW, B_NOT_RESIZABLE | B_NOT_ZOOMABLE | B_AUTO_UPDATE_SIZE_LIMITS)
         , m_picker(picker)
     {
+        auto haikuColor = toHaikuColor(color);
         m_colorControl = new BColorControl(B_ORIGIN, B_CELLS_32x8, 8, "picker", new BMessage('chng'));
-        m_colorControl->SetValue(toHaikuColor(color));
+        m_colorControl->SetValue(haikuColor);
 
         m_alphaSlider = new BSlider("alpha", "Alpha", new BMessage('alph'), 0, 255, B_HORIZONTAL);
+        m_alphaSlider->SetValue(haikuColor.alpha);
         m_alphaSlider->SetModificationMessage(new BMessage('alph'));
-        m_alphaSlider->SetValue(color.toSRGB<uint8_t>().alpha);
 
         BGroupLayout* root = new BGroupLayout(B_VERTICAL);
         SetLayout(root);
@@ -138,7 +139,7 @@ void WebColorPickerHaiku::setSelectedColor(const Color& color)
              static_cast<BColorControl*>(view)->SetValue(toHaikuColor(color));
         }
         if (BView* view = m_window->FindView("alpha")) {
-             static_cast<BSlider*>(view)->SetValue(color.toSRGB<uint8_t>().alpha);
+             static_cast<BSlider*>(view)->SetValue(toHaikuColor(color).alpha);
         }
         m_window->Unlock();
     }
