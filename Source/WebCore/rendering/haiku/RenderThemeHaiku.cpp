@@ -35,6 +35,7 @@
 #include "PaintInfo.h"
 #include "RenderBox.h"
 #include "RenderElement.h"
+#include "RenderMeter.h"
 #include "RenderProgress.h"
 #include "RenderStyle+SettersInlines.h"
 #include "UserAgentScripts.h"
@@ -188,6 +189,58 @@ void RenderThemeHaiku::adjustTextAreaStyle(RenderStyle& style, const Element* el
 bool RenderThemeHaiku::paintTextArea(const RenderElement& object, const PaintInfo& info, const FloatRect& intRect)
 {
     return paintTextField(object, info, intRect);
+}
+
+bool RenderThemeHaiku::paintMenuList(const RenderElement& object, const PaintInfo& info, const FloatRect& rect)
+{
+    if (!be_control_look)
+        return true;
+
+    // A MenuList is just a button in Haiku (BMenuField)
+    return paintButton(object, info, rect);
+}
+
+bool RenderThemeHaiku::paintMeter(const RenderElement& object, const PaintInfo& info, const FloatRect& intRect)
+{
+    if (!be_control_look)
+        return true;
+
+    if (!is<RenderMeter>(object))
+        return true;
+
+    // Meter is similar to progress bar
+    const auto& renderMeter = downcast<RenderMeter>(object);
+    // TODO: Use different colors based on meter value/optimality?
+    double position = renderMeter.valueRatio();
+
+    rgb_color base = colorForValue(B_CONTROL_BACKGROUND_COLOR, object.useDarkAppearance());
+    rgb_color barColor = colorForValue(B_CONTROL_HIGHLIGHT_COLOR, object.useDarkAppearance());
+
+    BRect rect(intRect);
+    BView* view = info.context().platformContext();
+
+    view->PushState();
+    be_control_look->DrawBorder(view, rect, view->Bounds(), base, B_PLAIN_BORDER);
+    rect.InsetBy(1, 1);
+
+    view->SetHighColor(base);
+    view->FillRect(rect);
+
+    if (position > 0) {
+        BRect barRect = rect;
+        barRect.right = barRect.left + barRect.Width() * position;
+        view->SetHighColor(barColor);
+        view->FillRect(barRect);
+    }
+    view->PopState();
+
+    return false;
+}
+
+bool RenderThemeHaiku::paintCapsLockIndicator(const RenderElement&, const PaintInfo&, const FloatRect&)
+{
+    // Not implemented visually on Haiku usually
+    return true;
 }
 
 void RenderThemeHaiku::adjustMenuListStyle(RenderStyle& style, const Element* element) const
@@ -368,12 +421,6 @@ Style::PreferredSizePair RenderThemeHaiku::controlSize(StyleAppearance appearanc
         default:
             return RenderTheme::controlSize(appearance, font, minimum, zoom);
     }
-}
-
-bool RenderThemeHaiku::paintMenuList(const RenderElement&, const PaintInfo&, const FloatRect&)
-{
-    // This is never called: the list is handled natively as a BMenu.
-    return true;
 }
 
 uint32 RenderThemeHaiku::flagsForObject(const RenderElement& object) const

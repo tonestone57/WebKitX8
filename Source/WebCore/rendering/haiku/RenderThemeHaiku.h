@@ -83,6 +83,10 @@ protected:
     bool paintProgressBar(const RenderElement&, const PaintInfo&, const FloatRect&) override;
     bool paintSearchField(const RenderElement&, const PaintInfo&, const FloatRect&) override;
     bool paintInnerSpinButton(const RenderElement&, const PaintInfo&, const FloatRect&) override;
+    bool paintTextArea(const RenderElement&, const PaintInfo&, const FloatRect&) override;
+    bool paintMenuList(const RenderElement&, const PaintInfo&, const FloatRect&) override;
+    bool paintMeter(const RenderElement&, const PaintInfo&, const FloatRect&) override;
+    bool paintCapsLockIndicator(const RenderElement&, const PaintInfo&, const FloatRect&) override;
 
     Style::PreferredSizePair controlSize(StyleAppearance, const FontCascade&, const Style::PreferredSizePair&, float) const override;
 private:

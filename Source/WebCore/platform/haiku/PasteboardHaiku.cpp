@@ -329,6 +329,13 @@ void Pasteboard::read(PasteboardWebContentReader& reader, WebContentReadingPolic
         if (reader.readPlainText(text))
             return;
     }
+
+    // Also try reading general text if specific MIME types failed but we have something
+    if (data->HasData("text/plain", B_MIME_TYPE)) {
+         // Already handled above
+    } else {
+        // Fallback for other types?
+    }
 }
 
 

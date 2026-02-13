@@ -285,4 +285,34 @@ String contextMenuItemTagDefaultDirection()
     return "Default Direction"_s;
 }
 
+String mediaElementPlayButtonHelpText()
+{
+    return "Play"_s;
+}
+
+String mediaElementPauseButtonHelpText()
+{
+    return "Pause"_s;
+}
+
+String mediaElementMuteButtonHelpText()
+{
+    return "Mute"_s;
+}
+
+String mediaElementUnmuteButtonHelpText()
+{
+    return "Unmute"_s;
+}
+
+String mediaElementVolumeUpButtonHelpText()
+{
+    return "Volume Up"_s;
+}
+
+String mediaElementVolumeDownButtonHelpText()
+{
+    return "Volume Down"_s;
+}
+
 } // namespace WebCore
