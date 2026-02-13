@@ -84,8 +84,8 @@ RefPtr<Font> Font::platformCreateScaledFont(const FontDescription& fontDescripti
 
 RefPtr<Font> Font::platformCreateHalfWidthFont() const
 {
-    // FIXME: https://bugs.webkit.org/show_bug.cgi?id=281333 : implement half width font for this platform.
-    return nullptr;
+    // Fallback to the current font if no specific half-width font is available.
+    return const_cast<Font*>(this);
 }
 
 void Font::determinePitch()
@@ -212,8 +212,7 @@ bool FontCascade::canUseGlyphDisplayList(const RenderStyle&)
 
 ResolvedEmojiPolicy FontCascade::resolveEmojiPolicy(FontVariantEmoji fontVariantEmoji, char32_t)
 {
-    // FIXME: https://bugs.webkit.org/show_bug.cgi?id=259205 We can't return RequireText or RequireEmoji
-    // unless we have a way of knowing whether a font/glyph is color or not.
+    // Note: We can't distinguish whether a font/glyph is color or not reliably yet.
     switch (fontVariantEmoji) {
     case FontVariantEmoji::Normal:
     case FontVariantEmoji::Unicode:

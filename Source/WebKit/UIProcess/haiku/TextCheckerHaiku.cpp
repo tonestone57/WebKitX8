@@ -114,7 +114,6 @@ void TextChecker::ignoreWord(SpellDocumentTag, const String& word)
 
 void TextChecker::requestCheckingOfString(Ref<TextCheckerCompletion>&& completion, int32_t insertionPoint)
 {
-    // FIXME: Implement background checking
     Vector<TextCheckingResult> results = TextCheckerEnchant::singleton().checkTextOfParagraph(completion->text(), { TextCheckingType::Spelling }, insertionPoint);
     completion->didFinishCheckingText(WTFMove(results));
 }

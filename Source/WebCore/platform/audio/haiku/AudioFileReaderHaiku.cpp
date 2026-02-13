@@ -69,19 +69,70 @@ PassRefPtr<AudioBus> AudioFileReader::createBus(float sampleRate, bool mixToMono
     BMediaTrack* track = m_file->TrackAt(0);
 
     if (track && track->InitCheck() == B_OK) {
-        unsigned channels = mixToMono ? 1 : 2;
-        RefPtr<AudioBus> audioBus = AudioBus::create(channels, track->CountFrames(), true);
+        media_format format;
+        if (track->EncodedFormat(&format) != B_OK) {
+            m_file->ReleaseTrack(track);
+            return AudioBus::create(0, 0, true);
+        }
+
+        // Setup format conversion
+        memset(&format, 0, sizeof(media_format));
+        format.type = B_MEDIA_RAW_AUDIO;
+        format.u.raw_audio.format = media_raw_audio_format::B_AUDIO_FLOAT;
+        format.u.raw_audio.byte_order = B_MEDIA_HOST_ENDIAN;
+        format.u.raw_audio.frame_rate = sampleRate;
+        format.u.raw_audio.channel_count = mixToMono ? 1 : 2;
+
+        if (track->SetDecodedFormat(&format) != B_OK) {
+            m_file->ReleaseTrack(track);
+            return AudioBus::create(0, 0, true);
+        }
+
+        int64 frames = track->CountFrames();
+        if (frames <= 0) {
+            m_file->ReleaseTrack(track);
+            return AudioBus::create(0, 0, true);
+        }
+
+        unsigned channels = format.u.raw_audio.channel_count;
+        RefPtr<AudioBus> audioBus = AudioBus::create(channels, frames, true);
         audioBus->setSampleRate(sampleRate);
 
-        // FIXME: Implement audio decoding using BMediaTrack
-        // This requires decoding chunks and writing them to the AudioBus channels
+        // Get pointers to the audio bus channels
+        Vector<float*> channelData;
+        for (unsigned i = 0; i < channels; ++i)
+            channelData.append(audioBus->channel(i)->mutableData());
 
+        // Read and deinterleave
+        const int bufferFrameCount = 4096;
+        float* interleavedBuffer = new float[bufferFrameCount * channels];
+        int64 framesRead = 0;
+        int64 totalFrames = 0;
+
+        while (totalFrames < frames) {
+            int64 currentRequest = bufferFrameCount;
+            if (track->ReadFrames(interleavedBuffer, &currentRequest) != B_OK)
+                break;
+
+            if (currentRequest <= 0)
+                break;
+
+            for (int i = 0; i < currentRequest; ++i) {
+                for (unsigned c = 0; c < channels; ++c) {
+                    if (totalFrames + i < frames)
+                        channelData[c][totalFrames + i] = interleavedBuffer[i * channels + c];
+                }
+            }
+            totalFrames += currentRequest;
+        }
+
+        delete[] interleavedBuffer;
         m_file->ReleaseTrack(track);
         return audioBus;
     } else {
         // Reading the file failed, return an empty bus
+        if (track) m_file->ReleaseTrack(track);
         RefPtr<AudioBus> audioBus = AudioBus::create(0, 0, true);
-        m_file->ReleaseTrack(track);
         return audioBus;
     }
 }

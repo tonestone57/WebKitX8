@@ -59,8 +59,13 @@ bool DragController::isCopyKeyDown(const DragData& /* dragData */)
 
 std::optional<DragOperation> DragController::dragOperation(const DragData& dragData)
 {
-    // FIXME: This logic is incomplete
     if (dragData.containsURL())
+        return DragOperation::Copy;
+
+    if (dragData.containsPlainText())
+        return DragOperation::Copy;
+
+    if (dragData.containsColor())
         return DragOperation::Copy;
 
     return std::nullopt;
