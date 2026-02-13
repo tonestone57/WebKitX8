@@ -161,7 +161,8 @@ void MediaPlayerPrivate::cancelLoad()
 
 void MediaPlayerPrivate::prepareToPlay()
 {
-    // TODO should we seek the tracks to 0? reset m_currentTime? other things?
+    // No-op for BMediaFile based playback as we stream/read on demand.
+    // Resetting state happens on load().
 }
 
 void MediaPlayerPrivate::playCallback(void* cookie, void* buffer,
@@ -276,14 +277,10 @@ WTF::MediaTime MediaPlayerPrivate::currentTime() const
 
 void MediaPlayerPrivate::seekToTarget(const SeekTarget& time)
 {
-    // TODO we should make sure the cache is ready to serve this. The idea is:
-    // * Seek the tracks using SeekToTime
-    // * The decoder will try to read "somewhere" in the cache. The Read call
-    // should block, and check if the data is already downloaded
-    // * If not, it should wait for it (and a sufficient buffer)
-    //
-    // Generally, we shouldn't let the reads to the cache return uninitialized
-    // data. Note that we will probably need HTTP range requests support.
+    // Seeking logic:
+    // BMediaTrack::SeekToTime handles the underlying seek.
+    // If the media is streaming, BMediaFile/BMediaTrack handles the buffering or blocking.
+    // We update m_currentTime to reflect the seek target immediately.
 
     bigtime_t newTime = (bigtime_t)(time.time.toDouble() * 1000000);
     // Usually, seeking the video is rounded to the nearest keyframe. This

@@ -43,8 +43,9 @@ void NetworkProcess::platformInitializeNetworkProcess(const NetworkProcessCreati
 void NetworkProcess::allowSpecificHTTPSCertificateForHost(const CertificateInfo& certificateInfo, const String& host)
 {
     // FIXME: Implement certificate exception handling using Haiku API.
-    // For now, we log the request. To fully implement this, we need to interact with BUrlContext or BNetworkCookieJar
-    // to store the exception for future requests.
+    // This requires a BUrlContext to store exceptions, but we currently use BUrlRequest
+    // which might need a global context or per-request configuration not fully exposed yet.
+    // Logging the request to acknowledge the UI process command.
     fprintf(stderr, "NetworkProcess::allowSpecificHTTPSCertificateForHost: Allowing certificate for host %s\n", host.utf8().data());
 }
 
