@@ -76,11 +76,13 @@ public:
                         filenames.append(String::fromUTF8(path.Path()));
                 }
                 m_listener->chooseFiles(filenames);
+                if (Looper()) Looper()->RemoveHandler(this);
                 delete this;
                 break;
             }
             case B_CANCEL:
                 m_listener->cancel();
+                if (Looper()) Looper()->RemoveHandler(this);
                 delete this;
                 break;
             default:
