@@ -54,7 +54,9 @@ void NetworkProcess::platformTerminate()
 
 void NetworkProcess::clearDiskCache(WallTime modifiedSince, CompletionHandler<void()>&& completionHandler)
 {
-    // FIXME: Clear Haiku network kit cache if available
+    // Haiku's BUrlProtocol currently doesn't expose a global cache clearing mechanism easily
+    // without iterating context. This remains a TODO for when the network kit exposes it.
+    // For now, we ack the request.
     completionHandler();
 }
 
