@@ -160,4 +160,9 @@ DestinationColorSpace screenColorSpace(Widget*)
     return DestinationColorSpace::SRGB();
 }
 
+void screenColorProfile(WebCore::ColorProfile&)
+{
+    // FIXME: Implement fetching the actual color profile from BScreen
+}
+
 } // namespace WebCore

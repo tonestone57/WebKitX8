@@ -40,6 +40,8 @@ public:
     virtual ~PageUIClientHaiku();
 
     void printFrame(WebPageProxy&, WebFrameProxy&, const WebCore::FloatSize& pdfFirstPageSize, CompletionHandler<void()>&&) override;
+    void runOpenPanel(WebPageProxy&, WebFrameProxy&, const WebCore::SecurityOriginData&, API::OpenPanelParameters*, WebOpenPanelResultListenerProxy*) override;
+    void showNotification(WebPageProxy&, const WebCore::NotificationData&, RefPtr<WebCore::NotificationResources>&&, CompletionHandler<void()>&&) override;
 
 private:
     WebViewBase& m_webView;

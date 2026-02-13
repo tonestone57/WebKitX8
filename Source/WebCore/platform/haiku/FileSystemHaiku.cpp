@@ -31,6 +31,7 @@
 
 #include <wtf/text/CString.h>
 
+#include <Directory.h>
 #include <Entry.h>
 #include <FindDirectory.h>
 #include <Path.h>
@@ -69,6 +70,11 @@ bool deleteEmptyDirectory(const String& path)
 {
     BEntry entry(path.utf8().data());
     return entry.Remove() == B_OK;
+}
+
+bool makeAllDirectories(const String& path)
+{
+    return create_directory(path.utf8().data(), 0777) == B_OK;
 }
 
 long long fileSize(const String& path)
