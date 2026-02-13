@@ -162,16 +162,26 @@ void Cursor::ensurePlatformCursor() const
         m_cursor = new BCursor(B_CURSOR_ID_I_BEAM); // Fallback
         break;
     case Cursor::Type::Cell:
+        m_cursor = new BCursor(B_CURSOR_ID_CROSS_HAIR);
+        break;
     case Cursor::Type::ContextMenu:
+        m_cursor = new BCursor(B_CURSOR_ID_SYSTEM_DEFAULT);
+        break;
     case Cursor::Type::Alias:
+        m_cursor = new BCursor(B_CURSOR_ID_CREATE_LINK);
+        break;
     case Cursor::Type::Progress:
+        m_cursor = new BCursor(B_CURSOR_ID_PROGRESS);
+        break;
     case Cursor::Type::NoDrop:
-        m_cursor = new BCursor(B_CURSOR_ID_NOT_ALLOWED);
+    case Cursor::Type::NotAllowed:
+        m_cursor = new BCursor(B_CURSOR_ID_NO_DROP);
         break;
     case Cursor::Type::Copy:
+        m_cursor = new BCursor(B_CURSOR_ID_COPY);
+        break;
     case Cursor::Type::None:
-    case Cursor::Type::NotAllowed:
-        m_cursor = new BCursor(B_CURSOR_ID_NOT_ALLOWED);
+        m_cursor = new BCursor(B_CURSOR_ID_SYSTEM_DEFAULT);
         break;
     case Cursor::Type::ZoomIn:
         m_cursor = new BCursor(B_CURSOR_ID_ZOOM_IN);

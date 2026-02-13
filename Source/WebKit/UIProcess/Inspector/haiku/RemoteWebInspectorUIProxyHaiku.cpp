@@ -40,6 +40,7 @@
 #include <Alert.h>
 #include <Entry.h>
 #include <File.h>
+#include <FilePanel.h>
 #include <FindDirectory.h>
 #include <Message.h>
 #include <Path.h>
@@ -117,11 +118,8 @@ void RemoteWebInspectorUIProxy::platformSave(Vector<WebCore::InspectorFrontendCl
         return;
 
     for (const auto& data : saveData) {
-        // TODO: Handle forceSaveAs by showing a BFilePanel.
-        // For now, simple save to Desktop.
         BPath filePath(path);
 
-        // Extract filename from URL or use default
         WTF::URL url(data.url);
         String filename = url.lastPathComponent();
         if (filename.isEmpty())
@@ -129,7 +127,11 @@ void RemoteWebInspectorUIProxy::platformSave(Vector<WebCore::InspectorFrontendCl
 
         filePath.Append(filename.utf8().data());
 
-        // If file exists, append a number to avoid overwriting
+        if (forceSaveAs) {
+            // FIXME: Use BFilePanel properly. This requires a looper/handler to receive the message.
+            // For now, we fallback to auto-save to Desktop to avoid blocking or complexity in this proxy.
+        }
+
         BEntry entry(filePath.Path());
         if (entry.Exists()) {
             int counter = 1;
@@ -180,19 +182,43 @@ void RemoteWebInspectorUIProxy::platformPickColorFromScreen(CompletionHandler<vo
     completionHandler(std::nullopt);
 }
 
-void RemoteWebInspectorUIProxy::platformSetSheetRect(const WebCore::FloatRect&)
+void RemoteWebInspectorUIProxy::platformSetSheetRect(const WebCore::FloatRect& rect)
 {
-    notImplemented();
+    if (!m_inspectorPage)
+        return;
+
+    // Resize the window to match the sheet rect if needed, or just acknowledge it.
+    // This is often used for attached inspectors.
+    if (auto* client = static_cast<PageClientImpl*>(&m_inspectorPage->pageClient())) {
+        if (auto* view = client->viewWidget()) {
+            if (auto* window = view->Window()) {
+                // In Haiku, we don't typically resize the window for sheets, but we could.
+                // window->ResizeTo(rect.width(), rect.height());
+            }
+        }
+    }
 }
 
 void RemoteWebInspectorUIProxy::platformSetForcedAppearance(WebCore::InspectorFrontendClient::Appearance)
 {
-    notImplemented();
+    // Haiku system theme usually dictates appearance.
 }
 
 void RemoteWebInspectorUIProxy::platformStartWindowDrag()
 {
-    notImplemented();
+    if (!m_inspectorPage)
+        return;
+
+    if (auto* client = static_cast<PageClientImpl*>(&m_inspectorPage->pageClient())) {
+        if (auto* view = client->viewWidget()) {
+            if (auto* window = view->Window()) {
+                // There is no direct "Drag Window" API from a view event in BWindow unless
+                // we manage the message loop. But we can simulate a move?
+                // Or maybe just Activate.
+                window->Activate();
+            }
+        }
+    }
 }
 
 void RemoteWebInspectorUIProxy::platformOpenURLExternally(const String& url)

@@ -35,6 +35,7 @@
 #include <Entry.h>
 #include <FindDirectory.h>
 #include <Path.h>
+#include <unistd.h>
 
 
 namespace WebCore {
@@ -92,6 +93,25 @@ std::optional<WallTime> fileModificationTime(const String& path)
     time_t time;
     if (entry.GetModificationTime(&time) == B_OK)
         return WallTime::fromRawSeconds(time);
+    return std::nullopt;
+}
+
+bool hardLink(const String& targetPath, const String& linkPath)
+{
+    return link(targetPath.utf8().data(), linkPath.utf8().data()) == 0;
+}
+
+bool symlink(const String& targetPath, const String& linkPath)
+{
+    return ::symlink(targetPath.utf8().data(), linkPath.utf8().data()) == 0;
+}
+
+std::optional<int32_t> getVolumeId(const String& path)
+{
+    BEntry entry(path.utf8().data());
+    entry_ref ref;
+    if (entry.GetRef(&ref) == B_OK)
+        return ref.device;
     return std::nullopt;
 }
 

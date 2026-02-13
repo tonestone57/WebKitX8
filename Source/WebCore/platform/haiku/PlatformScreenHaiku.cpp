@@ -57,9 +57,12 @@ bool screenHasInvertedColors()
     return false;
 }
 
-FloatRect screenRect(Widget*)
+FloatRect screenRect(Widget* widget)
 {
-    BScreen screen;
+    BView* view = widget ? widget->platformWidget() : nullptr;
+    BWindow* window = view ? view->Window() : nullptr;
+    BScreen screen(window);
+
     if (!screen.IsValid())
         return FloatRect();
     // BRect is inclusive, so add 1 to width and height
@@ -69,7 +72,10 @@ FloatRect screenRect(Widget*)
 
 FloatRect screenAvailableRect(Widget* widget)
 {
-    BScreen screen;
+    BView* view = widget ? widget->platformWidget() : nullptr;
+    BWindow* window = view ? view->Window() : nullptr;
+    BScreen screen(window);
+
     if (!screen.IsValid())
         return FloatRect();
 
@@ -162,7 +168,8 @@ DestinationColorSpace screenColorSpace(Widget*)
 
 void screenColorProfile(WebCore::ColorProfile&)
 {
-    // FIXME: Implement fetching the actual color profile from BScreen
+    // Haiku does not currently expose ICC profiles for screens via BScreen.
+    // We assume sRGB.
 }
 
 } // namespace WebCore

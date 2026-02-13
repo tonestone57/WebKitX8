@@ -44,6 +44,10 @@
 #include <Message.h>
 #include <Path.h>
 #include <String.h>
+#include <TranslationUtils.h>
+#include <TranslatorRoster.h>
+#include <BitmapStream.h>
+#include <DataIO.h>
 #include <wtf/text/CString.h>
 
 
@@ -190,9 +194,26 @@ void WebCore::Pasteboard::write(WebCore::PasteboardImage const& pasteboardImage)
     if (!data)
         return;
 
+    // 1. Archive as BBitmap (Haiku internal)
     BMessage archive;
     if (platformImage->Archive(&archive) == B_OK)
         data->AddMessage("image/bitmap", &archive);
+
+    // 2. Export as PNG (Interoperability)
+    BTranslatorRoster* roster = BTranslatorRoster::Default();
+    if (roster) {
+        // BBitmapStream takes the bitmap but we must detach it to prevent deletion
+        BBitmapStream stream(platformImage.get());
+        BMallocIO outStream;
+
+        // Translate to PNG
+        if (roster->Translate(&stream, NULL, NULL, &outStream, B_PNG_FORMAT) == B_OK) {
+             data->AddData("image/png", B_MIME_TYPE, outStream.Buffer(), outStream.BufferLength());
+        }
+
+        BBitmap* tmp = NULL;
+        stream.DetachBitmap(&tmp);
+    }
 
     be_clipboard->Commit();
 }

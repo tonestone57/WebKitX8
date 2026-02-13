@@ -36,6 +36,8 @@
 #include <InterfaceDefs.h>
 #include <Shape.h>
 #include <View.h>
+#include <wtf/HashSet.h>
+#include <wtf/NeverDestroyed.h>
 
 static int buttonWidth(int scrollbarWidth, int thickness)
 {
@@ -43,6 +45,12 @@ static int buttonWidth(int scrollbarWidth, int thickness)
 }
 
 namespace WebCore {
+
+static HashSet<Scrollbar*>& scrollbars()
+{
+    static NeverDestroyed<HashSet<Scrollbar*>> scrollbars;
+    return scrollbars;
+}
 
 ScrollbarTheme& ScrollbarTheme::nativeTheme()
 {
@@ -57,6 +65,16 @@ ScrollbarThemeHaiku::ScrollbarThemeHaiku(bool drawOuterFrame)
 
 ScrollbarThemeHaiku::~ScrollbarThemeHaiku()
 {
+}
+
+void ScrollbarThemeHaiku::registerScrollbar(Scrollbar& scrollbar)
+{
+    scrollbars().add(&scrollbar);
+}
+
+void ScrollbarThemeHaiku::unregisterScrollbar(Scrollbar& scrollbar)
+{
+    scrollbars().remove(&scrollbar);
 }
 
 int ScrollbarThemeHaiku::scrollbarThickness(ScrollbarWidth scrollbarWidth, OverlayScrollbarSizeRelevancy overlayRelavancy)

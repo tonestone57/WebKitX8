@@ -32,8 +32,11 @@
 #include "FontCascade.h"
 #include "Image.h"
 #include "NotImplemented.h"
+#include "TextRun.h"
 
 #include <Bitmap.h>
+#include <InterfaceDefs.h>
+#include <TranslationUtils.h>
 #include <View.h>
 #include <cstring>
 
@@ -133,14 +136,62 @@ DragImageRef createDragImageFromImage(Image* image, ImageOrientation orientation
 
 DragImageData createDragImageForLink(Element&, URL& url, const String& label, float deviceScaleFactor)
 {
-    notImplemented();
-    return { nullptr, nullptr };
+    // Simple drag image for links: Label on top, URL on bottom
+    BFont font;
+    if (be_plain_font)
+        font = *be_plain_font;
+
+    font.SetSize(DragLinkLabelFontsize);
+
+    float labelWidth = font.StringWidth(label.utf8().data());
+    float urlWidth = font.StringWidth(url.string().utf8().data());
+    float width = std::max(labelWidth, urlWidth) + 10;
+    float height = DragLinkLabelFontsize + DragLinkUrlFontSize + 10;
+
+    BRect rect(0, 0, width, height);
+    BBitmap* bitmap = new BBitmap(rect, B_RGBA32, true);
+    if (bitmap->InitCheck() != B_OK) {
+        delete bitmap;
+        return { nullptr, nullptr };
+    }
+
+    BView* view = new BView(rect, "drag", B_FOLLOW_NONE, 0);
+    bitmap->AddChild(view);
+
+    if (bitmap->Lock()) {
+        view->SetHighColor(B_TRANSPARENT_COLOR);
+        view->FillRect(rect);
+
+        view->SetHighColor(0, 0, 0, 255); // Black text
+        view->SetFont(&font);
+
+        // Draw Label
+        font_height fh;
+        font.GetHeight(&fh);
+        float y = fh.ascent + 2;
+        view->DrawString(label.utf8().data(), BPoint(5, y));
+
+        // Draw URL
+        font.SetSize(DragLinkUrlFontSize);
+        font.GetHeight(&fh);
+        y += fh.ascent + fh.descent + fh.leading + 2;
+        view->SetHighColor(0, 0, 255, 255); // Blue URL
+        view->SetFont(&font);
+        view->DrawString(url.string().utf8().data(), BPoint(5, y));
+
+        view->Sync();
+        bitmap->RemoveChild(view);
+        bitmap->Unlock();
+    }
+    delete view;
+
+    return { bitmap, nullptr };
 }
 
-DragImageRef createDragImageIconForCachedImageFilename(const String&)
+DragImageRef createDragImageIconForCachedImageFilename(const String& filename)
 {
-    notImplemented();
-    return nullptr;
+    BBitmap* bitmap = BTranslationUtils::GetBitmap(filename.utf8().data());
+    return bitmap;
 }
 
 DragImageRef platformAdjustDragImageForDeviceScaleFactor(DragImageRef image, float deviceScaleFactor)

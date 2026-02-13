@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2013 Apple Inc. All rights reserved.
  * Copyright (C) 2013 University of Szeged. All rights reserved.
+ * Copyright (C) 2014 Haiku, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,6 +32,11 @@
 #include <UrlContext.h>
 #include <UrlProtocolRoster.h>
 #include <UrlRequest.h>
+#include <Directory.h>
+#include <File.h>
+#include <FindDirectory.h>
+#include <Path.h>
+#include <Message.h>
 
 #include "Cookie.h"
 #include "CookieRequestHeaderFieldProxy.h"
@@ -47,14 +53,57 @@
 
 namespace WebCore {
 
+static const char* kCookieDirectory = "WebKit/Cookies";
+
+static void saveCookiesToDisk(BPrivate::Network::BNetworkCookieJar& jar)
+{
+    BPath path;
+    if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) != B_OK)
+        return;
+    path.Append("WebKit");
+    create_directory(path.Path(), 0755);
+    path.Append("Cookies");
+
+    BFile file(path.Path(), B_READ_WRITE | B_CREATE_FILE | B_ERASE_FILE);
+    if (file.InitCheck() != B_OK)
+        return;
+
+    BMessage msg;
+    if (jar.Flatten(&msg) == B_OK)
+        msg.Flatten(&file);
+}
+
+static void loadCookiesFromDisk(BPrivate::Network::BNetworkCookieJar& jar)
+{
+    BPath path;
+    if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) != B_OK)
+        return;
+    path.Append("WebKit/Cookies");
+
+    BFile file(path.Path(), B_READ_ONLY);
+    if (file.InitCheck() != B_OK)
+        return;
+
+    BMessage msg;
+    if (msg.Unflatten(&file) == B_OK)
+        jar.Unflatten(&msg);
+}
+
 NetworkStorageSession::NetworkStorageSession(PAL::SessionID sessionID)
     : m_sessionID(sessionID)
     , m_context(nullptr)
 {
+    if (sessionID.isEphemeral()) {
+        m_context = new BPrivate::Network::BUrlContext();
+        // Memory only, no persistence
+    }
 }
 
 NetworkStorageSession::~NetworkStorageSession()
 {
+    if (m_sessionID.isEphemeral() && m_context) {
+        delete m_context;
+    }
 }
 
 static std::unique_ptr<NetworkStorageSession>& defaultSession()
@@ -73,6 +122,9 @@ void NetworkStorageSession::setCookiesFromDOM(const URL& firstParty,
         = new BPrivate::Network::BNetworkCookie(value, BUrl(url));
 
     platformSession().GetCookieJar().AddCookie(heapCookie);
+
+    if (!m_sessionID.isEphemeral())
+        saveCookiesToDisk(platformSession().GetCookieJar());
 }
 
 HTTPCookieAcceptPolicy NetworkStorageSession::cookieAcceptPolicy() const
@@ -109,15 +161,29 @@ std::pair<String, bool> NetworkStorageSession::cookiesForDOM(const URL& firstPar
 		
 		result << "; " << c->RawCookie(false);
 	}
-	result.Remove(0, 2);
+
+    if (result.Length() > 0)
+	    result.Remove(0, 2);
 
     return {String::fromUTF8(result), secure};
 }
 
 void NetworkStorageSession::setCookies(const Vector<Cookie>& cookies, const URL&, const URL&)
 {
-    for (const auto& cookie : cookies)
-        setCookie(cookie);
+    for (const auto& cookie : cookies) {
+        BPrivate::Network::BNetworkCookie* newCookie = new BPrivate::Network::BNetworkCookie(
+            cookie.name.utf8().data(), cookie.value.utf8().data(), BUrl(cookie.domain.utf8().data()));
+
+        newCookie->SetPath(cookie.path.utf8().data());
+        newCookie->SetSecure(cookie.secure);
+        newCookie->SetHttpOnly(cookie.httpOnly);
+        newCookie->SetExpiration(cookie.expires.value_or(0));
+
+        platformSession().GetCookieJar().AddCookie(newCookie);
+    }
+
+    if (!m_sessionID.isEphemeral())
+        saveCookiesToDisk(platformSession().GetCookieJar());
 }
 
 void NetworkStorageSession::setCookie(const Cookie& cookie)
@@ -128,17 +194,16 @@ void NetworkStorageSession::setCookie(const Cookie& cookie)
     newCookie->SetPath(cookie.path.utf8().data());
     newCookie->SetSecure(cookie.secure);
     newCookie->SetHttpOnly(cookie.httpOnly);
-    newCookie->SetExpiration(cookie.expires.value_or(0)); // Convert to time_t if needed, or 0 for session?
-    // BNetworkCookie handles session vs persistent automatically based on expiration.
+    newCookie->SetExpiration(cookie.expires.value_or(0));
 
-    // AddCookie takes ownership of the cookie object.
     platformSession().GetCookieJar().AddCookie(newCookie);
+
+    if (!m_sessionID.isEphemeral())
+        saveCookiesToDisk(platformSession().GetCookieJar());
 }
 
 void NetworkStorageSession::deleteCookie(const Cookie& cookie, WTF::CompletionHandler<void()>&& completionHandler)
 {
-    // We need to find the specific cookie to delete it.
-    // Assuming GetIterator() returns an iterator for all cookies.
     BPrivate::Network::BNetworkCookieJar::Iterator it(platformSession().GetCookieJar().GetIterator());
     const BPrivate::Network::BNetworkCookie* c;
 
@@ -148,6 +213,10 @@ void NetworkStorageSession::deleteCookie(const Cookie& cookie, WTF::CompletionHa
             break;
         }
     }
+
+    if (!m_sessionID.isEphemeral())
+        saveCookiesToDisk(platformSession().GetCookieJar());
+
     completionHandler();
 }
 
@@ -156,7 +225,6 @@ void NetworkStorageSession::deleteCookie(const URL& url, const String& cookieNam
 #if TRACE_COOKIE_JAR
        printf("CookieJar: delete cookie %s for %s\n", cookieName.utf8().data(), url.string().utf8().data());
 #endif
-    // Iterate over cookies for the URL and remove the one with the matching name.
     BPrivate::Network::BNetworkCookieJar::UrlIterator it(platformSession().GetCookieJar().GetUrlIterator(BUrl(url)));
     const BPrivate::Network::BNetworkCookie* c;
 
@@ -166,12 +234,20 @@ void NetworkStorageSession::deleteCookie(const URL& url, const String& cookieNam
             break;
         }
     }
+
+    if (!m_sessionID.isEphemeral())
+        saveCookiesToDisk(platformSession().GetCookieJar());
+
     completionHandler();
 }
 
 void NetworkStorageSession::deleteAllCookies(WTF::CompletionHandler<void()>&& completionHandler)
 {
     platformSession().GetCookieJar().Purge(NULL);
+
+    if (!m_sessionID.isEphemeral())
+        saveCookiesToDisk(platformSession().GetCookieJar());
+
     completionHandler();
 }
 
@@ -192,6 +268,10 @@ void NetworkStorageSession::deleteAllCookiesModifiedSince(WallTime since, WTF::C
     for (auto* cookie : cookiesToRemove) {
         platformSession().GetCookieJar().RemoveCookie(cookie);
     }
+
+    if (!m_sessionID.isEphemeral())
+        saveCookiesToDisk(platformSession().GetCookieJar());
+
     completionHandler();
 }
 
@@ -201,8 +281,6 @@ void NetworkStorageSession::deleteCookiesForHostnames(const Vector<String>& cook
     BPrivate::Network::BNetworkCookieJar::Iterator it(platformSession().GetCookieJar().GetIterator());
     const BPrivate::Network::BNetworkCookie* c;
 
-    // We can't safely remove while iterating if the iterator doesn't support it.
-    // So collect cookies to remove first.
     Vector<const BPrivate::Network::BNetworkCookie*> cookiesToRemove;
 
     while ((c = it.Next())) {
@@ -216,6 +294,10 @@ void NetworkStorageSession::deleteCookiesForHostnames(const Vector<String>& cook
     for (auto* cookie : cookiesToRemove) {
         platformSession().GetCookieJar().RemoveCookie(cookie);
     }
+
+    if (!m_sessionID.isEphemeral())
+        saveCookiesToDisk(platformSession().GetCookieJar());
+
     completionHandler();
 }
 
@@ -275,8 +357,6 @@ void NetworkStorageSession::hasCookies(const RegistrableDomain& domain, Completi
     BPrivate::Network::BNetworkCookieJar::Iterator it(platformSession().GetCookieJar().GetIterator());
     const BPrivate::Network::BNetworkCookie* c;
     bool found = false;
-    // FIXME: BNetworkCookie domain matching might be more complex (subdomains).
-    // This simple string match assumes exact domain or parent domain logic is handled elsewhere or acceptable.
     while ((c = it.Next())) {
         if (String::fromUTF8(c->Domain()).endsWith(domain.string())) {
             found = true;
@@ -298,17 +378,15 @@ bool NetworkStorageSession::getRawCookies(const URL& firstParty,
     const BPrivate::Network::BNetworkCookie* c;
 
     while ((c = it.Next())) {
-        // Best effort mapping
         rawCookies.append(Cookie(
             String::fromUTF8(c->Name()),
             String::fromUTF8(c->Value()),
             String::fromUTF8(c->Domain()),
             String::fromUTF8(c->Path()),
-            // BNetworkCookie times are time_t
             (double)c->CreationTime(), (double)c->ExpirationDate(), (double)c->LastAccessTime(),
             c->HttpOnly(),
             c->Secure(),
-            c->ExpirationDate() == 0 // session if no expiration
+            c->ExpirationDate() == 0
         ));
     }
 
@@ -338,7 +416,9 @@ std::pair<String, bool> NetworkStorageSession::cookieRequestHeaderFieldValue(con
 		
 		result << "; " << c->RawCookie(false);
 	}
-	result.Remove(0, 2);
+
+    if (result.Length() > 0)
+	    result.Remove(0, 2);
 
     return {String::fromUTF8(result.String()), secure};
 }
@@ -358,7 +438,6 @@ BPrivate::Network::BUrlContext& NetworkStorageSession::platformSession() const
     if (m_context)
         return *m_context;
 
-    // This is the only way to access the default context in the netservces lib
     static BPrivate::Network::BUrlContext* sDefaultContext = nullptr;
 
     if (sDefaultContext == nullptr) {
@@ -366,6 +445,8 @@ BPrivate::Network::BUrlContext& NetworkStorageSession::platformSession() const
             = BPrivate::Network::BUrlProtocolRoster::MakeRequest(BUrl("data:"), NULL, NULL);
         sDefaultContext = fakeRequest->Context();
         delete fakeRequest;
+
+        loadCookiesFromDisk(sDefaultContext->GetCookieJar());
     }
     return *sDefaultContext;
 }
@@ -376,4 +457,3 @@ void NetworkStorageSession::setPlatformSession(BPrivate::Network::BUrlContext* c
 }
 
 }
-
