@@ -25,15 +25,38 @@
 
 #include "config.h"
 #include "NetworkProcess.h"
+#include "NetworkProcessHaiku.h"
 
 #include "NetworkProcessCreationParameters.h"
 #include <WebCore/NotImplemented.h>
 #include <wtf/Language.h>
+#include <wtf/HashSet.h>
+#include <wtf/Lock.h>
+#include <wtf/NeverDestroyed.h>
 #include <stdio.h>
 
 namespace WebKit {
 
 using namespace WebCore;
+
+static Lock s_allowedHostsLock;
+static HashSet<String>& allowedHosts()
+{
+    static NeverDestroyed<HashSet<String>> hosts;
+    return hosts;
+}
+
+void addAllowedHTTPSCertificateHost(const String& host)
+{
+    Locker locker { s_allowedHostsLock };
+    allowedHosts().add(host);
+}
+
+bool isHTTPSCertificateHostAllowed(const String& host)
+{
+    Locker locker { s_allowedHostsLock };
+    return allowedHosts().contains(host);
+}
 
 void NetworkProcess::platformInitializeNetworkProcess(const NetworkProcessCreationParameters& parameters)
 {
@@ -47,6 +70,9 @@ void NetworkProcess::allowSpecificHTTPSCertificateForHost(const CertificateInfo&
     // which might need a global context or per-request configuration not fully exposed yet.
     // Logging the request to acknowledge the UI process command.
     fprintf(stderr, "NetworkProcess::allowSpecificHTTPSCertificateForHost: Allowing certificate for host %s\n", host.utf8().data());
+
+    // Store the host in our local set to bypass verification in NetworkDataTaskHaiku
+    addAllowedHTTPSCertificateHost(host);
 }
 
 void NetworkProcess::platformTerminate()
