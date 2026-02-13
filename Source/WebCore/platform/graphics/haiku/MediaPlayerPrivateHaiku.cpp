@@ -344,8 +344,10 @@ MediaPlayer::ReadyState MediaPlayerPrivate::readyState() const
 
 PlatformTimeRanges& MediaPlayerPrivate::buffered() const
 {
-    // FIXME: Return actual buffered ranges based on network cache or BMediaFile state.
-    // For now, if we have a media file and are playing, assume we have content.
+    // BMediaFile handles buffering internally (or blocks). We don't have access to the
+    // download progress of the underlying stream if we pass a URL directly.
+    // Report the full duration as buffered if we have enough data to start playing,
+    // to satisfy WebCore expectations.
     m_buffered.clear();
     if (m_readyState >= MediaPlayer::ReadyState::HaveEnoughData && duration() > MediaTime::zeroTime()) {
         m_buffered.add(MediaTime::zeroTime(), duration());
