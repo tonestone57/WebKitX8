@@ -23,31 +23,17 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma once
+#include "config.h"
+#include "NativeWebTouchEvent.h"
 
-#include "WebMouseEvent.h"
-#include "WebKeyboardEvent.h"
-#include "WebWheelEvent.h"
-#include "WebTouchEvent.h"
-
-class BMessage;
+#include "WebEventFactory.h"
 
 namespace WebKit {
-class WebMouseEvent;
-class WebWheelEvent;
-class WebKeyboardEvent;
-class WebTouchEvent;
 
-class WebEventFactory {
-public:
-    static WebMouseEvent createWebMouseEvent(const BMessage*);
-    static WebWheelEvent createWebWheelEvent(const BMessage*);
-    static WebKeyboardEvent createWebKeyboardEvent(const BMessage*);
-    static WebTouchEvent createWebTouchEvent(const BMessage*);
-
-private:
-    static int32_t currentMouseButtons;
-    static WebMouseEventButton currentMouseButton;
-};
+NativeWebTouchEvent::NativeWebTouchEvent(const BMessage* message)
+    : WebTouchEvent(WebEventFactory::createWebTouchEvent(message))
+    , m_nativeEvent(*message)
+{
+}
 
 } // namespace WebKit

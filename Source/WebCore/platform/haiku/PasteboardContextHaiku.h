@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 Haiku Inc. All rights reserved.
+ * Copyright (C) 2024 Haiku, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,29 +25,23 @@
 
 #pragma once
 
-#include "WebMouseEvent.h"
-#include "WebKeyboardEvent.h"
-#include "WebWheelEvent.h"
-#include "WebTouchEvent.h"
+#include <WebCore/PasteboardContext.h>
+#include <Message.h>
 
-class BMessage;
+namespace WebCore {
 
-namespace WebKit {
-class WebMouseEvent;
-class WebWheelEvent;
-class WebKeyboardEvent;
-class WebTouchEvent;
-
-class WebEventFactory {
+class PasteboardContextHaiku : public PasteboardContext {
 public:
-    static WebMouseEvent createWebMouseEvent(const BMessage*);
-    static WebWheelEvent createWebWheelEvent(const BMessage*);
-    static WebKeyboardEvent createWebKeyboardEvent(const BMessage*);
-    static WebTouchEvent createWebTouchEvent(const BMessage*);
+    PasteboardContextHaiku(BMessage* message = nullptr)
+        : m_message(message)
+    {
+    }
+
+    bool hasMessage() const { return m_message != nullptr; }
+    BMessage* message() const { return m_message; }
 
 private:
-    static int32_t currentMouseButtons;
-    static WebMouseEventButton currentMouseButton;
+    BMessage* m_message;
 };
 
-} // namespace WebKit
+} // namespace WebCore

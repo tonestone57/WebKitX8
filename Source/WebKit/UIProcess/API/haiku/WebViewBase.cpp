@@ -31,6 +31,7 @@
 #include "NativeWebMouseEvent.h"
 #include "NativeWebKeyboardEvent.h"
 #include "NativeWebWheelEvent.h"
+#include "NativeWebTouchEvent.h"
 
 #include "PageClientImplHaiku.h"
 #include "PageUIClientHaiku.h"
@@ -109,6 +110,14 @@ void WebViewBase::MessageReceived(BMessage* message)
         case B_UNMAPPED_KEY_UP:
             callOnMainRunLoop([this, message = *message](){
                 fPage->handleKeyboardEvent(NativeWebKeyboardEvent(&message));
+            });
+            break;
+        case B_TOUCH_DOWN:
+        case B_TOUCH_UP:
+        case B_TOUCH_MOVED:
+        case B_TOUCH_CANCEL:
+            callOnMainRunLoop([this, message = *message](){
+                fPage->handleTouchEvent(nullptr, NativeWebTouchEvent(&message));
             });
             break;
         default:
