@@ -68,12 +68,14 @@ private:
 };
 
 // Custom BBufferConsumer to capture data
-class MediaCaptureNode : public BBufferConsumer {
+class MediaCaptureNode : public BBufferConsumer, public BMediaEventLooper {
 public:
     using Callback = Function<void(BBuffer*)>;
 
     MediaCaptureNode(const char* name, media_type type, Callback&& callback)
-        : BBufferConsumer(B_MEDIA_RAW_AUDIO) // flavor doesn't matter much here
+        : BMediaNode(name)
+        , BBufferConsumer(type)
+        , BMediaEventLooper()
         , m_name(name)
         , m_type(type)
         , m_callback(WTF::move(callback))
@@ -87,48 +89,36 @@ public:
         Quit();
     }
 
-    status_t Start(bigtime_t performance_time) override
+    void NodeRegistered() final
     {
-        return BBufferConsumer::Start(performance_time);
+        SetPriority(B_REAL_TIME_PRIORITY);
+        Run();
     }
 
-    status_t Stop(bigtime_t performance_time, bool immediate) override
-    {
-        return BBufferConsumer::Stop(performance_time, immediate);
-    }
-
-    void BufferReceived(BBuffer* buffer) override
-    {
-        if (m_callback)
-            m_callback(buffer);
-        else
-            buffer->Recycle();
-    }
-
-    status_t AcceptFormat(const media_destination& dest, media_format* format) override
+    status_t AcceptFormat(const media_destination& dest, media_format* format) final
     {
         if (format->type != m_type && format->type != B_MEDIA_WILDCARD)
             return B_MEDIA_BAD_FORMAT;
         return B_OK;
     }
 
-    status_t Connected(const media_source& producer, const media_destination& where, const media_format& with_format, media_input* out_input) override
+    status_t Connected(const media_source& producer, const media_destination& where, const media_format& with_format, media_input* out_input) final
     {
         m_input.source = producer;
         m_input.destination = where;
         m_input.format = with_format;
         m_input.node = Node();
-        sprintf(m_input.name, "%s input", m_name.utf8().data());
+        snprintf(m_input.name, sizeof(m_input.name), "%s input", m_name.utf8().data());
         *out_input = m_input;
         return B_OK;
     }
 
-    void Disconnected(const media_source& producer, const media_destination& where) override
+    void Disconnected(const media_source& producer, const media_destination& where) final
     {
         memset(&m_input, 0, sizeof(m_input));
     }
 
-    status_t GetNextInput(int32* cookie, media_input* out_input) override
+    status_t GetNextInput(int32* cookie, media_input* out_input) final
     {
         if (*cookie != 0) return B_ERROR;
         *out_input = m_input;
@@ -136,7 +126,30 @@ public:
         return B_OK;
     }
 
-    void DisposeInputCookie(int32 cookie) override {}
+    void DisposeInputCookie(int32 cookie) final {}
+
+    void BufferReceived(BBuffer* buffer) final
+    {
+        if (m_callback)
+            m_callback(buffer);
+        else
+            buffer->Recycle();
+    }
+
+    void HandleEvent(const media_timed_event* event, bigtime_t lateness, bool realTimeEvent) final
+    {
+        switch (event->type) {
+        case BTimedEventQueue::B_START:
+            break;
+        case BTimedEventQueue::B_STOP:
+            break;
+        case BTimedEventQueue::B_HANDLE_BUFFER:
+            // Handled by BufferReceived via BMediaEventLooper dispatch
+            break;
+        default:
+            break;
+        }
+    }
 
     media_input Input() { return m_input; }
 
@@ -230,7 +243,6 @@ void RealtimeIncomingAudioSourceHaiku::startProducingData()
     media_format format;
     format.type = B_MEDIA_RAW_AUDIO;
     format.u.raw_audio = media_raw_audio_format::wildcard;
-    format.u.raw_audio.format = media_raw_audio_format::B_AUDIO_FLOAT;
 
     if (roster->Connect(output.source, input.destination, &format, &output, &input) != B_OK) {
         stopProducingData();
@@ -284,10 +296,28 @@ void RealtimeIncomingAudioSourceHaiku::handleBuffer(BBuffer* buffer)
 
          size_t numFrames = buffer->SizeUsed() / frameSize;
 
-         auto audioData = PlatformAudioDataHaiku::create((const uint8_t*)buffer->Data(), buffer->SizeUsed());
+         RefPtr<PlatformAudioDataHaiku> audioData;
+
+         if (format->format == media_raw_audio_format::B_AUDIO_SHORT) {
+             // Convert Short to Float
+             Vector<float> floatData;
+             floatData.resize(numFrames * format->channel_count);
+             const int16* src = (const int16*)buffer->Data();
+             float* dst = floatData.data();
+             const float scale = 1.0f / 32768.0f;
+             for (size_t i = 0; i < floatData.size(); ++i) {
+                 dst[i] = src[i] * scale;
+             }
+             audioData = PlatformAudioDataHaiku::create((const uint8_t*)floatData.data(), floatData.size() * sizeof(float));
+         } else {
+             // Assume float or pass through (if we add more formats later)
+             audioData = PlatformAudioDataHaiku::create((const uint8_t*)buffer->Data(), buffer->SizeUsed());
+         }
+
          MediaTime timestamp = MediaTime(header->start_time, 1000000);
 
-         audioSamplesAvailable(timestamp, audioData, description, numFrames);
+         if (audioData)
+            audioSamplesAvailable(timestamp, *audioData, description, numFrames);
      }
      buffer->Recycle();
 }
@@ -434,26 +464,38 @@ void RealtimeIncomingVideoSourceHaiku::handleBuffer(BBuffer* buffer)
          int height = format->display.line_count;
 
          if (width > 0 && height > 0) {
-             ComputedPlaneLayout layout;
-             layout.destinationOffset = 0;
-             layout.destinationStride = format->display.bytes_per_row;
-             layout.sourceTop = 0;
-             layout.sourceHeight = height;
-             layout.sourceLeftBytes = 0;
-             layout.sourceWidthBytes = width * 4;
-
-             PlatformVideoColorSpace colorSpace;
-
-             auto frame = VideoFrame::createBGRA(
-                 std::span<const uint8_t>((const uint8_t*)buffer->Data(), buffer->SizeUsed()),
-                 width, height, layout, WTF::move(colorSpace)
+             auto pixelBuffer = PixelBuffer::tryCreate(
+                 PixelBufferFormat { AlphaPremultiplication::Unpremultiplied, PixelFormat::BGRA8, DestinationColorSpace::SRGB() },
+                 IntSize(width, height)
              );
 
-             if (frame) {
-                 VideoFrameTimeMetadata metadata;
-                 metadata.captureTime = MonotonicTime::now();
+             if (pixelBuffer) {
+                 // Copy data
+                 const uint8_t* src = (const uint8_t*)buffer->Data();
+                 uint8_t* dst = pixelBuffer->bytes();
+                 size_t srcStride = format->display.bytes_per_row;
+                 size_t dstStride = width * 4;
+                 size_t rows = height;
+                 size_t copyWidth = std::min(srcStride, dstStride);
 
-                 videoFrameAvailable(*frame, metadata);
+                 if (srcStride == dstStride) {
+                     memcpy(dst, src, dstStride * rows);
+                 } else {
+                     for (size_t y = 0; y < rows; ++y) {
+                         memcpy(dst, src, copyWidth);
+                         src += srcStride;
+                         dst += dstStride;
+                     }
+                 }
+
+                 auto frame = VideoFrame::createFromPixelBuffer(pixelBuffer.releaseNonNull());
+
+                 if (frame) {
+                     VideoFrameTimeMetadata metadata;
+                     metadata.captureTime = MonotonicTime::now();
+
+                     videoFrameAvailable(*frame, metadata);
+                 }
              }
          }
      }
