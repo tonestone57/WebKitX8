@@ -1,5 +1,4 @@
 /*
- * Copyright (C) 2018 Sony Interactive Entertainment Inc.
  * Copyright (C) 2019 Haiku, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,30 +24,62 @@
  */
 
 #include "config.h"
-#include "NetworkSessionHaiku.h"
-
-#include "NetworkProcess.h"
-#include "NetworkSessionCreationParameters.h"
-#include "WebCookieManager.h"
 #include "WebSocketTaskHaiku.h"
+
+#include "NetworkSocketChannel.h"
+#include <wtf/RunLoop.h>
+#include <wtf/TZoneMallocInlines.h>
 
 namespace WebKit {
 
 using namespace WebCore;
 
-NetworkSessionHaiku::NetworkSessionHaiku(NetworkProcess& networkProcess, const NetworkSessionCreationParameters& parameters)
-    : NetworkSession(networkProcess, parameters)
+WTF_MAKE_TZONE_ALLOCATED_IMPL(WebSocketTask);
+
+Ref<WebSocketTask> WebSocketTask::create(NetworkSocketChannel& channel, const ResourceRequest& request, const String& protocol)
+{
+    return adoptRef(*new WebSocketTask(channel, request, protocol));
+}
+
+WebSocketTask::WebSocketTask(NetworkSocketChannel& channel, const ResourceRequest& request, const String& protocol)
+    : m_channel(channel)
+    , m_request(request)
+    , m_protocol(protocol)
 {
 }
 
-NetworkSessionHaiku::~NetworkSessionHaiku()
+WebSocketTask::~WebSocketTask()
 {
-
 }
 
-RefPtr<WebSocketTask> NetworkSessionHaiku::createWebSocketTask(WebPageProxyIdentifier, std::optional<WebCore::FrameIdentifier>, std::optional<WebCore::PageIdentifier>, NetworkSocketChannel& channel, const WebCore::ResourceRequest& request, const String& protocol, const WebCore::ClientOrigin&, bool hadMainFrameMainResourcePrivateRelayed, bool allowPrivacyProxy, OptionSet<WebCore::AdvancedPrivacyProtections>, WebCore::StoredCredentialsPolicy)
+void WebSocketTask::sendString(std::span<const uint8_t>, CompletionHandler<void()>&& callback)
 {
-    return WebSocketTask::create(channel, request, protocol);
+    callback();
+}
+
+void WebSocketTask::sendData(std::span<const uint8_t>, CompletionHandler<void()>&& callback)
+{
+    callback();
+}
+
+void WebSocketTask::close(int32_t code, const String& reason)
+{
+    m_channel.didClose(static_cast<unsigned short>(code), reason);
+}
+
+void WebSocketTask::cancel()
+{
+}
+
+void WebSocketTask::resume()
+{
+    // Signal connection failure for now as native WebSocket support is not fully implemented.
+    RunLoop::main().dispatch([this, weakThis = ThreadSafeWeakPtr { *this }] {
+        auto strongThis = weakThis.get();
+        if (!strongThis)
+            return;
+        m_channel.didReceiveMessageError("Native WebSockets are not yet implemented on Haiku."_s);
+    });
 }
 
 } // namespace WebKit

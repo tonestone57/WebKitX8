@@ -1,5 +1,4 @@
 /*
- * Copyright (C) 2018 Sony Interactive Entertainment Inc.
  * Copyright (C) 2019 Haiku, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -24,24 +23,49 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma once
+#include "config.h"
+#include "Download.h"
+#include "NetworkDataTask.h"
 
-#include "NetworkSession.h"
+#include <wtf/text/CString.h>
 
 namespace WebKit {
 
-struct NetworkSessionCreationParameters;
+void Download::platformCancelNetworkLoad(CompletionHandler<void(std::span<const uint8_t>)>&& completionHandler)
+{
+    // Serialize URL as resume data.
+    // Format: [8 bytes offset][URL string]
 
-class NetworkSessionHaiku final : public NetworkSession {
-public:
-    static std::unique_ptr<NetworkSession> create(NetworkProcess& networkProcess, const NetworkSessionCreationParameters& parameters)
-    {
-        return makeUnique<NetworkSessionHaiku>(networkProcess, parameters);
-    }
-    NetworkSessionHaiku(NetworkProcess&, const NetworkSessionCreationParameters&);
-    ~NetworkSessionHaiku();
+    String url = m_download->firstRequest().url().string();
+    CString utf8 = url.utf8();
 
-    RefPtr<WebSocketTask> createWebSocketTask(WebPageProxyIdentifier, std::optional<WebCore::FrameIdentifier>, std::optional<WebCore::PageIdentifier>, NetworkSocketChannel&, const WebCore::ResourceRequest&, const String& protocol, const WebCore::ClientOrigin&, bool hadMainFrameMainResourcePrivateRelayed, bool allowPrivacyProxy, OptionSet<WebCore::AdvancedPrivacyProtections>, WebCore::StoredCredentialsPolicy) final;
-};
+    // Use m_download->bytesTransferredOverNetwork() for offset
+    uint64_t offset = static_cast<uint64_t>(m_download->bytesTransferredOverNetwork());
+
+    Vector<uint8_t> resumeData;
+    resumeData.reserveInitialCapacity(sizeof(uint64_t) + utf8.length());
+
+    // Append offset (little endian assuming Haiku x86)
+    // Using simple append for now.
+    for (size_t i = 0; i < sizeof(uint64_t); ++i)
+        resumeData.append(static_cast<uint8_t>((offset >> (i * 8)) & 0xFF));
+
+    resumeData.append(reinterpret_cast<const uint8_t*>(utf8.data()), utf8.length());
+
+    completionHandler(std::span<const uint8_t>(resumeData.data(), resumeData.size()));
+}
+
+void Download::platformDestroyDownload()
+{
+}
+
+void Download::platformDidFinish(CompletionHandler<void()>&& completionHandler)
+{
+    completionHandler();
+}
+
+void Download::resume(std::span<const uint8_t> resumeData, const String& path, SandboxExtension::Handle&& sandboxExtensionHandle, std::span<const uint8_t> activityAccessToken)
+{
+}
 
 } // namespace WebKit

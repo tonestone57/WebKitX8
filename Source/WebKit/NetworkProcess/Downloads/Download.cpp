@@ -207,7 +207,7 @@ uint64_t Download::messageSenderDestinationID() const
     return m_downloadID.toUInt64();
 }
 
-#if !PLATFORM(COCOA)
+#if !PLATFORM(COCOA) && !PLATFORM(HAIKU)
 void Download::platformCancelNetworkLoad(CompletionHandler<void(std::span<const uint8_t>)>&& completionHandler)
 {
     completionHandler({ });

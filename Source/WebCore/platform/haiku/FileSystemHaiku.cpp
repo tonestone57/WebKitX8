@@ -37,6 +37,7 @@
 #include <FindDirectory.h>
 #include <Path.h>
 #include <fs_attr.h>
+#include <fs_info.h>
 #include <unistd.h>
 
 
@@ -244,6 +245,19 @@ std::optional<int32_t> getVolumeId(const String& path)
     if (entry.GetRef(&ref) == B_OK)
         return ref.device;
     return std::nullopt;
+}
+
+std::optional<uint64_t> getVolumeFreeSpace(const String& path)
+{
+    dev_t device = dev_for_path(path.utf8().data());
+    if (device < 0)
+        return std::nullopt;
+
+    fs_info info;
+    if (fs_stat_dev(device, &info) != B_OK)
+        return std::nullopt;
+
+    return (uint64_t)info.free_blocks * info.block_size;
 }
 
 } // namespace FileSystem
