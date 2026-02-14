@@ -92,7 +92,7 @@ void WebViewBase::MessageReceived(BMessage* message)
     {
         case B_MOUSE_WHEEL_CHANGED:
             callOnMainRunLoop([this, message = *message](){
-                fPage->handleNativeWheelEvent(NativeWebWheelEvent(&message));
+                fPage->handleWheelEvent(NativeWebWheelEvent(&message));
             });
             break;
         case B_MOUSE_UP:

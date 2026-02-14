@@ -40,6 +40,7 @@
 #include "WebCore/Region.h"
 #include "WebFrameProxy.h"
 #include "ShareableBitmap.h"
+#include "WebFullScreenManagerProxy.h"
 
 #include <View.h>
 #include <Window.h>
@@ -538,11 +539,21 @@ RefPtr<WebDateTimePicker> PageClientImpl::createDateTimePicker(WebPageProxy& pag
 }
 
 #if ENABLE(FULLSCREEN_API)
+class WebFullScreenManagerProxyClientHaiku final : public WebFullScreenManagerProxyClient {
+    WTF_MAKE_FAST_ALLOCATED;
+public:
+    void closeFullScreenManager() override { }
+    bool isFullScreen() override { return false; }
+    void enterFullScreen(WebCore::FloatSize, CompletionHandler<void(bool)>&& completionHandler) override { completionHandler(false); }
+    void exitFullScreen(CompletionHandler<void()>&& completionHandler) override { completionHandler(); }
+    void beganEnterFullScreen(const WebCore::IntRect&, const WebCore::IntRect&, CompletionHandler<void(bool)>&& completionHandler) override { completionHandler(false); }
+    void beganExitFullScreen(const WebCore::IntRect&, const WebCore::IntRect&, CompletionHandler<void()>&& completionHandler) override { completionHandler(); }
+};
+
 WebFullScreenManagerProxyClient& PageClientImpl::fullScreenManagerProxyClient()
 {
-    // FIXME: Implement full screen support
-    RELEASE_ASSERT_NOT_REACHED();
-    return *static_cast<WebFullScreenManagerProxyClient*>(nullptr);
+    static NeverDestroyed<WebFullScreenManagerProxyClientHaiku> client;
+    return client;
 }
 #endif
 

@@ -29,6 +29,7 @@
 #include "LogInitialization.h"
 #include "WebProcessCreationParameters.h"
 #include <WebCore/LogInitialization.h>
+#include <WebCore/MemoryCache.h>
 #include <WebCore/PlatformDisplayHaiku.h>
 #include <wtf/Language.h>
 #include <wtf/LogInitialization.h>
@@ -61,6 +62,10 @@ void WebProcess::platformTerminate()
 
 void WebProcess::platformSetCacheModel(CacheModel cacheModel)
 {
+    if (cacheModel == CacheModel::DocumentViewer)
+        MemoryCache::singleton().setDisabled(true);
+    else
+        MemoryCache::singleton().setDisabled(false);
 }
 
 void WebProcess::grantAccessToAssetServices(WTF::Vector<WebKit::SandboxExtension::Handle>&&)

@@ -37,8 +37,10 @@
 #include <WebCore/NotImplemented.h>
 
 #include <Alert.h>
+#include <Directory.h>
 #include <Entry.h>
 #include <File.h>
+#include <FilePanel.h>
 #include <FindDirectory.h>
 #include <Message.h>
 #include <Path.h>
@@ -53,7 +55,13 @@ public:
     InspectorWindow(BRect frame, WebInspectorUIProxy& proxy)
         : BWindow(frame, "Web Inspector", B_TITLED_WINDOW, B_ASYNCHRONOUS_CONTROLS)
         , m_proxy(proxy)
+        , m_filePanel(nullptr)
     {
+    }
+
+    ~InspectorWindow()
+    {
+        delete m_filePanel;
     }
 
     bool QuitRequested() override
@@ -67,8 +75,47 @@ public:
         return true;
     }
 
+    void MessageReceived(BMessage* message) override
+    {
+        switch (message->what) {
+        case B_SAVE_REQUESTED:
+            handleSaveRequest(message);
+            break;
+        default:
+            BWindow::MessageReceived(message);
+            break;
+        }
+    }
+
+    void save(const String& suggestedURL, const String& content, bool forceSaveAs)
+    {
+        m_saveContent = content;
+
+        if (!m_filePanel)
+            m_filePanel = new BFilePanel(B_SAVE_PANEL, new BMessenger(this));
+
+        if (!suggestedURL.isEmpty())
+            m_filePanel->SetSaveText(suggestedURL.utf8().data());
+
+        m_filePanel->Show();
+    }
+
 private:
+    void handleSaveRequest(BMessage* message)
+    {
+        entry_ref ref;
+        const char* name;
+        if (message->FindRef("directory", &ref) == B_OK && message->FindString("name", &name) == B_OK) {
+            BDirectory dir(&ref);
+            BFile file(&dir, name, B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
+            if (file.InitCheck() == B_OK)
+                file.Write(m_saveContent.utf8().data(), m_saveContent.utf8().length());
+        }
+    }
+
     WebInspectorUIProxy& m_proxy;
+    BFilePanel* m_filePanel;
+    String m_saveContent;
 };
 
 RefPtr<WebPageProxy> WebInspectorUIProxy::platformCreateFrontendPage()
@@ -214,17 +261,10 @@ void WebInspectorUIProxy::platformRevealFileExternally(const String& path)
 
 void WebInspectorUIProxy::platformSave(Vector<WebCore::InspectorFrontendClient::SaveData>&& saveData, bool forceSaveAs)
 {
-    // Reuse logic from RemoteWebInspectorUIProxyHaiku if possible, or implement similarly.
-    // For now, iterate and save.
     for (const auto& data : saveData) {
         if (m_inspectorWindow) {
              if (auto* window = dynamic_cast<InspectorWindow*>(m_inspectorWindow)) {
-                 // Assuming InspectorWindow has a save method as in RemoteWebInspectorUIProxyHaiku
-                 // If not, we should probably add one or unify the implementation.
-                 // Ideally, we would use BFilePanel here.
-                 // For this "fix blockers" pass, we will note that full implementation requires BFilePanel logic duplication
-                 // or refactoring.
-                 // window->save(data.url, data.content, forceSaveAs);
+                 window->save(data.url, data.content, forceSaveAs);
              }
         }
     }

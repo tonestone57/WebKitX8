@@ -59,10 +59,12 @@ void WebProcessPool::platformInitialize(NeedsGlobalStaticInitialization)
 
 void WebProcessPool::platformInitializeNetworkProcess(NetworkProcessCreationParameters&)
 {
+    // FIXME: Set up network process parameters if needed.
 }
 
 void WebProcessPool::platformInitializeWebProcess(const WebKit::WebProcessProxy&, WebProcessCreationParameters&)
 {
+    // FIXME: Set up web process parameters if needed.
 }
 
 void WebProcessPool::platformInvalidateContext()
@@ -71,6 +73,7 @@ void WebProcessPool::platformInvalidateContext()
 
 void WebProcessPool::platformResolvePathsForSandboxExtensions()
 {
+    // Haiku does not currently use sandbox extensions.
 }
 
 } // namespace WebKit

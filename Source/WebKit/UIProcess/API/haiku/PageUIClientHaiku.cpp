@@ -49,13 +49,74 @@
 #include <WebCore/NotificationResources.h>
 
 #include <Alert.h>
+#include <Button.h>
 #include <FilePanel.h>
+#include <GroupLayout.h>
+#include <GroupLayoutBuilder.h>
 #include <Notification.h>
 #include <Entry.h>
 #include <Path.h>
 #include <Messenger.h>
+#include <TextControl.h>
 
 namespace WebKit {
+
+class JavaScriptPromptWindow : public BWindow {
+public:
+    JavaScriptPromptWindow(const String& message, const String& defaultValue, CompletionHandler<void(const String&)>&& completionHandler)
+        : BWindow(BRect(0, 0, 350, 150), "JavaScript Prompt", B_TITLED_WINDOW, B_NOT_RESIZABLE | B_NOT_ZOOMABLE | B_AUTO_UPDATE_SIZE_LIMITS)
+        , m_completionHandler(WTFMove(completionHandler))
+    {
+        m_textControl = new BTextControl("prompt", message.utf8().data(), defaultValue.utf8().data(), nullptr);
+
+        BButton* okButton = new BButton("OK", new BMessage('ok'));
+        BButton* cancelButton = new BButton("Cancel", new BMessage('cncl'));
+
+        okButton->MakeDefault(true);
+
+        SetLayout(new BGroupLayout(B_VERTICAL));
+        AddChild(BGroupLayoutBuilder(B_VERTICAL, 10)
+            .Add(m_textControl)
+            .AddGroup(B_HORIZONTAL, 10)
+                .AddGlue()
+                .Add(cancelButton)
+                .Add(okButton)
+            .End()
+            .SetInsets(10, 10, 10, 10)
+        );
+
+        CenterOnScreen();
+    }
+
+    void MessageReceived(BMessage* message) override {
+        switch(message->what) {
+            case 'ok':
+                if (m_completionHandler)
+                    m_completionHandler(String::fromUTF8(m_textControl->Text()));
+                m_completionHandler = nullptr;
+                Quit();
+                break;
+            case 'cncl':
+                if (m_completionHandler)
+                    m_completionHandler(String());
+                m_completionHandler = nullptr;
+                Quit();
+                break;
+            default:
+                BWindow::MessageReceived(message);
+        }
+    }
+
+    bool QuitRequested() override {
+        if (m_completionHandler)
+             m_completionHandler(String());
+        return true;
+    }
+
+private:
+    BTextControl* m_textControl;
+    CompletionHandler<void(const String&)> m_completionHandler;
+};
 
 class OpenPanelHandler : public BHandler {
 public:
@@ -232,9 +293,9 @@ void PageUIClientHaiku::runJavaScriptConfirm(WebPageProxy&, const String& messag
     completionHandler(button == 1);
 }
 
-void PageUIClientHaiku::runJavaScriptPrompt(WebPageProxy&, const String&, const String&, WebFrameProxy&, const WebCore::SecurityOriginData&, CompletionHandler<void(const String&)>&& completionHandler)
+void PageUIClientHaiku::runJavaScriptPrompt(WebPageProxy&, const String& message, const String& defaultValue, WebFrameProxy&, const WebCore::SecurityOriginData&, CompletionHandler<void(const String&)>&& completionHandler)
 {
-    completionHandler(String());
+    (new JavaScriptPromptWindow(message, defaultValue, WTFMove(completionHandler)))->Show();
 }
 
 void PageUIClientHaiku::setStatusText(WebPageProxy* page, const String& text)

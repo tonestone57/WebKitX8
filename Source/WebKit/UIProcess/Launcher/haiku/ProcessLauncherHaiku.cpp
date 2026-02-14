@@ -45,7 +45,7 @@ namespace WebKit {
 void ProcessLauncher::launchProcess()
 {
     IPC::SocketPair socketPair = IPC::createPlatformConnection(SOCK_DGRAM, 
-        IPC::PlatformConnectionOptions::SetCloexecOnClient | IPC::PlatformConnectionOptions::SetCloexecOnServer);
+        IPC::PlatformConnectionOptions::SetCloexecOnServer);
 
     BString executablePath;
     switch (m_launchOptions.processType) {
@@ -77,9 +77,6 @@ void ProcessLauncher::launchProcess()
 
     posix_spawn_file_actions_t file_actions;
     posix_spawn_file_actions_init(&file_actions);
-    posix_spawn_file_actions_adddup2(&file_actions, socketPair.client.value(), socketPair.client.value());
-        // make client socket available to child process. This is necessary since
-        // CLOEXEC is set on it.
     posix_spawn_file_actions_destroy(&file_actions);
 
     int status = posix_spawn(&m_processID, executablePath, &file_actions, NULL, argv, environ);
