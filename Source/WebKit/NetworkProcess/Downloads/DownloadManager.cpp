@@ -99,7 +99,24 @@ void DownloadManager::downloadDestinationDecided(DownloadID downloadID, Ref<Netw
 
 void DownloadManager::resumeDownload(PAL::SessionID sessionID, DownloadID downloadID, std::span<const uint8_t> resumeData, const String& path, SandboxExtension::Handle&& sandboxExtensionHandle, CallDownloadDidStart callDownloadDidStart, std::span<const uint8_t> activityAccessToken)
 {
-#if !PLATFORM(COCOA)
+#if PLATFORM(HAIKU)
+    if (resumeData.size() <= sizeof(uint64_t))
+        return;
+
+    uint64_t offset = 0;
+    for (size_t i = 0; i < sizeof(uint64_t); ++i)
+        offset |= static_cast<uint64_t>(resumeData[i]) << (i * 8);
+
+    String url = String::fromUTF8(resumeData.subspan(sizeof(uint64_t)).data(), resumeData.size() - sizeof(uint64_t));
+    if (url.isEmpty())
+        return;
+
+    ResourceRequest request(url);
+    if (offset > 0)
+        request.setHTTPHeaderField(HTTPHeaderName::Range, makeString("bytes="_s, offset, '-'));
+
+    startDownload(sessionID, downloadID, request, std::nullopt, std::nullopt, String(), FromDownloadAttribute::No, std::nullopt, std::nullopt, std::nullopt);
+#elif !PLATFORM(COCOA)
     notImplemented();
 #else
     CheckedPtr networkSession = protectedClient()->networkSession(sessionID);

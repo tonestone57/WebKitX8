@@ -25,6 +25,7 @@
 
 #include "config.h"
 #include "Download.h"
+#include "NetworkDataTask.h"
 
 #include <wtf/text/CString.h>
 
@@ -33,9 +34,22 @@ namespace WebKit {
 void Download::platformCancelNetworkLoad(CompletionHandler<void(std::span<const uint8_t>)>&& completionHandler)
 {
     // Serialize URL as resume data.
+    // Format: [8 bytes offset][URL string]
+
     String url = m_download->firstRequest().url().string();
     CString utf8 = url.utf8();
+
+    // Use m_download->bytesTransferredOverNetwork() for offset
+    uint64_t offset = static_cast<uint64_t>(m_download->bytesTransferredOverNetwork());
+
     Vector<uint8_t> resumeData;
+    resumeData.reserveInitialCapacity(sizeof(uint64_t) + utf8.length());
+
+    // Append offset (little endian assuming Haiku x86)
+    // Using simple append for now.
+    for (size_t i = 0; i < sizeof(uint64_t); ++i)
+        resumeData.append(static_cast<uint8_t>((offset >> (i * 8)) & 0xFF));
+
     resumeData.append(reinterpret_cast<const uint8_t*>(utf8.data()), utf8.length());
 
     completionHandler(std::span<const uint8_t>(resumeData.data(), resumeData.size()));
