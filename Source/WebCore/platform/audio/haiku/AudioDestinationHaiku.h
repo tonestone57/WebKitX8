@@ -20,8 +20,8 @@
 #define AudioDestinationHaiku_h
 
 #include "AudioDestination.h"
-
 #include "AudioBus.h"
+#include <SoundPlayer.h>
 
 namespace WebCore {
 
@@ -35,11 +35,14 @@ public:
 
     bool isPlaying() override { return m_isPlaying; }
     float sampleRate() const override { return m_sampleRate; }
-    //AudioIOCallback& callback() const override { return m_callback; }
 
 private:
+    static void audioCallback(void*, void*, size_t, const media_raw_audio_format&);
+    void render(void*, size_t);
+
     AudioIOCallback& m_callback;
     RefPtr<AudioBus> m_renderBus;
+    BSoundPlayer* m_soundPlayer;
 
     float m_sampleRate;
     bool m_isPlaying;
