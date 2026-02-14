@@ -470,7 +470,7 @@ private:
         printInfo.pageSetupScaleFactor = 1.0;
         printInfo.availablePaperWidth = printableRect.Width();
         printInfo.availablePaperHeight = printableRect.Height();
-        printInfo.rect = IntRect(0, 0, printableRect.Width(), printableRect.Height());
+        printInfo.rect = IntRect(0, 0, (int)printableRect.Width(), (int)printableRect.Height());
 
         m_page.drawRectToImage(m_frame.frameID(), printInfo, rect, snapshotSize, [this, protectedThis = Ref { *this }](std::optional<ShareableBitmap::Handle>&& imageHandle) {
             if (imageHandle) {
