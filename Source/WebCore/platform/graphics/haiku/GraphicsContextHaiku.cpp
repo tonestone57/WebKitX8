@@ -335,8 +335,8 @@ void GraphicsContextHaiku::fillRect(const FloatRect& rect, const Color& color)
     // FillRect is much faster.
     const auto [r, g, b, a] = color.toColorTypeLossy<SRGBA<uint8_t>>().resolved();
 
-    if (a == 255 && m_view->DrawingMode() == B_OP_COPY) {
-        m_view->SetHighColor(r, g, b, 255);
+    if (compositeOperation() == CompositeOperator::SourceOver || compositeOperation() == CompositeOperator::Copy) {
+        m_view->SetHighColor(r, g, b, a);
         m_view->FillRect(rect);
         return;
     }
@@ -416,6 +416,13 @@ void GraphicsContextHaiku::fillRoundedRectImpl(const FloatRoundedRect& roundRect
         const auto shadow = dropShadow();
         ShadowBlur contextShadow(*shadow, shadowsIgnoreTransforms());
         contextShadow.drawRectShadow(*this, roundRect);
+    }
+
+    if (roundRect.radii().isUniformCornerRadius()) {
+        const auto [r, g, b, a] = color.toColorTypeLossy<SRGBA<uint8_t>>().resolved();
+        m_view->SetHighColor(r, g, b, a);
+        m_view->FillRoundRect(rect, topLeft.width(), topLeft.height());
+        return;
     }
 
     BPoint points[3];

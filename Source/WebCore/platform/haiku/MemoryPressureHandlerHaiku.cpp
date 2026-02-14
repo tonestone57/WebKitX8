@@ -54,9 +54,9 @@ void MemoryPressureHandler::install()
             uint64_t freeMemory = (uint64_t)info.free_memory * B_PAGE_SIZE;
             uint64_t totalMemory = (uint64_t)info.max_pages * B_PAGE_SIZE;
 
-            // Trigger if less than 64MB or 5% memory free
-            if (freeMemory < 64 * 1024 * 1024 || (totalMemory > 0 && (double)freeMemory / totalMemory < 0.05)) {
-                MemoryPressureHandler::singleton().triggerMemoryPressureEvent(false);
+            // Trigger if less than 128MB or 10% memory free
+            if (freeMemory < 128 * 1024 * 1024 || (totalMemory > 0 && (double)freeMemory / totalMemory < 0.10)) {
+                MemoryPressureHandler::singleton().triggerMemoryPressureEvent(true);
             }
         }
     }, 10_s);
