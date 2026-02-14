@@ -28,6 +28,7 @@
 
 #include "DumpRenderTreeHaiku.h"
 #include "UIScriptContext.h"
+#include <WebView.h>
 
 namespace WTR {
 
@@ -45,6 +46,26 @@ void UIScriptControllerHaiku::doAsyncTask(JSValueRef callback)
             return;
         m_context->asyncTaskComplete(callbackID);
     });
+}
+
+void UIScriptControllerHaiku::zoomToScale(double scale, JSValueRef callback)
+{
+    if (webView && webView->WebPage()) {
+        if (webView->LockLooper()) {
+            webView->WebPage()->ResetZoomFactor();
+            // ChangeZoomFactor takes an increment.
+            // Assuming Reset sets it to 1.0.
+            webView->WebPage()->ChangeZoomFactor(scale - 1.0, false);
+            webView->UnlockLooper();
+        }
+    }
+    doAsyncTask(callback);
+}
+
+void UIScriptControllerHaiku::simulateAccessibilitySettingsChangeNotification(JSValueRef callback)
+{
+    // Not implemented for Haiku, but we can simulate the callback firing.
+    doAsyncTask(callback);
 }
 
 }

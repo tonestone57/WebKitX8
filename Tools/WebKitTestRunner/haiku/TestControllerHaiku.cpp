@@ -21,6 +21,8 @@
 #include "TestController.h"
 
 #include <Application.h>
+#include <OS.h>
+#include <wtf/MonotonicTime.h>
 #include "NotImplemented.h"
 #include "PlatformWebView.h"
 #include "WebView.h"
@@ -29,7 +31,6 @@ namespace WTR {
 
 void TestController::notifyDone()
 {
-    notImplemented();
 }
 
 void TestController::platformInitialize()
@@ -40,12 +41,11 @@ void TestController::platformInitialize()
         m_forceNoTimeout = true;
     }
 
-    new BApplication("application/x-vnd.haiku-webkit.testrunner");
+    // BApplication is created in main.cpp
 }
 
 void TestController::platformDestroy()
 {
-    delete be_app;
 }
 
 void TestController::platformWillRunTest(const TestInvocation&)
@@ -60,10 +60,13 @@ unsigned TestController::imageCountInGeneralPasteboard() const
 
 void TestController::platformRunUntil(bool& condition, double timeout)
 {
-    // FIXME condition (?), timeout (via BMessageRunnner)
-    notImplemented();
+    WTF::MonotonicTime startTime = WTF::MonotonicTime::now();
+    while (!condition) {
+        if (timeout > 0 && (WTF::MonotonicTime::now() - startTime).seconds() > timeout)
+            break;
 
-    be_app->Run();
+        snooze(10000); // 10ms
+    }
 }
 
 static const char* getEnvironmentVariableOrExit(const char* variableName)
@@ -102,10 +105,17 @@ void TestController::setHidden(bool hidden)
         return;
     }
 
-    if (hidden)
-        view->Hide();
-    else
-        view->Show();
+    if (hidden) {
+        if (view->LockLooper()) {
+            view->Hide();
+            view->UnlockLooper();
+        }
+    } else {
+        if (view->LockLooper()) {
+            view->Show();
+            view->UnlockLooper();
+        }
+    }
 }
 
 void TestController::runModal(PlatformWebView*)

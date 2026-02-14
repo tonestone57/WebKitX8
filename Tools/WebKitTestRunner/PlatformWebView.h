@@ -48,10 +48,14 @@ typedef struct _GtkWidget GtkWidget;
 typedef WKViewRef PlatformWKView;
 typedef GtkWidget* PlatformWindow;
 #elif PLATFORM(HAIKU)
-class BWebView;
+#include <wtf/RefPtr.h>
+namespace WebKit {
+class WebViewBase;
+}
 class BWindow;
-typedef BWebView* PlatformWKView;
-typedef BWindow* PlatformWindow;
+class BBitmap;
+using PlatformWKView = RefPtr<WebKit::WebViewBase>;
+using PlatformWindow = BWindow*;
 #elif USE(LIBWPE) || ENABLE(WPE_PLATFORM)
 namespace WTR {
 class PlatformWebViewClient;
@@ -69,6 +73,8 @@ using PlatformImage = cairo_surface_t*;
 #elif USE(SKIA)
 #include <skia/core/SkImage.h>
 using PlatformImage = SkImage*;
+#elif PLATFORM(HAIKU)
+using PlatformImage = BBitmap*;
 #endif
 
 namespace WTR {

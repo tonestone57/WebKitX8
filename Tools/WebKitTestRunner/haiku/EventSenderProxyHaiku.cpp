@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2014 Haiku, inc.
+ * Copyright (C) 2014 Haiku, inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,28 +26,45 @@
 #include "config.h"
 #include "EventSenderProxy.h"
 
-#include "NotImplemented.h"
+#include "PlatformWebView.h"
+#include "TestController.h"
+#include "WebViewBase.h"
+#include <InterfaceDefs.h>
+#include <Message.h>
+#include <String.h>
+#include <Window.h>
+#include <wtf/MonotonicTime.h>
 
 namespace WTR {
 
-EventSenderProxy::EventSenderProxy(TestController* testController)
-    : m_testController(testController)
-    , m_time(0)
-    , m_leftMouseButtonDown(false)
-    , m_clickCount(0)
-    , m_clickTime(0)
-    , m_clickButton(kWKEventMouseButtonNoButton)
-#if ENABLE(TOUCH_EVENTS)
-    , m_touchPoints(0)
-#endif
+static uint32 modifiersForWKEventModifiers(WKEventModifiers wkModifiers)
 {
+    uint32 modifiers = 0;
+    if (wkModifiers & kWKEventModifiersShiftKey)
+        modifiers |= B_SHIFT_KEY;
+    if (wkModifiers & kWKEventModifiersControlKey)
+        modifiers |= B_COMMAND_KEY;
+    if (wkModifiers & kWKEventModifiersAltKey)
+        modifiers |= B_CONTROL_KEY;
+    if (wkModifiers & kWKEventModifiersMetaKey)
+        modifiers |= B_OPTION_KEY;
+    if (wkModifiers & kWKEventModifiersCapsLockKey)
+        modifiers |= B_CAPS_LOCK;
+    return modifiers;
 }
 
-EventSenderProxy::~EventSenderProxy()
+static uint32 mouseButtonForWKEventMouseButton(int button)
 {
-#if ENABLE(TOUCH_EVENTS)
-    clearTouchPoints();
-#endif
+    switch (button) {
+    case kWKEventMouseButtonLeftButton:
+        return B_PRIMARY_MOUSE_BUTTON;
+    case kWKEventMouseButtonRightButton:
+        return B_SECONDARY_MOUSE_BUTTON;
+    case kWKEventMouseButtonMiddleButton:
+        return B_TERTIARY_MOUSE_BUTTON;
+    default:
+        return 0;
+    }
 }
 
 void EventSenderProxy::updateClickCountForButton(int button)
@@ -66,16 +83,58 @@ void EventSenderProxy::updateClickCountForButton(int button)
 
 void EventSenderProxy::mouseDown(unsigned button, WKEventModifiers wkModifiers)
 {
-    notImplemented();
     updateClickCountForButton(button);
+
+    auto* view = m_testController->mainWebView()->platformView().get();
+    if (!view) return;
+
+    BMessage msg(B_MOUSE_DOWN);
+    int64 when = (int64)(m_time * 1000000.0);
+    msg.AddInt64("when", when);
+    msg.AddInt32("buttons", mouseButtonForWKEventMouseButton(button));
+    msg.AddInt32("modifiers", modifiersForWKEventModifiers(wkModifiers));
+    msg.AddInt32("clicks", m_clickCount);
+
+    BPoint where(m_position.x, m_position.y);
+    msg.AddPoint("be:view_where", where);
+
+    BPoint screenWhere = where;
+    if (view->Window())
+        screenWhere += view->Window()->Frame().LeftTop();
+    msg.AddPoint("screen_where", screenWhere);
+
+    if (view->LockLooper()) {
+        view->MessageReceived(&msg);
+        view->UnlockLooper();
+    }
 }
 
 void EventSenderProxy::mouseUp(unsigned button, WKEventModifiers wkModifiers)
 {
-    notImplemented();
+    auto* view = m_testController->mainWebView()->platformView().get();
+    if (!view) return;
+
+    BMessage msg(B_MOUSE_UP);
+    int64 when = (int64)(m_time * 1000000.0);
+    msg.AddInt64("when", when);
+    msg.AddInt32("buttons", 0);
+    msg.AddInt32("modifiers", modifiersForWKEventModifiers(wkModifiers));
+
+    BPoint where(m_position.x, m_position.y);
+    msg.AddPoint("be:view_where", where);
+
+    BPoint screenWhere = where;
+    if (view->Window())
+        screenWhere += view->Window()->Frame().LeftTop();
+    msg.AddPoint("screen_where", screenWhere);
 
     m_clickPosition = m_position;
-    m_clickTime = currentEventTime();
+    m_clickTime = m_time;
+
+    if (view->LockLooper()) {
+        view->MessageReceived(&msg);
+        view->UnlockLooper();
+    }
 }
 
 void EventSenderProxy::mouseMoveTo(double x, double y)
@@ -83,36 +142,86 @@ void EventSenderProxy::mouseMoveTo(double x, double y)
     m_position.x = x;
     m_position.y = y;
 
-    notImplemented();
+    auto* view = m_testController->mainWebView()->platformView().get();
+    if (!view) return;
+
+    BMessage msg(B_MOUSE_MOVED);
+    int64 when = (int64)(m_time * 1000000.0);
+    msg.AddInt64("when", when);
+    msg.AddInt32("buttons", m_leftMouseButtonDown ? B_PRIMARY_MOUSE_BUTTON : 0);
+    msg.AddInt32("modifiers", 0);
+
+    BPoint where(x, y);
+    msg.AddPoint("be:view_where", where);
+
+    BPoint screenWhere = where;
+    if (view->Window())
+        screenWhere += view->Window()->Frame().LeftTop();
+    msg.AddPoint("screen_where", screenWhere);
+
+    msg.AddInt32("transit", B_INSIDE_VIEW);
+
+    if (view->LockLooper()) {
+        view->MessageReceived(&msg);
+        view->UnlockLooper();
+    }
 }
 
 void EventSenderProxy::mouseScrollBy(int horizontal, int vertical)
 {
-    notImplemented();
+    auto* view = m_testController->mainWebView()->platformView().get();
+    if (!view) return;
+
+    BMessage msg(B_MOUSE_WHEEL_CHANGED);
+    int64 when = (int64)(m_time * 1000000.0);
+    msg.AddInt64("when", when);
+    msg.AddInt32("modifiers", 0);
+
+    msg.AddFloat("be:wheel_delta_x", (float)horizontal);
+    msg.AddFloat("be:wheel_delta_y", (float)vertical);
+
+    if (view->LockLooper()) {
+        view->MessageReceived(&msg);
+        view->UnlockLooper();
+    }
 }
 
 void EventSenderProxy::continuousMouseScrollBy(int horizontal, int vertical, bool paged)
 {
-    notImplemented();
+    mouseScrollBy(horizontal, vertical);
 }
 
 void EventSenderProxy::mouseScrollByWithWheelAndMomentumPhases(int x, int y, int /*phase*/, int /*momentum*/)
 {
-    // EFL does not have the concept of wheel gesture phases or momentum. Just relay to
-    // the mouse wheel handler.
     mouseScrollBy(x, y);
 }
 
 void EventSenderProxy::leapForward(int milliseconds)
 {
-    notImplemented();
-
     m_time += milliseconds / 1000.0;
 }
 
 void EventSenderProxy::keyDown(WKStringRef keyRef, WKEventModifiers wkModifiers, unsigned location)
 {
-    notImplemented();
+    auto* view = m_testController->mainWebView()->platformView().get();
+    if (!view) return;
+
+    size_t bufferSize = WKStringGetMaximumUTF8CStringSize(keyRef);
+    Vector<char> keyBuffer(bufferSize);
+    WKStringGetUTF8CString(keyRef, keyBuffer.data(), bufferSize);
+    String keyName = String::fromUTF8(keyBuffer.data());
+
+    BMessage msg(B_KEY_DOWN);
+    int64 when = (int64)(m_time * 1000000.0);
+    msg.AddInt64("when", when);
+    msg.AddInt32("modifiers", modifiersForWKEventModifiers(wkModifiers));
+
+    msg.AddString("bytes", keyName.utf8().data());
+
+    if (view->LockLooper()) {
+        view->MessageReceived(&msg);
+        view->UnlockLooper();
+    }
 }
 
 }

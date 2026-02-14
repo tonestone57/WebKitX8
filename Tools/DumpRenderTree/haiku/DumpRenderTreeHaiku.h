@@ -37,6 +37,7 @@ class BWebFrame;
 class AccessibilityController;
 class GCController;
 
+extern BWebView* webView;
 extern BWebFrame* topLoadingFrame;
 extern bool waitForPolicy;
 extern BMessageRunner* waitToDumpWatchdog;

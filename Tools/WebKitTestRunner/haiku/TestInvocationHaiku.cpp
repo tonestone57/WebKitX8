@@ -1,8 +1,5 @@
 /*
- * Copyright (C) 2009 Apple Inc. All rights reserved.
- *           (C) 2011 Brent Fulgham <bfulgham@webkit.org>. All rights reserved.
- *           (C) 2010, 2011 Igalia S.L
- *           (C) 2012 Intel Corporation. All rights reserved.
+ * Copyright (C) 2014 Haiku, inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -13,102 +10,133 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS''
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
- * THE POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "config.h"
 #include "TestInvocation.h"
 
 #include <Bitmap.h>
-#include "NotImplemented.h"
-#include "PixelDumpSupport.h"
+#include <BitmapStream.h>
+#include <DataIO.h>
+#include <TranslatorRoster.h>
+#include <wtf/MD5.h>
+#include <wtf/Vector.h>
+#include <cstdio>
+#include <span>
+
+#include "APICast.h"
+#include "APIImage.h"
+#include "ShareableBitmap.h"
+#include "BitmapImage.h"
 #include "PlatformWebView.h"
 #include "TestController.h"
-#include <WebKit/WKImageCairo.h>
-#include <cstdio>
-#include <wtf/Assertions.h>
-#include <wtf/MD5.h>
-#include <wtf/StringExtras.h>
 
 namespace WTR {
 
-void computeMD5HashStringForCairoSurface(BBitmap* surface, char hashString[33])
+static void printPNG(const unsigned char* data, size_t length, const char* checksum)
 {
-    ASSERT(surface->ColorSpace() == B_RGB32); // ImageDiff assumes 32 bit RGBA, we must as well.
+    printf("Content-Type: image/png\n");
+    printf("Content-Length: %lu\n", length);
+    if (checksum)
+        printf("ActualHash: %s\n", checksum);
+    printf("\n");
+    fwrite(data, 1, length, stdout);
+}
 
-    BRect r = surface->Bounds();
-    size_t pixelsHigh = r.Height();
-    size_t pixelsWide = r.Width();
-    size_t bytesPerRow = surface->BytesPerRow();
+static void computeMD5HashStringForBitmap(BBitmap* bitmap, char hashString[33])
+{
+    if (!bitmap)
+        return;
+
+    BRect bounds = bitmap->Bounds();
+    int pixelsWide = bounds.Width() + 1;
+    int pixelsHigh = bounds.Height() + 1;
+    int bytesPerRow = bitmap->BytesPerRow();
+    unsigned char* pixelData = (unsigned char*)bitmap->Bits();
 
     MD5 md5Context;
-    unsigned char* bitmapData = static_cast<unsigned char*>(surface->Bits());
-    for (size_t row = 0; row < pixelsHigh; ++row) {
-        md5Context.addBytes(bitmapData, 4 * pixelsWide);
-        bitmapData += bytesPerRow;
+    for (int i = 0; i < pixelsHigh; ++i) {
+        md5Context.addBytes(std::span<const uint8_t>(pixelData, 4 * pixelsWide));
+        pixelData += bytesPerRow;
     }
+
     MD5::Digest hash;
-    md5Context.checksum(hash);
+    md5Context.computeHash(hash);
 
     snprintf(hashString, 33, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
         hash[0], hash[1], hash[2], hash[3], hash[4], hash[5], hash[6], hash[7],
         hash[8], hash[9], hash[10], hash[11], hash[12], hash[13], hash[14], hash[15]);
 }
 
-#if 0
-static status_t writeFunction(void* closure, const unsigned char* data, unsigned length)
+static void dumpBitmap(BBitmap* bitmap, const char* checksum)
 {
-    Vector<unsigned char>* in = reinterpret_cast<Vector<unsigned char>*>(closure);
-    in->append(data, length);
-    return B_OK;
-}
-#endif
+    if (!bitmap)
+        return;
 
-static void dumpBitmap(BBitmap* surface, const char* checksum)
-{
-    notImplemented();
-#if 0
-    Vector<unsigned char> pixelData;
-    cairo_surface_write_to_png_stream(surface, writeFunction, &pixelData);
-    const size_t dataLength = pixelData.size();
-    const unsigned char* data = pixelData.data();
+    BBitmapStream stream(bitmap);
 
-    printPNG(data, dataLength, checksum);
-#endif
+    BMallocIO mio;
+    status_t err = BTranslatorRoster::Default()->Translate(&stream, NULL, NULL, &mio, B_PNG_FORMAT);
+
+    BBitmap* out;
+    stream.DetachBitmap(&out);
+
+    if (err == B_OK) {
+        printPNG((const unsigned char*)mio.Buffer(), mio.BufferLength(), checksum);
+    } else {
+        fprintf(stderr, "Error translating bitmap: %s\n", strerror(err));
+    }
 }
 
-void TestInvocation::dumpPixelsAndCompareWithExpected(WKImageRef wkImage, WKArrayRef repaintRects)
+void TestInvocation::dumpPixelsAndCompareWithExpected(SnapshotResultType type, WKArrayRef repaintRects, WKImageRef wkImage)
 {
-    notImplemented();
-#if 0
-#if PLATFORM(EFL) || PLATFORM(GTK)
-    UNUSED_PARAM(wkImage);
-    cairo_surface_t* surface = WKImageCreateCairoSurface(TestController::shared().mainWebView()->windowSnapshotImage().get());
-#else
-    cairo_surface_t* surface = WKImageCreateCairoSurface(wkImage);
-#endif
+    BBitmap* bBitmap = nullptr;
+    std::unique_ptr<BBitmap> snapshotBitmap;
+    RefPtr<WebCore::BitmapRef> platformImage;
 
-    if (repaintRects)
-        paintRepaintRectOverlay(surface, repaintRects);
+    if (wkImage) {
+        auto* apiImage = WebKit::toImpl(wkImage);
+        if (apiImage) {
+            auto* shareableBitmap = apiImage->resource();
+            if (shareableBitmap) {
+                platformImage = shareableBitmap->createPlatformImage();
+                bBitmap = platformImage.get();
+            }
+        }
+    } else if (type == SnapshotResultType::WebView) {
+        bBitmap = TestController::singleton().mainWebView()->windowSnapshotImage();
+        // Since windowSnapshotImage returns a pointer we assume ownership of?
+        // No, PlatformWebView.h defines PlatformImage as BBitmap*.
+        // We usually expect ownership transfer for snapshots.
+        // Let's check PlatformWebViewHaiku.cpp implementation later.
+    }
 
-    char actualHash[33];
-    computeMD5HashStringForCairoSurface(surface, actualHash);
-    if (!compareActualHashToExpectedAndDumpResults(actualHash))
-        dumpBitmap(surface, actualHash);
+    if (!bBitmap)
+        return;
 
-    cairo_surface_destroy(surface);
-#endif
+    char actualHashMD5[33];
+    computeMD5HashStringForBitmap(bBitmap, actualHashMD5);
+
+    if (!compareActualHashToExpectedAndDumpResults(actualHashMD5))
+        dumpBitmap(bBitmap, actualHashMD5);
+
+    // If we obtained the bitmap from windowSnapshotImage, we might need to delete it.
+    // Ideally TestController/PlatformWebView should manage this or return a smart pointer.
+    // For now, assuming if it came from windowSnapshotImage, we own it.
+    if (!wkImage && bBitmap) {
+        delete bBitmap;
+    }
 }
 
-} // namespace WTR
-
+}

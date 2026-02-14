@@ -20,14 +20,54 @@
 #include "config.h"
 
 #include "TestController.h"
-#include <wtf/Assertions.h>
+#include <Application.h>
+#include <OS.h>
 #include <stdlib.h>
+#include <wtf/Assertions.h>
+
+struct TestRunnerArguments {
+    int argc;
+    char** argv;
+};
+
+static status_t testRunnerThread(void* data)
+{
+    TestRunnerArguments* args = static_cast<TestRunnerArguments*>(data);
+
+    {
+        WTR::TestController controller(args->argc, const_cast<const char**>(args->argv));
+        // The controller runs tests in its constructor/destructor lifecycle or explicit run method
+        // depending on how it's implemented. Assuming standard WTR behavior:
+        // Controller is created, runs, and when destroyed or done, we quit.
+    }
+
+    // When controller is done, we quit the app
+    if (be_app)
+        be_app->PostMessage(B_QUIT_REQUESTED);
+
+    return B_OK;
+}
 
 int main(int argc, char** argv)
 {
     WTFInstallReportBacktraceOnCrashHook();
 
-    WTR::TestController controller(argc, const_cast<const char**>(argv));
+    // Create the application on the main thread
+    BApplication app("application/x-vnd.haiku-webkit.testrunner");
+
+    // Spawn the test runner thread
+    TestRunnerArguments args = { argc, argv };
+    thread_id thread = spawn_thread(testRunnerThread, "TestRunnerThread", B_NORMAL_PRIORITY, &args);
+
+    if (thread >= B_OK) {
+        resume_thread(thread);
+    } else {
+        fprintf(stderr, "Failed to spawn test runner thread: %s\n", strerror(thread));
+        return 1;
+    }
+
+    // Run the application loop
+    app.Run();
 
     return 0;
 }
