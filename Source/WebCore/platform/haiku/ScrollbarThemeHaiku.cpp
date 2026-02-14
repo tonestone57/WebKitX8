@@ -218,8 +218,6 @@ void ScrollbarThemeHaiku::paintTrackBackground(GraphicsContext& context, Scrollb
 
 void ScrollbarThemeHaiku::paintTickmarks(GraphicsContext& context, Scrollbar& scrollbar, const IntRect& rect)
 {
-    // Tickmarks for scrollbars (e.g. search results)
-    // Haiku doesn't have standard scrollbar tickmarks, but we can draw simple lines
     if (scrollbar.orientation() != ScrollbarOrientation::Vertical && scrollbar.orientation() != ScrollbarOrientation::Horizontal)
         return;
 
@@ -227,13 +225,22 @@ void ScrollbarThemeHaiku::paintTickmarks(GraphicsContext& context, Scrollbar& sc
     if (!view)
         return;
 
-    // TODO: Implementation depends on how tickmarks are passed (usually via custom painting or overlay)
-    // WebCore usually handles painting individual tickmarks if we expose them?
-    // This function is for painting the *container* of tickmarks or all of them?
-    // Actually paintTickmarks usually iterates and paints provided rects?
-    // Wait, ScrollbarTheme::paintTickmarks is usually provided with the rect of the track to paint marks into?
+    view->PushState();
+    view->SetHighColor(255, 255, 0, 200); // Highlight color
 
-    // For now, no-op as standard Haiku scrollbars don't show tickmarks.
+    Vector<IntRect> tickmarks;
+    scrollbar.getTickmarks(tickmarks);
+
+    for (const auto& mark : tickmarks) {
+        // Map from scroll coordinates to track rect coordinates
+        // The mark rects are usually relative to the document or scrollable area?
+        // No, Scrollbar::getTickmarks returns rects in the coordinate space of the scrollbar's track?
+        // Usually implementation iterates and draws simple lines.
+        // Assuming we just draw the rects provided (which are usually in scrollbar coords).
+
+        view->FillRect(BRect(mark));
+    }
+    view->PopState();
 }
 
 void ScrollbarThemeHaiku::paintButton(GraphicsContext& context, Scrollbar& scrollbar, const IntRect& intRect, ScrollbarPart part)

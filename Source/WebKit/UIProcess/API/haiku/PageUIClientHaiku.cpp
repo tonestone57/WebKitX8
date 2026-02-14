@@ -209,9 +209,8 @@ void PageUIClientHaiku::printFrame(WebPageProxy& page, WebFrameProxy& frame, con
         job.BeginJob();
 
         // Note: This currently only prints the visible viewport of the WebView.
-        // Full-page printing requires coordination with the WebProcess to generate
-        // a PDF or render the full document content.
-        // TODO: Implement drawPagesToPDF integration.
+        // Full-page printing is handled by PageClientImplHaiku using AsyncPrinter.
+        // This method is primarily for API clients who might want simple printing.
         BRect printableRect = job.PrintableRect();
         BRect viewRect = m_webView.Bounds();
 
@@ -319,12 +318,13 @@ void PageUIClientHaiku::mouseDidMoveOverElement(WebPageProxy& page, const WebHit
 
 void PageUIClientHaiku::toolbarsAreVisible(WebPageProxy&, Function<void(bool)>&& completionHandler)
 {
-    bool visible = true;
+    bool visible = false;
     if (BWindow* window = m_webView.Window()) {
-        // Assume if window has a KeyMenuBar, it's visible?
-        // Actually, WebKit is asking if *browser* toolbars are visible.
-        // We can ask the window via a synchronous message if needed, but for now defaulting to true is okay.
-        // Or better, let's assume if there are any views other than us, there might be toolbars.
+        if (window->Lock()) {
+            if (window->KeyMenuBar() && !window->KeyMenuBar()->IsHidden())
+                visible = true;
+            window->Unlock();
+        }
     }
     completionHandler(visible);
 }

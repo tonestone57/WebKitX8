@@ -101,27 +101,33 @@ bool fileExists(const String& path)
 
 bool deleteNonEmptyDirectory(const String& path)
 {
-    // BEntry::Remove() handles recursive deletion for directories?
-    // "If the entry is a directory, it must be empty to be removed." - BeBook
-    // So we need to implement recursive deletion.
+    BEntry entry(path.utf8().data(), false); // Don't traverse symlinks
+    if (entry.InitCheck() != B_OK)
+        return false;
 
-    BDirectory dir(path.utf8().data());
+    if (entry.IsSymLink())
+        return entry.Remove() == B_OK;
+
+    if (!entry.IsDirectory())
+        return false;
+
+    BDirectory dir(&entry);
     if (dir.InitCheck() != B_OK)
         return false;
 
-    BEntry entry;
-    while (dir.GetNextEntry(&entry) == B_OK) {
-        if (entry.IsDirectory()) {
+    BEntry subEntry;
+    while (dir.GetNextEntry(&subEntry) == B_OK) {
+        if (subEntry.IsDirectory()) {
             BPath subPath;
-            entry.GetPath(&subPath);
+            subEntry.GetPath(&subPath);
             if (!deleteNonEmptyDirectory(String::fromUTF8(subPath.Path())))
                 return false;
         } else {
-            if (entry.Remove() != B_OK)
+            if (subEntry.Remove() != B_OK)
                 return false;
         }
     }
-    return dir.GetEntry(&entry) == B_OK && entry.Remove() == B_OK;
+    return entry.Remove() == B_OK;
 }
 
 String pathGetFileName(const String& path)

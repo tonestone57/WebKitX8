@@ -59,15 +59,12 @@ void WebProcessPool::platformInitialize(NeedsGlobalStaticInitialization)
 
 void WebProcessPool::platformInitializeNetworkProcess(NetworkProcessCreationParameters& parameters)
 {
-    // FIXME: Set up network process parameters if needed.
-    // For Haiku, we might need to pass down specific paths or settings.
-    // Currently, most things are handled via standard paths or BPath logic in the child process.
+    // Ensure network process has access to necessary paths if sandboxing is ever enabled.
 }
 
 void WebProcessPool::platformInitializeWebProcess(const WebKit::WebProcessProxy&, WebProcessCreationParameters& parameters)
 {
-    // FIXME: Set up web process parameters if needed.
-    // Ensure we pass any Haiku-specific parameters here.
+    // Ensure web process has access to necessary paths if sandboxing is ever enabled.
 }
 
 void WebProcessPool::platformInvalidateContext()

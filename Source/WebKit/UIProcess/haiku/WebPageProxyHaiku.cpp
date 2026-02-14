@@ -41,6 +41,11 @@ namespace WebKit {
 
 void WebPageProxy::platformInitialize()
 {
+    BPath path;
+    if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK) {
+        path.Append("WebKit");
+        create_directory(path.Path(), 0755);
+    }
 }
 
 String WebPageProxy::userAgentForURL(const URL&)

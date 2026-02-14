@@ -66,7 +66,17 @@ const BGradient& Gradient::getHaikuGradient()
 		i++;
 	}
 
-	// TODO handle m_spreadMethod (pad/reflect/repeat)
+	switch (m_spreadMethod) {
+    case GradientSpreadMethod::Pad:
+        m_gradient->SetSpreadMethod(B_GRADIENT_PAD);
+        break;
+    case GradientSpreadMethod::Reflect:
+        m_gradient->SetSpreadMethod(B_GRADIENT_REFLECT);
+        break;
+    case GradientSpreadMethod::Repeat:
+        m_gradient->SetSpreadMethod(B_GRADIENT_REPEAT);
+        break;
+    }
 
 	return *m_gradient;
 }

@@ -686,11 +686,11 @@ void GraphicsContextHaiku::drawDotsForDocumentMarker(WebCore::FloatRect const& r
     m_view->PushState();
     m_view->SetHighColor(strokeColor());
     m_view->SetPenSize(1.0);
+    m_view->SetLowColor(B_TRANSPARENT_COLOR);
 
+    pattern p = { { 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa } };
     float y = rect.maxY();
-    for (float x = rect.x(); x < rect.maxX(); x += 2) {
-        m_view->StrokeLine(BPoint(x, y), BPoint(x, y));
-    }
+    m_view->StrokeLine(BPoint(rect.x(), y), BPoint(rect.maxX(), y), p);
 
     m_view->PopState();
 }
@@ -813,7 +813,7 @@ void GraphicsContextHaiku::didUpdateState(GraphicsContextState& state)
         switch (strokeStyle()) {
 			case WebCore::StrokeStyle::DoubleStroke:
 			case WebCore::StrokeStyle::WavyStroke:
-                // FIXME: Implement fancy strokes
+                // Not supported by BView
                 m_strokeStyle = B_SOLID_HIGH;
                 break;
 			case WebCore::StrokeStyle::SolidStroke:
@@ -919,7 +919,6 @@ void GraphicsContextHaiku::didUpdateState(GraphicsContextState& state)
 #if ENABLE(3D_RENDERING) && USE(TEXTURE_MAPPER)
 TransformationMatrix GraphicsContextHaiku::get3DTransform() const
 {
-    // FIXME: Can we approximate the transformation better than this?
     return getCTM().toTransformationMatrix();
 }
 

@@ -84,10 +84,83 @@ void ResourceHandle::cancel()
     }
 }
 
-void ResourceHandle::platformLoadResourceSynchronously(NetworkingContext* context, const ResourceRequest& request, StoredCredentialsPolicy /*storedCredentials*/, WebCore::SecurityOrigin*, ResourceError& error, ResourceResponse& response, Vector<unsigned char>& data)
+void ResourceHandle::platformLoadResourceSynchronously(NetworkingContext* context, const ResourceRequest& request, StoredCredentialsPolicy storedCredentials, WebCore::SecurityOrigin*, ResourceError& error, ResourceResponse& response, Vector<unsigned char>& data)
 {
-    // FIXME: Implement synchronous loading
-    error = ResourceError(String(), 0, request.url(), String());
+    BUrlRequest* urlRequest = request.toNetworkRequest(context);
+    if (!urlRequest) {
+        error = ResourceError(String(), 0, request.url(), "Failed to create request"_s);
+        return;
+    }
+
+    class SyncListener : public BUrlProtocolListener {
+    public:
+        SyncListener(ResourceResponse& response, Vector<unsigned char>& data)
+            : m_response(response)
+            , m_data(data)
+            , m_sem(create_sem(0, "SyncListener"))
+        {
+        }
+
+        ~SyncListener()
+        {
+            delete_sem(m_sem);
+        }
+
+        void Wait() {
+            while (acquire_sem(m_sem) == B_INTERRUPTED);
+        }
+
+        void ConnectionOpened(BUrlRequest*) override { }
+        void HostnameResolved(BUrlRequest*, const char*) override { }
+        void ResponseStarted(BUrlRequest* caller) override {
+            const BHttpResult* result = dynamic_cast<const BHttpResult*>(&caller->Result());
+            if (result) {
+                m_response.setURL(URL(result->Url()));
+                m_response.setMimeType(String::fromUTF8(result->ContentType()));
+                m_response.setHTTPStatusCode(result->StatusCode());
+                m_response.setHTTPStatusText(String::fromUTF8(result->StatusText()));
+                const BHttpHeaders& headers = result->Headers();
+                for (int i = 0; i < headers.CountHeaders(); i++) {
+                    m_response.setHTTPHeaderField(String::fromUTF8(headers.HeaderAt(i).Name()), String::fromUTF8(headers.HeaderAt(i).Value()));
+                }
+            }
+        }
+        void HeadersReceived(BUrlRequest*) override { }
+        void DataReceived(BUrlRequest*, const char* data, off_t, ssize_t size) override {
+            if (size > 0)
+                m_data.append(std::span<const uint8_t>((const uint8_t*)data, size));
+        }
+        void DownloadProgress(BUrlRequest*, ssize_t, ssize_t) override { }
+        void UploadProgress(BUrlRequest*, ssize_t, ssize_t) override { }
+        void RequestCompleted(BUrlRequest*, bool success) override {
+            m_success = success;
+            release_sem(m_sem);
+        }
+        void DebugMessage(BUrlRequest*, BUrlProtocolDebugMessage, const char*) override { }
+
+        bool m_success { false };
+    private:
+        ResourceResponse& m_response;
+        Vector<unsigned char>& m_data;
+        sem_id m_sem;
+    };
+
+    SyncListener listener(response, data);
+    urlRequest->SetListener(&listener);
+
+    if (urlRequest->Run() < B_OK) {
+        error = ResourceError(String(), 0, request.url(), "Failed to run request"_s);
+        delete urlRequest;
+        return;
+    }
+
+    listener.Wait();
+
+    if (!listener.m_success) {
+        error = ResourceError(String(), 0, request.url(), "Request failed"_s);
+    }
+
+    delete urlRequest;
 }
 
 

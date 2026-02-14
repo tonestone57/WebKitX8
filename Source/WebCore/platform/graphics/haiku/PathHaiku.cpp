@@ -421,8 +421,8 @@ void PathHaiku::add(PathArc arc)
 
 void PathHaiku::add(PathClosedArc arc)
 {
-    // TODO what's special about a "closed" arc?
     add(arc.arc);
+    m_platformPath.Close();
 }
 
 
@@ -736,9 +736,21 @@ bool PathHaiku::transform(const AffineTransform& transform)
         	float& angle, bool largeArc, bool counterClockWise, BPoint& point)
         {
             point = m_transform.mapPoint(point);
-            rx *= m_transform.a();
-            ry *= m_transform.d();
-            // FIXME: rotate angle...
+            // Decompose the affine transform to get scale and rotation.
+            // This is non-trivial for shears, but we can approximate for
+            // common scale+rotate cases.
+            // Note: BShape ArcTo parameters are rx, ry, rotation angle (degrees).
+
+            // Apply scaling roughly
+            float scaleX = hypot(m_transform.a(), m_transform.b());
+            float scaleY = hypot(m_transform.c(), m_transform.d());
+            rx *= scaleX;
+            ry *= scaleY;
+
+            // Apply rotation
+            // atan2(b, a) gives rotation of X axis.
+            double rotation = atan2(m_transform.b(), m_transform.a());
+            angle += rad2deg(rotation);
 
             return B_OK;
         }
@@ -758,10 +770,19 @@ bool PathHaiku::transform(const AffineTransform& transform)
 
 FloatRect PathHaiku::strokeBoundingRect(const Function<void(GraphicsContext&)>& applier) const
 {
-    // Used by the web inspector to highlight some element
     if (applier) {
-        // FIXME: Calculate exact stroke bounds
-        // For now, return bounds inflated by a guess or just Bounds()
+        // Use HitTestBitmap to calculate exact bounds? No, that's too slow for bounding rect.
+        // We can create a temporary view/bitmap and get the size?
+        // Or just inflate by stroke thickness if we can get it from applier?
+        // Applier takes a GraphicsContext. We can record the state changes.
+        // But for now, getting the BShape bounds is fast.
+        // Let's assume a reasonable padding if we can't determine stroke width easily.
+        // Most usage of this is for dirty rect calculation or hit testing.
+        // Returning a slightly larger rect is safe.
+
+        BRect bounds = m_platformPath.Bounds();
+        bounds.InsetBy(-10, -10); // Arbitrary safety margin
+        return bounds;
     }
 
     return m_platformPath.Bounds();

@@ -106,6 +106,7 @@ private:
 WebPageProxy* RemoteWebInspectorUIProxy::platformCreateFrontendPageAndWindow()
 {
     BRect rect(100, 100, 900, 700);
+    // window will be deleted when closed
     InspectorWindow* window = new InspectorWindow(rect);
 
     Ref<API::PageConfiguration> configuration = API::PageConfiguration::create();

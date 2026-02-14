@@ -118,7 +118,7 @@ DragImageRef dissolveDragImageToFraction(DragImageRef image, float fraction)
     if (!image)
         return nullptr;
 
-    BBitmap* bitmap = static_cast<BBitmap*>(image);
+    BBitmap* bitmap = new BBitmap(static_cast<BBitmap*>(image));
     if (bitmap->Lock()) {
         uint8* bits = (uint8*)bitmap->Bits();
         int32 bpr = bitmap->BytesPerRow();
@@ -134,6 +134,7 @@ DragImageRef dissolveDragImageToFraction(DragImageRef image, float fraction)
         }
         bitmap->Unlock();
     }
+    delete static_cast<BBitmap*>(image);
     return bitmap;
 }
 

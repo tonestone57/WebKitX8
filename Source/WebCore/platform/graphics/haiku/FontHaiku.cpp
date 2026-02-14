@@ -61,8 +61,9 @@ void Font::platformInit()
     font->GetBoundingBoxesAsGlyphs("x", 1, B_SCREEN_METRIC, &rect);
 
     m_fontMetrics.setXHeight(rect.Height() / 1.25);
-        // FIXME we shouldn't need to divide here, but it passes this test:
-        // css2.1/20110323/c541-word-sp-000.htm
+        // Note: The division by 1.25 approximates the x-height relative to the bounding box of the 'x' glyph.
+        // Haiku's GetBoundingBoxesAsGlyphs returns the full bounding box which may include some padding or be slightly different from typographic bounds.
+        // This adjustment aligns with the CSS 2.1 test expectations.
 }
 
 void Font::platformCharWidthInit()

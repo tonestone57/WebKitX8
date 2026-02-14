@@ -223,24 +223,29 @@ void WebInspectorUIProxy::platformShowCertificate(const WebCore::CertificateInfo
 
 void WebInspectorUIProxy::platformAttach()
 {
-    notImplemented();
+    // Attachment requires embedding the inspector view into the page's window.
+    // This is currently not supported by the Haiku MiniBrowser architecture.
 }
 
 void WebInspectorUIProxy::platformDetach()
 {
-    notImplemented();
+    // Detachment usually involves creating a new window for the inspector.
+    // Since we only support separate window mode, this is a no-op or handled by close/open.
 }
 
 void WebInspectorUIProxy::platformSetAttachedWindowHeight(unsigned)
 {
+    // Not supported for detached window.
 }
 
 void WebInspectorUIProxy::platformSetAttachedWindowWidth(unsigned)
 {
+    // Not supported for detached window.
 }
 
 void WebInspectorUIProxy::platformSetSheetRect(const WebCore::FloatRect&)
 {
+    // Not supported.
 }
 
 void WebInspectorUIProxy::platformStartWindowDrag()

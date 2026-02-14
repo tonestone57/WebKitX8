@@ -220,7 +220,21 @@ void WebCore::Pasteboard::write(WebCore::PasteboardImage const& pasteboardImage)
 
 void Pasteboard::write(const PasteboardBuffer& buffer)
 {
-    // Not implemented for now as PasteboardBuffer structure is not verified.
+    AutoClipboardLocker locker(be_clipboard);
+    if (!locker.isLocked())
+        return;
+
+    be_clipboard->Clear();
+    BMessage* data = be_clipboard->Data();
+    if (!data)
+        return;
+
+    if (buffer.data) {
+        auto contiguous = buffer.data->makeContiguous();
+        data->AddData(buffer.type.utf8().data(), B_MIME_TYPE, contiguous->data(), contiguous->size());
+    }
+
+    be_clipboard->Commit();
 }
 
 void WebCore::Pasteboard::write(WebCore::PasteboardWebContent const& content)
@@ -492,8 +506,20 @@ void Pasteboard::clear()
 }
 
 #if ENABLE(DRAG_SUPPORT)
-void Pasteboard::setDragImage(DragImage, const IntPoint&)
+static DragImageRef s_dragImage = nullptr;
+
+void Pasteboard::setDragImage(DragImage image, const IntPoint&)
 {
+    if (s_dragImage)
+        delete s_dragImage;
+    // We assume ownership of the bitmap
+    s_dragImage = image;
+}
+
+// Helper to access the drag image from DragClientHaiku
+DragImageRef platformDragImage()
+{
+    return s_dragImage;
 }
 #endif
 

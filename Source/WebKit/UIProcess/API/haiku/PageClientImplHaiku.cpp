@@ -145,7 +145,10 @@ void PageClientImpl::toolTipChanged(const String&, const String& newToolTip)
 
 void PageClientImpl::setCursor(const WebCore::Cursor& cursor)
 {
-    fWebView.setCursor(cursor);
+    if (fWebView.LockLooper()) {
+        fWebView.SetViewCursor(cursor.platformCursor());
+        fWebView.UnlockLooper();
+    }
 }
 
 void PageClientImpl::setCursorHiddenUntilMouseMoves(bool hiddenUntilMouseMoves)
@@ -318,18 +321,22 @@ void PageClientImpl::didFinishLoadingDataForCustomContentProvider(const String&,
 
 void PageClientImpl::navigationGestureDidBegin()
 {
+    // Not implemented
 }
 
 void PageClientImpl::navigationGestureWillEnd(bool, WebBackForwardListItem&)
 {
+    // Not implemented
 }
 
 void PageClientImpl::navigationGestureDidEnd(bool, WebBackForwardListItem&)
 {
+    // Not implemented
 }
 
 void PageClientImpl::navigationGestureDidEnd()
 {
+    // Not implemented
 }
 
 void PageClientImpl::willRecordNavigationSnapshot(WebBackForwardListItem&)
@@ -395,9 +402,26 @@ private:
             return;
         }
 
+        // Optimize: Only snapshot pages within the requested range
+        int32 firstPage = m_printJob->FirstPage();
+        int32 lastPage = m_printJob->LastPage();
+        int32 currentPage = m_pageIndex + 1; // 1-based index
+
+        if (currentPage < firstPage || currentPage > lastPage) {
+            m_snapshots.append(nullptr);
+            m_pageIndex++;
+            snapshotNextPage();
+            return;
+        }
+
         WebCore::IntRect rect = m_pageRects[m_pageIndex];
-        // FIXME: Handle scaling?
-        m_page.takeSnapshot(rect, m_pageRects[m_pageIndex].size(), SnapshotOptionsShareable, [this, protectedThis = Ref { *this }](std::optional<ShareableBitmap::Handle>&& imageHandle) {
+
+        WebCore::IntSize snapshotSize = rect.size();
+        if (m_scaleFactor != 1.0 && m_scaleFactor > 0) {
+            snapshotSize.scale(m_scaleFactor);
+        }
+
+        m_page.takeSnapshot(rect, snapshotSize, SnapshotOptionsShareable, [this, protectedThis = Ref { *this }](std::optional<ShareableBitmap::Handle>&& imageHandle) {
             if (imageHandle) {
                 m_snapshots.append(ShareableBitmap::create(WTFMove(*imageHandle)));
             } else {
@@ -433,7 +457,6 @@ private:
 
         m_printJob->BeginJob();
 
-        // FIXME: Use page range from print job settings?
         int32 firstPage = m_printJob->FirstPage();
         int32 lastPage = m_printJob->LastPage();
 
