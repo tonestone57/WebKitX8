@@ -506,12 +506,20 @@ void Pasteboard::clear()
 }
 
 #if ENABLE(DRAG_SUPPORT)
+static DragImageRef s_dragImage = nullptr;
+
 void Pasteboard::setDragImage(DragImage image, const IntPoint&)
 {
-    // FIXME: Store the drag image so it can be used by DragController.
-    // Currently we don't have a place to store it in the Pasteboard object.
-    // If we take ownership, we should delete it, but if it's used later, we shouldn't.
-    // Leaking for now to avoid crashes if it is used.
+    if (s_dragImage)
+        delete s_dragImage;
+    // We assume ownership of the bitmap
+    s_dragImage = image;
+}
+
+// Helper to access the drag image from DragClientHaiku
+DragImageRef platformDragImage()
+{
+    return s_dragImage;
 }
 #endif
 

@@ -214,7 +214,9 @@ FontPlatformData::SetFallBackStandardFont(const BString& font)
 RefPtr<SharedBuffer> FontPlatformData::openTypeTable(uint32_t table) const
 {
 	UNUSED_PARAM(table);
-    // FIXME: Implement accessing raw font table data
+    // Haiku's BFont API does not provide access to raw font tables or the underlying font file path.
+    // Implementing this would require using FreeType directly and matching the BFont to a FT_Face,
+    // which is complex and error-prone without private system APIs.
 	return nullptr;
 }
 

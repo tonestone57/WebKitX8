@@ -736,9 +736,21 @@ bool PathHaiku::transform(const AffineTransform& transform)
         	float& angle, bool largeArc, bool counterClockWise, BPoint& point)
         {
             point = m_transform.mapPoint(point);
-            rx *= m_transform.a();
-            ry *= m_transform.d();
-            // FIXME: rotate angle...
+            // Decompose the affine transform to get scale and rotation.
+            // This is non-trivial for shears, but we can approximate for
+            // common scale+rotate cases.
+            // Note: BShape ArcTo parameters are rx, ry, rotation angle (degrees).
+
+            // Apply scaling roughly
+            float scaleX = hypot(m_transform.a(), m_transform.b());
+            float scaleY = hypot(m_transform.c(), m_transform.d());
+            rx *= scaleX;
+            ry *= scaleY;
+
+            // Apply rotation
+            // atan2(b, a) gives rotation of X axis.
+            double rotation = atan2(m_transform.b(), m_transform.a());
+            angle += rad2deg(rotation);
 
             return B_OK;
         }

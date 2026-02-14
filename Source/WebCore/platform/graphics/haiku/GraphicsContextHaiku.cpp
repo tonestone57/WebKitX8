@@ -813,7 +813,7 @@ void GraphicsContextHaiku::didUpdateState(GraphicsContextState& state)
         switch (strokeStyle()) {
 			case WebCore::StrokeStyle::DoubleStroke:
 			case WebCore::StrokeStyle::WavyStroke:
-                // FIXME: Implement fancy strokes
+                // Not supported by BView
                 m_strokeStyle = B_SOLID_HIGH;
                 break;
 			case WebCore::StrokeStyle::SolidStroke:

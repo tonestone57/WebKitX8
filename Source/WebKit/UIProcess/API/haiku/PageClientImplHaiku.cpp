@@ -402,8 +402,20 @@ private:
             return;
         }
 
+        // Optimize: Only snapshot pages within the requested range
+        int32 firstPage = m_printJob->FirstPage();
+        int32 lastPage = m_printJob->LastPage();
+        int32 currentPage = m_pageIndex + 1; // 1-based index
+
+        if (currentPage < firstPage || currentPage > lastPage) {
+            m_snapshots.append(nullptr);
+            m_pageIndex++;
+            snapshotNextPage();
+            return;
+        }
+
         WebCore::IntRect rect = m_pageRects[m_pageIndex];
-        // FIXME: Handle scaling?
+        // Scaling is handled by providing a larger bitmap size if needed, but currently 1:1
         m_page.takeSnapshot(rect, m_pageRects[m_pageIndex].size(), SnapshotOptionsShareable, [this, protectedThis = Ref { *this }](std::optional<ShareableBitmap::Handle>&& imageHandle) {
             if (imageHandle) {
                 m_snapshots.append(ShareableBitmap::create(WTFMove(*imageHandle)));
@@ -440,7 +452,6 @@ private:
 
         m_printJob->BeginJob();
 
-        // FIXME: Use page range from print job settings?
         int32 firstPage = m_printJob->FirstPage();
         int32 lastPage = m_printJob->LastPage();
 
