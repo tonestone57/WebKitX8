@@ -1,88 +1,100 @@
 /*
- * Copyright (C) 2012 Samsung Electronics
- * Copyright (C) 2012 Intel Corporation. All rights reserved.
+ * Copyright (C) 2014 Haiku, inc.
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Library General Public
- * License as published by the Free Software Foundation; either
- * version 2 of the License, or (at your option) any later version.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Library General Public License for more details.
- *
- * You should have received a copy of the GNU Library General Public License
- * along with this program; see the file COPYING.LIB.  If not, write to
- * the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
- * Boston, MA 02110-1301, USA.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "config.h"
 #include "PlatformWebView.h"
 
-#include "NotImplemented.h"
-#include <WebView.h>
+#include "APICast.h"
+#include "APIPageConfiguration.h"
+#include "WebViewBase.h"
 #include <Window.h>
-
-using namespace WebKit;
 
 namespace WTR {
 
-PlatformWebView::PlatformWebView(WKContextRef context, WKPageGroupRef pageGroup,
-    WKPageRef /* relatedPage */, WKDictionaryRef options)
+PlatformWebView::PlatformWebView(WKPageConfigurationRef configuration, const TestOptions& options)
+    : m_options(options)
 {
-    WKRetainPtr<WKStringRef> useFixedLayoutKey(AdoptWK,
-        WKStringCreateWithUTF8CString("UseFixedLayout"));
-    m_usingFixedLayout = options ? WKBooleanGetValue(static_cast<WKBooleanRef>(
-        WKDictionaryGetItemForKey(options, useFixedLayoutKey.get()))) : false;
+    BRect frame(0, 0, 800, 600);
+    m_window = new BWindow(frame, "WebKitTestRunner", B_TITLED_WINDOW, B_NOT_RESIZABLE | B_QUIT_ON_WINDOW_CLOSE);
 
-    m_window = new BWindow(BRect(0, 0, 800, 600), "WebKitTestRunner",
-        B_DOCUMENT_WINDOW, 0);
+    auto& config = *reinterpret_cast<API::PageConfiguration*>(configuration);
+    m_view = WebKit::WebViewBase::create("WTRView", frame, m_window, config);
 
-    // TODO create m_view
-    m_view = new BWebView(context, pageGroup);
-    WKPageSetUseFixedLayout(WKViewGetPage(m_view->GetWKView()),
-        m_usingFixedLayout);
-
-    m_window->AddChild(m_view);
-
-    if (m_usingFixedLayout)
-        resizeTo(800, 600);
-
-    m_windowIsKey = false;
+    m_window->AddChild(m_view.get());
+    m_window->Show();
 }
 
 PlatformWebView::~PlatformWebView()
 {
-    delete m_window; // The window owns the view
+    if (m_window) {
+        if (m_window->Lock()) {
+            if (m_view && m_view->Window())
+                m_view->RemoveSelf();
+            m_window->Quit();
+        }
+    }
 }
 
-void PlatformWebView::resizeTo(unsigned width, unsigned height)
+void PlatformWebView::resizeTo(unsigned width, unsigned height, WebViewSizingMode)
 {
-    m_view->ResizeTo(width, height);
+    if (m_window)
+        m_window->ResizeTo(width, height);
 }
 
 WKPageRef PlatformWebView::page()
 {
-    return WKViewGetPage(m_view->GetWKView());
+    return toAPI(m_view->page());
 }
 
 void PlatformWebView::focus()
 {
-    notImplemented();
+    if (m_view->LockLooper()) {
+        m_view->MakeFocus(true);
+        m_view->UnlockLooper();
+    }
 }
 
 WKRect PlatformWebView::windowFrame()
 {
-    BRect r = m_window->Frame();
-    return WKRectMake(r.left, r.top, r.Width(), r.Height());
+    if (!m_window)
+        return WKRectMake(0, 0, 0, 0);
+
+    BRect frame = m_window->Frame();
+    return WKRectMake(frame.left, frame.top, frame.Width(), frame.Height());
 }
 
-void PlatformWebView::setWindowFrame(WKRect frame)
+void PlatformWebView::setWindowFrame(WKRect frame, WebViewSizingMode)
 {
-    m_window->MoveTo(frame.origin.x, frame.origin.y);
-    m_window->ResizeTo(frame.size.width, frame.size.height);
+    if (m_window) {
+        m_window->MoveTo(frame.origin.x, frame.origin.y);
+        m_window->ResizeTo(frame.size.width, frame.size.height);
+    }
+}
+
+void PlatformWebView::didInitializeClients()
+{
 }
 
 void PlatformWebView::addChromeInputField()
@@ -95,14 +107,74 @@ void PlatformWebView::removeChromeInputField()
 
 void PlatformWebView::makeWebViewFirstResponder()
 {
+    focus();
 }
 
 void PlatformWebView::changeWindowScaleIfNeeded(float)
 {
 }
 
-void PlatformWebView::didInitializeClients()
+void PlatformWebView::setNavigationGesturesEnabled(bool)
 {
 }
 
+void PlatformWebView::forceWindowFramesChanged()
+{
 }
+
+void PlatformWebView::setWindowIsKey(bool isKey)
+{
+    m_windowIsKey = isKey;
+    if (isKey && m_window)
+        m_window->Activate();
+}
+
+void PlatformWebView::setTextInChromeInputField(const String&)
+{
+}
+
+void PlatformWebView::selectChromeInputField()
+{
+}
+
+String PlatformWebView::getSelectedTextInChromeInputField()
+{
+    return String();
+}
+
+bool PlatformWebView::isSecureEventInputEnabled() const
+{
+    return false;
+}
+
+bool PlatformWebView::drawsBackground() const
+{
+    return true;
+}
+
+void PlatformWebView::setDrawsBackground(bool)
+{
+}
+
+void PlatformWebView::setEditable(bool)
+{
+}
+
+void PlatformWebView::removeFromWindow()
+{
+    if (m_view && m_view->Window())
+        m_view->RemoveSelf();
+}
+
+void PlatformWebView::addToWindow()
+{
+    if (m_view && !m_view->Window() && m_window)
+        m_window->AddChild(m_view.get());
+}
+
+PlatformImage PlatformWebView::windowSnapshotImage()
+{
+    return nullptr;
+}
+
+} // namespace WTR
