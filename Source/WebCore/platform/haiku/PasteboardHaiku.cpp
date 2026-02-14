@@ -62,6 +62,11 @@ namespace WebCore {
 #if ENABLE(DRAG_SUPPORT)
 std::unique_ptr<Pasteboard> Pasteboard::createForDragAndDrop(std::unique_ptr<PasteboardContext>&& context)
 {
+    // If no specific context is provided, we should create one backed by a "Drag" clipboard
+    // to avoid clobbering the system clipboard during drag initiation.
+    if (!context)
+        context = makeUnique<PasteboardContextHaiku>(nullptr); // Marker for "use drag clipboard"
+
     return createForCopyAndPaste(std::move(context));
 }
 
@@ -71,7 +76,8 @@ std::unique_ptr<Pasteboard> Pasteboard::create(const DragData& dragData)
 }
 #endif
 
-Pasteboard::Pasteboard(std::unique_ptr<WebCore::PasteboardContext, std::default_delete<WebCore::PasteboardContext> >&&)
+Pasteboard::Pasteboard(std::unique_ptr<WebCore::PasteboardContext, std::default_delete<WebCore::PasteboardContext> >&& context)
+    : m_context(std::move(context))
 {
 }
 
@@ -80,16 +86,53 @@ class PasteboardTransaction {
 public:
     PasteboardTransaction(const PasteboardContext* context)
     {
+        // 1. Try to get BMessage from context
         if (auto* hContext = dynamic_cast<const PasteboardContextHaiku*>(context))
             m_message = hContext->message();
 
+        // 2. If no BMessage, check if we should use the "Drag" clipboard
         if (!m_message) {
-            if (be_clipboard->Lock()) {
+            // Check if context is a PasteboardContextHaiku but with null message (marker for drag clipboard)
+            // But dynamic_cast above handles it. If hContext->message() is null, m_message is null.
+            if (auto* hContext = dynamic_cast<const PasteboardContextHaiku*>(context)) {
+                // It's a drag context but no message provided -> Use "WebKitDrag" clipboard
+                m_clipboard = new BClipboard("WebKitDrag");
+            } else {
+                // Default context -> Use System clipboard
+                m_clipboard = be_clipboard;
+            }
+
+            if (m_clipboard->Lock()) {
                 m_clipboardLocked = true;
-                m_message = be_clipboard->Data();
+                m_message = m_clipboard->Data();
             }
         }
     }
+
+    ~PasteboardTransaction()
+    {
+        if (m_clipboardLocked) {
+            if (m_committed)
+                m_clipboard->Commit();
+            m_clipboard->Unlock();
+        }
+
+        if (m_clipboard && m_clipboard != be_clipboard)
+            delete m_clipboard;
+    }
+
+    BMessage* message() const { return m_message; }
+    bool isValid() const { return m_message != nullptr; }
+
+    void commit() { m_committed = true; }
+    void clear() { if (m_message) m_message->MakeEmpty(); }
+
+private:
+    BMessage* m_message = nullptr;
+    BClipboard* m_clipboard = nullptr;
+    bool m_clipboardLocked = false;
+    bool m_committed = false;
+};
 
     ~PasteboardTransaction()
     {

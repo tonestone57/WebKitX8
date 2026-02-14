@@ -122,6 +122,8 @@ private:
     void wheelEventWasNotHandledByWebCore(const NativeWebWheelEvent&) override;
     void requestDOMPasteAccess(WebCore::DOMPasteAccessCategory, WebCore::DOMPasteRequiresInteraction, const WebCore::IntRect& elementRect, const String& originIdentifier, CompletionHandler<void(WebCore::DOMPasteAccessResponse)>&&) final {}
 
+    void startDrag(const WebCore::DragItem&, WebCore::ShareableBitmap::Handle&&, const std::optional<WebCore::NodeIdentifier>&) override;
+
 private:
     DefaultUndoController fUndoController;
 
