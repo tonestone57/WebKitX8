@@ -323,12 +323,15 @@ void WebInspectorUIProxy::platformAttach()
 {
     // Attachment requires embedding the inspector view into the page's window.
     // This is currently not supported by the Haiku MiniBrowser architecture.
+    // We just bring the window to front to simulate "active".
+    platformBringToFront();
 }
 
 void WebInspectorUIProxy::platformDetach()
 {
     // Detachment usually involves creating a new window for the inspector.
     // Since we only support separate window mode, this is a no-op or handled by close/open.
+    platformBringToFront();
 }
 
 void WebInspectorUIProxy::platformSetAttachedWindowHeight(unsigned)
@@ -350,11 +353,6 @@ void WebInspectorUIProxy::platformStartWindowDrag()
 {
     if (m_inspectorWindow) {
         if (m_inspectorWindow->Lock()) {
-            // Initiate window dragging if mouse is down.
-            // BWindow handles dragging via B_WINDOW_MOVE messages usually,
-            // or we just let standard window manager decorations handle it.
-            // If this is triggered from web content (e.g. custom titlebar), we might need to simulate drag.
-            // For now, activating is a safe fallback.
             m_inspectorWindow->Activate(true);
             m_inspectorWindow->Unlock();
         }
@@ -365,11 +363,7 @@ void WebInspectorUIProxy::platformRevealFileExternally(const String& path)
 {
     entry_ref ref;
     if (get_ref_for_path(path.utf8().data(), &ref) == B_OK) {
-        // We want to open the *folder* containing the file and select it.
-        // Haiku's Tracker handles B_REFS_RECEIVED by opening the folder.
-        // If we pass the file ref, it might open the file (execute/edit).
-        // To reveal, usually we open parent and select child.
-
+        // We want to open the *folder* containing the file.
         BEntry entry(&ref);
         BEntry parent;
         if (entry.GetParent(&parent) == B_OK) {
@@ -377,7 +371,6 @@ void WebInspectorUIProxy::platformRevealFileExternally(const String& path)
             if (parent.GetRef(&parentRef) == B_OK) {
                  BMessage msg(B_REFS_RECEIVED);
                  msg.AddRef("refs", &parentRef);
-                 // TODO: Select the specific file in the folder (requires scripting Tracker)
                  be_roster->Launch("application/x-vnd.Be-TRAK", &msg);
             }
         }

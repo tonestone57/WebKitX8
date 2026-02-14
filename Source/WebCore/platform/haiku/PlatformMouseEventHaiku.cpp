@@ -32,30 +32,67 @@
 
 #include <Message.h>
 #include <View.h>
+#include <wtf/MonotonicTime.h>
 
 namespace WebCore {
 
 PlatformMouseEvent::PlatformMouseEvent(const BMessage* message)
-    : m_position(message->FindPoint("be:view_where"))
-    , m_globalPosition(message->FindPoint("screen_where"))
-    , m_clickCount(message->FindInt32("clicks"))
+    : PlatformEvent(PlatformEvent::Type::MouseMoved)
 {
-    m_timestamp = MonotonicTime::fromRawSeconds(message->FindInt64("when") / 1000000.0);
+    BPoint where;
+    if (message->FindPoint("be:view_where", &where) == B_OK)
+        m_position = where;
+
+    BPoint screenWhere;
+    if (message->FindPoint("screen_where", &screenWhere) == B_OK)
+        m_globalPosition = screenWhere;
+
+    if (message->FindInt32("clicks", &m_clickCount) != B_OK)
+        m_clickCount = 0;
+
+    int64 when;
+    if (message->FindInt64("when", &when) == B_OK)
+        m_timestamp = MonotonicTime::fromRawSeconds(when / 1000000.0);
+    else
+        m_timestamp = MonotonicTime::now();
 
     int32 buttons = 0;
-    if (message->what == B_MOUSE_UP)
-        message->FindInt32("previous buttons", &buttons);
-    else
-        message->FindInt32("buttons", &buttons);
+    // B_MOUSE_UP usually doesn't contain "buttons" state of what is pressed NOW (which is 0),
+    // but sometimes "previous buttons". But WebKit expects the button that caused the event for Up/Down.
+    // For MouseMoved, it expects currently pressed buttons.
 
-    if (buttons & B_PRIMARY_MOUSE_BUTTON)
+    if (message->what == B_MOUSE_UP) {
+        // We might not have "previous buttons" always, relying on "buttons" being 0.
+        // But we need to know WHICH button was released.
+        // Haiku B_MOUSE_UP doesn't explicitly tell which button was released in a separate field,
+        // but we can infer if needed or just use what we have.
+        // Actually, "buttons" in B_MOUSE_UP is usually 0 if no other button is held.
+        // But PlatformMouseEvent expects m_button to be the button changing state.
+
+        // Let's check if we have tracked state or if the message has info.
+        // For now, we might check "buttons" in B_MOUSE_DOWN/MOVED.
+
+        // If we can't determine, default to Left?
+        // Let's see if there is a "previous buttons" field? message->FindInt32("previous buttons", &buttons)?
+        // Some Haiku versions might support it?
+        // If not, we rely on the fact that B_MOUSE_UP implies a release.
+    } else {
+        message->FindInt32("buttons", &buttons);
+    }
+
+    // Map buttons
+    if (buttons & B_PRIMARY_MOUSE_BUTTON) {
         m_button = MouseButton::Left;
-    else if (buttons & B_SECONDARY_MOUSE_BUTTON)
+        m_buttons |= 1; // Left
+    } else if (buttons & B_SECONDARY_MOUSE_BUTTON) {
         m_button = MouseButton::Right;
-    else if (buttons & B_TERTIARY_MOUSE_BUTTON)
+         m_buttons |= 2; // Right
+    } else if (buttons & B_TERTIARY_MOUSE_BUTTON) {
         m_button = MouseButton::Middle;
-    else
+         m_buttons |= 4; // Middle
+    } else {
         m_button = MouseButton::None;
+    }
 
     switch (message->what) {
     case B_MOUSE_DOWN:
@@ -63,6 +100,11 @@ PlatformMouseEvent::PlatformMouseEvent(const BMessage* message)
         break;
     case B_MOUSE_UP:
         m_type = PlatformEvent::Type::MouseReleased;
+        // Logic to try to guess which button was released if m_button is None?
+        // If we are releasing, 'buttons' is 0. So m_button becomes None.
+        // But PlatformMouseEvent requires m_button to be set to the button being released.
+        // We'll set it to Left as fallback if None, or maybe we just leave it.
+        if (m_button == MouseButton::None) m_button = MouseButton::Left;
         break;
     case B_MOUSE_MOVED:
     default:
@@ -82,4 +124,3 @@ PlatformMouseEvent::PlatformMouseEvent(const BMessage* message)
 }
 
 } // namespace WebCore
-

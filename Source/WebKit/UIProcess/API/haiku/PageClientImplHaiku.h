@@ -125,6 +125,10 @@ private:
 private:
     DefaultUndoController fUndoController;
 
+#if ENABLE(FULLSCREEN_API)
+    std::unique_ptr<WebFullScreenManagerProxyClient> m_fullScreenManagerProxyClient;
+#endif
+
     WebViewBase& fWebView;
 };
 

@@ -184,6 +184,10 @@ public:
     WEBCORE_EXPORT PlatformWheelEvent(HWND, WPARAM, LPARAM, bool isMouseHWheel);
 #endif
 
+#if PLATFORM(HAIKU)
+    PlatformWheelEvent(const BMessage*);
+#endif
+
 protected:
     PlatformWheelEventGranularity m_granularity { PlatformWheelEventGranularity::ScrollByPixelWheelEvent };
     bool m_directionInvertedFromDevice { false };
