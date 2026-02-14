@@ -28,6 +28,7 @@
 
 #include "NetworkSocketChannel.h"
 #include <wtf/RunLoop.h>
+#include <wtf/TZoneMallocInlines.h>
 
 namespace WebKit {
 

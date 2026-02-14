@@ -34,9 +34,11 @@
 #include "NetworkLoad.h"
 #include "NetworkSession.h"
 #include "PendingDownload.h"
+#include <WebCore/HTTPHeaderNames.h>
 #include <WebCore/NotImplemented.h>
 #include <pal/SessionID.h>
 #include <wtf/StdLibExtras.h>
+#include <wtf/text/MakeString.h>
 
 namespace WebKit {
 using namespace WebCore;
