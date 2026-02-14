@@ -25,7 +25,6 @@
 
 #include "config.h"
 #include "TestInvocation.h"
-#include "PixelDumpSupport.h"
 
 #include <Bitmap.h>
 #include <BitmapStream.h>
@@ -42,6 +41,16 @@
 #include "BitmapImage.h"
 
 namespace WTR {
+
+static void printPNG(const unsigned char* data, size_t length, const char* checksum)
+{
+    printf("Content-Type: image/png\n");
+    printf("Content-Length: %lu\n", length);
+    if (checksum)
+        printf("ActualHash: %s\n", checksum);
+    printf("\n");
+    fwrite(data, 1, length, stdout);
+}
 
 static void computeMD5HashStringForBitmap(BBitmap* bitmap, char hashString[33])
 {
