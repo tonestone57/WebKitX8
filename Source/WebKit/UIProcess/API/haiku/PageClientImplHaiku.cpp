@@ -426,7 +426,7 @@ private:
         BRect printableRect = m_printJob->PrintableRect();
         m_view->UnlockLooper();
 
-        WebCore::PrintInfo printInfo;
+        PrintInfo printInfo;
         printInfo.pageSetupScaleFactor = 1.0;
         printInfo.availablePaperWidth = printableRect.Width();
         printInfo.availablePaperHeight = printableRect.Height();
