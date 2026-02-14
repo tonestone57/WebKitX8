@@ -133,27 +133,6 @@ private:
     bool m_committed = false;
 };
 
-    ~PasteboardTransaction()
-    {
-        if (m_clipboardLocked) {
-            if (m_committed)
-                be_clipboard->Commit();
-            be_clipboard->Unlock();
-        }
-    }
-
-    BMessage* message() const { return m_message; }
-    bool isValid() const { return m_message != nullptr; }
-
-    void commit() { m_committed = true; }
-    void clear() { if (m_message) m_message->MakeEmpty(); }
-
-private:
-    BMessage* m_message = nullptr;
-    bool m_clipboardLocked = false;
-    bool m_committed = false;
-};
-
 void Pasteboard::writeTrustworthyWebURLsPboardType(const PasteboardURL& url)
 {
     write(url);

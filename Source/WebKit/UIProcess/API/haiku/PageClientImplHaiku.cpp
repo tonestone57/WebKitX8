@@ -40,6 +40,7 @@
 #include "WebCore/Region.h"
 #include "WebFrameProxy.h"
 #include "ShareableBitmap.h"
+#include "WebCore/ShareableBitmap.h"
 #include "WebFullScreenManagerProxy.h"
 
 #include <View.h>
