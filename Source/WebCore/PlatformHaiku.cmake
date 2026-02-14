@@ -194,6 +194,13 @@ if (ENABLE_WEB_AUDIO)
     )
 endif ()
 
+if (ENABLE_MEDIA_STREAM)
+    list(APPEND WebCore_SOURCES
+        platform/mediastream/haiku/RealtimeMediaSourceCenterHaiku.cpp
+        platform/mediastream/haiku/RealtimeMediaSourceHaiku.cpp
+    )
+endif ()
+
 list(APPEND WebCore_USER_AGENT_STYLE_SHEETS
     ${WebCore_DERIVED_SOURCES_DIR}/ModernMediaControls.css
 )

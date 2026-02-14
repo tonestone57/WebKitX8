@@ -470,14 +470,22 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
                 if (!m_videoTrack) {
                     // Request B_RGB32 for video to avoid software conversion during blit
                     format.u.raw_video.display.format = B_RGB32;
-                    if (track->DecodedFormat(&format) != B_OK) {
-                         LOG(Media, "MediaPlayerPrivateHaiku: Failed to set RGB32 format for video track %d", i);
+                    status_t err = track->DecodedFormat(&format);
+                    if (err != B_OK) {
+                         LOG(Media, "MediaPlayerPrivateHaiku: Failed to set RGB32 format for video track %d, retrying with wildcard", i);
+                         format.u.raw_video.display.format = 0; // Wildcard
+                         if (track->DecodedFormat(&format) != B_OK) {
+                             LOG(Media, "MediaPlayerPrivateHaiku: Failed to get any decoded format for video track %d", i);
+                             m_mediaFile->ReleaseTrack(track);
+                             m_mediaLock.Unlock();
+                             continue;
+                         }
                     }
 
                     m_videoTrack = track;
                     m_frameBuffer = new BBitmap(
                         BRect(0, 0, format.Width() - 1, format.Height() - 1),
-                        B_RGB32);
+                        format.u.raw_video.display.format); // Use the negotiated format
                 } else {
                     m_mediaFile->ReleaseTrack(track);
                 }

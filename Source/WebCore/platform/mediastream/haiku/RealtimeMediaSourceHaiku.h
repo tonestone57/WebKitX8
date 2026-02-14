@@ -29,6 +29,10 @@
 
 #include "RealtimeMediaSource.h"
 #include <wtf/text/WTFString.h>
+#include <wtf/Lock.h>
+#include <wtf/Threading.h>
+
+class BMediaRecorder;
 
 namespace WebCore {
 
@@ -46,8 +50,15 @@ private:
     const RealtimeMediaSourceCapabilities& capabilities() final;
     const RealtimeMediaSourceSettings& settings() final;
 
+    void captureLoop();
+
     RealtimeMediaSourceCapabilities m_capabilities;
     RealtimeMediaSourceSettings m_settings;
+
+    BMediaRecorder* m_recorder;
+    RefPtr<Thread> m_captureThread;
+    bool m_isCapturing;
+    Lock m_lock;
 };
 
 class RealtimeIncomingVideoSourceHaiku final : public RealtimeMediaSource {
@@ -64,8 +75,15 @@ private:
     const RealtimeMediaSourceCapabilities& capabilities() final;
     const RealtimeMediaSourceSettings& settings() final;
 
+    void captureLoop();
+
     RealtimeMediaSourceCapabilities m_capabilities;
     RealtimeMediaSourceSettings m_settings;
+
+    BMediaRecorder* m_recorder;
+    RefPtr<Thread> m_captureThread;
+    bool m_isCapturing;
+    Lock m_lock;
 };
 
 } // namespace WebCore
