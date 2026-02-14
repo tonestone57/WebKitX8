@@ -26,6 +26,7 @@
 #include "config.h"
 #include "WebPage.h"
 
+#include "WebPageCreationParameters.h"
 #include <WebCore/BackForwardController.h>
 #include <WebCore/EventHandler.h>
 #include <WebCore/KeyboardEvent.h>
@@ -42,8 +43,11 @@ using namespace WebCore;
 
 namespace WebKit {
 
-void WebPage::platformInitialize(WebKit::WebPageCreationParameters const&)
+void WebPage::platformInitialize(WebKit::WebPageCreationParameters const& parameters)
 {
+    m_statusBarIsVisible = parameters.statusBarIsVisible;
+    m_menuBarIsVisible = parameters.menuBarIsVisible;
+    m_toolbarsAreVisible = parameters.toolbarsAreVisible;
 }
 
 void WebPage::platformReinitializeAccessibilityToken()
@@ -148,13 +152,8 @@ bool WebPage::handleEditingKeyboardEvent(WebCore::KeyboardEvent& event)
         return false;
 
     if (platformEvent->type() == PlatformEvent::Type::RawKeyDown || platformEvent->type() == PlatformEvent::Type::Char) {
-        // Handle common shortcuts
-        // Haiku standard shortcuts use Command (Alt) key?
-        // WebKit usually assumes Ctrl for non-Mac. Haiku uses Alt as Command.
-        // PlatformKeyboardEventHaiku should map Alt to Meta or Ctrl based on configuration.
-        // Assuming Standard shortcuts:
-
-        bool isCommandKey = platformEvent->modifiers().contains(PlatformEvent::Modifier::Command);
+        // Haiku uses Alt (Command) for shortcuts.
+        bool isCommandKey = platformEvent->modifiers().contains(PlatformEvent::Modifier::ControlKey); // Mapped to Command in PlatformKeyboardEventHaiku
 
         if (isCommandKey) {
             String commandName;
@@ -172,7 +171,7 @@ bool WebPage::handleEditingKeyboardEvent(WebCore::KeyboardEvent& event)
                 commandName = "SelectAll"_s;
                 break;
             case VK_Z:
-                if (platformEvent->modifiers().contains(PlatformEvent::Modifier::Shift))
+                if (platformEvent->modifiers().contains(PlatformEvent::Modifier::ShiftKey))
                     commandName = "Redo"_s;
                 else
                     commandName = "Undo"_s;

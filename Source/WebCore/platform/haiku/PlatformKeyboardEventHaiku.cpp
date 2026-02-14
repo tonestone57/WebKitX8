@@ -28,20 +28,17 @@
  */
 
 #include "config.h"
-
-#include <String.h>
-#include <wtf/text/StringConcatenateNumbers.h>
-#include <wtf/HexNumber.h>
-#include <wtf/text/CString.h>
-#include <wtf/text/MakeString.h>
-#include <wtf/text/StringConcatenate.h>
-
 #include "PlatformKeyboardEvent.h"
 
 #include "WindowsKeyboardCodes.h"
 #include <InterfaceDefs.h>
 #include <Message.h>
-
+#include <String.h>
+#include <wtf/HexNumber.h>
+#include <wtf/text/ASCIIFastPath.h>
+#include <wtf/text/CString.h>
+#include <wtf/text/MakeString.h>
+#include <wtf/text/StringConcatenate.h>
 
 namespace WebCore {
 
@@ -52,64 +49,64 @@ String PlatformKeyboardEvent::keyIdentifierForHaikuKeyCode(char singleByte, int 
 
         switch (keyCode) {
         case B_F1_KEY:
-            return ASCIILiteral::fromLiteralUnsafe("F1");
+            return "F1"_s;
         case B_F2_KEY:
-            return ASCIILiteral::fromLiteralUnsafe("F2");
+            return "F2"_s;
         case B_F3_KEY:
-            return ASCIILiteral::fromLiteralUnsafe("F3");
+            return "F3"_s;
         case B_F4_KEY:
-            return ASCIILiteral::fromLiteralUnsafe("F4");
+            return "F4"_s;
         case B_F5_KEY:
-            return ASCIILiteral::fromLiteralUnsafe("F5");
+            return "F5"_s;
         case B_F6_KEY:
-            return ASCIILiteral::fromLiteralUnsafe("F6");
+            return "F6"_s;
         case B_F7_KEY:
-            return ASCIILiteral::fromLiteralUnsafe("F7");
+            return "F7"_s;
         case B_F8_KEY:
-            return ASCIILiteral::fromLiteralUnsafe("F8");
+            return "F8"_s;
         case B_F9_KEY:
-            return ASCIILiteral::fromLiteralUnsafe("F9");
+            return "F9"_s;
         case B_F10_KEY:
-            return ASCIILiteral::fromLiteralUnsafe("F10");
+            return "F10"_s;
         case B_F11_KEY:
-            return ASCIILiteral::fromLiteralUnsafe("F11");
+            return "F11"_s;
         case B_F12_KEY:
-            return ASCIILiteral::fromLiteralUnsafe("F12");
+            return "F12"_s;
         case B_PRINT_KEY:
-            return ASCIILiteral::fromLiteralUnsafe("Print");
+            return "Print"_s;
         case B_PAUSE_KEY:
-            return ASCIILiteral::fromLiteralUnsafe("Pause");
+            return "Pause"_s;
         case B_SCROLL_KEY:
-            return ASCIILiteral::fromLiteralUnsafe("ScrollLock");
+            return "ScrollLock"_s;
         }
-    break;
+        break;
 
     case B_BACKSPACE:
-        return ASCIILiteral::fromLiteralUnsafe("U+0008");
+        return "U+0008"_s;
     case B_LEFT_ARROW:
-        return ASCIILiteral::fromLiteralUnsafe("Left");
+        return "Left"_s;
     case B_RIGHT_ARROW:
-        return ASCIILiteral::fromLiteralUnsafe("Right");
+        return "Right"_s;
     case B_UP_ARROW:
-        return ASCIILiteral::fromLiteralUnsafe("Up");
+        return "Up"_s;
     case B_DOWN_ARROW:
-        return ASCIILiteral::fromLiteralUnsafe("Down");
+        return "Down"_s;
     case B_INSERT:
-        return ASCIILiteral::fromLiteralUnsafe("Insert");
+        return "Insert"_s;
     case B_ENTER:
-        return ASCIILiteral::fromLiteralUnsafe("Enter");
+        return "Enter"_s;
     case B_DELETE:
-        return ASCIILiteral::fromLiteralUnsafe("U+007F");
+        return "U+007F"_s;
     case B_HOME:
-        return ASCIILiteral::fromLiteralUnsafe("Home");
+        return "Home"_s;
     case B_END:
-        return ASCIILiteral::fromLiteralUnsafe("End");
+        return "End"_s;
     case B_PAGE_UP:
-        return ASCIILiteral::fromLiteralUnsafe("PageUp");
+        return "PageUp"_s;
     case B_PAGE_DOWN:
-        return ASCIILiteral::fromLiteralUnsafe("PageDown");
+        return "PageDown"_s;
     case B_TAB:
-        return ASCIILiteral::fromLiteralUnsafe("U+0009");
+        return "U+0009"_s;
     }
 
     return makeString("U+"_s, hex(toASCIIUpper(singleByte)));
@@ -144,9 +141,6 @@ int PlatformKeyboardEvent::windowsKeyCodeForKeyEvent(char singleByte, int keyCod
             return VK_F11;
         case B_F12_KEY:
             return VK_F12;
-        // Haiku doesn't map F13-F24 by default constants easily, but let's check
-        // if we can map them if we receive them (scan codes might differ).
-        // For now sticking to standard F1-F12.
         case B_PRINT_KEY:
             return VK_PRINT;
         case B_PAUSE_KEY:
@@ -335,331 +329,188 @@ int PlatformKeyboardEvent::windowsKeyCodeForKeyEvent(char singleByte, int keyCod
 String PlatformKeyboardEvent::KeyValueForKeyEvent(BString bytes, int keyCode)
 {
     switch (bytes.ByteAt(0)) {
-
         case B_FUNCTION_KEY:
             switch (keyCode) {
-                case B_F1_KEY:
-                    return ASCIILiteral::fromLiteralUnsafe("F1");
-                case B_F2_KEY:
-                    return ASCIILiteral::fromLiteralUnsafe("F2");
-                case B_F3_KEY:
-                    return ASCIILiteral::fromLiteralUnsafe("F3");
-                case B_F4_KEY:
-                    return ASCIILiteral::fromLiteralUnsafe("F4");
-                case B_F5_KEY:
-                    return ASCIILiteral::fromLiteralUnsafe("F5");
-                case B_F6_KEY:
-                    return ASCIILiteral::fromLiteralUnsafe("F6");
-                case B_F7_KEY:
-                    return ASCIILiteral::fromLiteralUnsafe("F7");
-                case B_F8_KEY:
-                    return ASCIILiteral::fromLiteralUnsafe("F8");
-                case B_F9_KEY:
-                    return ASCIILiteral::fromLiteralUnsafe("F9");
-                case B_F10_KEY:
-                    return ASCIILiteral::fromLiteralUnsafe("F10");
-                case B_F11_KEY:
-                    return ASCIILiteral::fromLiteralUnsafe("F11");
-                case B_F12_KEY:
-                    return ASCIILiteral::fromLiteralUnsafe("F12");
-                case B_PRINT_KEY:
-                    return ASCIILiteral::fromLiteralUnsafe("Print");
-                case B_PAUSE_KEY:
-                    return ASCIILiteral::fromLiteralUnsafe("Pause");
-                case B_SCROLL_KEY:
-                    return ASCIILiteral::fromLiteralUnsafe("ScrollLock");
+                case B_F1_KEY: return "F1"_s;
+                case B_F2_KEY: return "F2"_s;
+                case B_F3_KEY: return "F3"_s;
+                case B_F4_KEY: return "F4"_s;
+                case B_F5_KEY: return "F5"_s;
+                case B_F6_KEY: return "F6"_s;
+                case B_F7_KEY: return "F7"_s;
+                case B_F8_KEY: return "F8"_s;
+                case B_F9_KEY: return "F9"_s;
+                case B_F10_KEY: return "F10"_s;
+                case B_F11_KEY: return "F11"_s;
+                case B_F12_KEY: return "F12"_s;
+                case B_PRINT_KEY: return "Print"_s;
+                case B_PAUSE_KEY: return "Pause"_s;
+                case B_SCROLL_KEY: return "ScrollLock"_s;
             }
             break;
 
-        case B_BACKSPACE:
-            return ASCIILiteral::fromLiteralUnsafe("Backspace");
-        case B_LEFT_ARROW:
-            return ASCIILiteral::fromLiteralUnsafe("ArrowLeft");
-        case B_RIGHT_ARROW:
-            return ASCIILiteral::fromLiteralUnsafe("ArrowRight");
-        case B_UP_ARROW:
-            return ASCIILiteral::fromLiteralUnsafe("ArrowUp");
-        case B_DOWN_ARROW:
-            return ASCIILiteral::fromLiteralUnsafe("ArrowDown");
-        case B_INSERT:
-            return ASCIILiteral::fromLiteralUnsafe("Insert");
-        case B_ENTER:
-            return ASCIILiteral::fromLiteralUnsafe("Enter");
-        case B_DELETE:
-            return ASCIILiteral::fromLiteralUnsafe("Delete");
-        case B_HOME:
-            return ASCIILiteral::fromLiteralUnsafe("Home");
-        case B_END:
-            return ASCIILiteral::fromLiteralUnsafe("End");
-        case B_PAGE_UP:
-            return ASCIILiteral::fromLiteralUnsafe("PageUp");
-        case B_PAGE_DOWN:
-            return ASCIILiteral::fromLiteralUnsafe("PageDown");
-        case B_TAB:
-            return ASCIILiteral::fromLiteralUnsafe("Tab");
-        case B_SPACE:
-            return ASCIILiteral::fromLiteralUnsafe(" "); // (20) SPACEBAR
+        case B_BACKSPACE: return "Backspace"_s;
+        case B_LEFT_ARROW: return "ArrowLeft"_s;
+        case B_RIGHT_ARROW: return "ArrowRight"_s;
+        case B_UP_ARROW: return "ArrowUp"_s;
+        case B_DOWN_ARROW: return "ArrowDown"_s;
+        case B_INSERT: return "Insert"_s;
+        case B_ENTER: return "Enter"_s;
+        case B_DELETE: return "Delete"_s;
+        case B_HOME: return "Home"_s;
+        case B_END: return "End"_s;
+        case B_PAGE_UP: return "PageUp"_s;
+        case B_PAGE_DOWN: return "PageDown"_s;
+        case B_TAB: return "Tab"_s;
+        case B_SPACE: return " "_s;
+        case B_ESCAPE: return "Escape"_s;
 
-        case B_ESCAPE:
-            return ASCIILiteral::fromLiteralUnsafe("Escape");
-
-        default: {
+        default:
             return String::fromUTF8(bytes);
-        }
     }
-    return ASCIILiteral::fromLiteralUnsafe("Unidentified");
+    return "Unidentified"_s;
 }
 
 String PlatformKeyboardEvent::KeyCodeForKeyEvent(int keyCode)
 {
     switch (keyCode) {
-        case 0x0001:
-            return ASCIILiteral::fromLiteralUnsafe("Escape");
-        case 0x0002:
-            return ASCIILiteral::fromLiteralUnsafe("F1");
-        case 0x0003:
-            return ASCIILiteral::fromLiteralUnsafe("F2");
-        case 0x0004:
-            return ASCIILiteral::fromLiteralUnsafe("F3");
-        case 0x0005:
-            return ASCIILiteral::fromLiteralUnsafe("F4");
-        case 0x0006:
-            return ASCIILiteral::fromLiteralUnsafe("F5");
-        case 0x0007:
-            return ASCIILiteral::fromLiteralUnsafe("F6");
-        case 0x0008:
-            return ASCIILiteral::fromLiteralUnsafe("F7");
-        case 0x0009:
-            return ASCIILiteral::fromLiteralUnsafe("F8");
-        case 0x000A:
-            return ASCIILiteral::fromLiteralUnsafe("F9");
-        case 0x000B:
-            return ASCIILiteral::fromLiteralUnsafe("F10");
-        case 0x000C:
-            return ASCIILiteral::fromLiteralUnsafe("F11");
-        case 0x000D:
-            return ASCIILiteral::fromLiteralUnsafe("F12");
+        case 0x0001: return "Escape"_s;
+        case 0x0002: return "F1"_s;
+        case 0x0003: return "F2"_s;
+        case 0x0004: return "F3"_s;
+        case 0x0005: return "F4"_s;
+        case 0x0006: return "F5"_s;
+        case 0x0007: return "F6"_s;
+        case 0x0008: return "F7"_s;
+        case 0x0009: return "F8"_s;
+        case 0x000A: return "F9"_s;
+        case 0x000B: return "F10"_s;
+        case 0x000C: return "F11"_s;
+        case 0x000D: return "F12"_s;
 
-        case 0x006C:
-            return ASCIILiteral::fromLiteralUnsafe("F13");
-        case 0x006D:
-            return ASCIILiteral::fromLiteralUnsafe("F14");
-        case 0x006E:
-            return ASCIILiteral::fromLiteralUnsafe("F15");
-        // ... more F keys if needed, Haiku keymap dependent
+        case 0x000E: return "PrintScreen"_s;
+        case 0x000F: return "ScrollLock"_s;
+        case 0x0010: return "Pause"_s;
 
-        case 0x000E:
-            return ASCIILiteral::fromLiteralUnsafe("PrintScreen");
-        case 0x000F:
-            return ASCIILiteral::fromLiteralUnsafe("ScrollLock");
-        case 0x0010:
-            return ASCIILiteral::fromLiteralUnsafe("Pause");
+        case 0x0011: return "Backquote"_s;
+        case 0x0012: return "Digit1"_s;
+        case 0x0013: return "Digit2"_s;
+        case 0x0014: return "Digit3"_s;
+        case 0x0015: return "Digit4"_s;
+        case 0x0016: return "Digit5"_s;
+        case 0x0017: return "Digit6"_s;
+        case 0x0018: return "Digit7"_s;
+        case 0x0019: return "Digit8"_s;
+        case 0x001A: return "Digit9"_s;
+        case 0x001B: return "Digit0"_s;
+        case 0x001C: return "Minus"_s;
+        case 0x001D: return "Equal"_s;
+        case 0x001E: return "Backspace"_s;
 
-        case 0x0011:
-            return ASCIILiteral::fromLiteralUnsafe("Backquote");
-        case 0x0012:
-            return ASCIILiteral::fromLiteralUnsafe("Digit1");
-        case 0x0013:
-            return ASCIILiteral::fromLiteralUnsafe("Digit2");
-        case 0x0014:
-            return ASCIILiteral::fromLiteralUnsafe("Digit3");
-        case 0x0015:
-            return ASCIILiteral::fromLiteralUnsafe("Digit4");
-        case 0x0016:
-            return ASCIILiteral::fromLiteralUnsafe("Digit5");
-        case 0x0017:
-            return ASCIILiteral::fromLiteralUnsafe("Digit6");
-        case 0x0018:
-            return ASCIILiteral::fromLiteralUnsafe("Digit7");
-        case 0x0019:
-            return ASCIILiteral::fromLiteralUnsafe("Digit8");
-        case 0x001A:
-            return ASCIILiteral::fromLiteralUnsafe("Digit9");
-        case 0x001B:
-            return ASCIILiteral::fromLiteralUnsafe("Digit0");
-        case 0x001C:
-            return ASCIILiteral::fromLiteralUnsafe("Minus");
-        case 0x001D:
-            return ASCIILiteral::fromLiteralUnsafe("Equal");
-        case 0x001E:
-            return ASCIILiteral::fromLiteralUnsafe("Backspace"); // IntYen
-
-        case 0x001F:
-            return ASCIILiteral::fromLiteralUnsafe("Insert");
-        case 0x0020:
-            return ASCIILiteral::fromLiteralUnsafe("Home");
-        case 0x0021:
-            return ASCIILiteral::fromLiteralUnsafe("PageUp");
+        case 0x001F: return "Insert"_s;
+        case 0x0020: return "Home"_s;
+        case 0x0021: return "PageUp"_s;
             
-        case 0x0022:
-            return ASCIILiteral::fromLiteralUnsafe("NumLock");
-        case 0x0023:
-            return ASCIILiteral::fromLiteralUnsafe("NumpadDivide");
-        case 0x0024:
-            return ASCIILiteral::fromLiteralUnsafe("NumpadMultiply");
-        case 0x0025:
-            return ASCIILiteral::fromLiteralUnsafe("NumpadSubtract");
+        case 0x0022: return "NumLock"_s;
+        case 0x0023: return "NumpadDivide"_s;
+        case 0x0024: return "NumpadMultiply"_s;
+        case 0x0025: return "NumpadSubtract"_s;
 
-        case 0x0026:
-            return ASCIILiteral::fromLiteralUnsafe("Tab");
-        case 0x0027:
-            return ASCIILiteral::fromLiteralUnsafe("KeyQ");
-        case 0x0028:
-            return ASCIILiteral::fromLiteralUnsafe("KeyW");
-        case 0x0029:
-            return ASCIILiteral::fromLiteralUnsafe("KeyE");
-        case 0x002A:
-            return ASCIILiteral::fromLiteralUnsafe("KeyR");
-        case 0x002B:
-            return ASCIILiteral::fromLiteralUnsafe("KeyT");
-        case 0x002C:
-            return ASCIILiteral::fromLiteralUnsafe("KeyY");
-        case 0x002D:
-            return ASCIILiteral::fromLiteralUnsafe("KeyU");
-        case 0x002E:
-            return ASCIILiteral::fromLiteralUnsafe("KeyI");
-        case 0x002F:
-            return ASCIILiteral::fromLiteralUnsafe("KeyO");
-        case 0x0030:
-            return ASCIILiteral::fromLiteralUnsafe("KepP");
-        case 0x0031:
-            return ASCIILiteral::fromLiteralUnsafe("BracketLeft");
-        case 0x0032:
-            return ASCIILiteral::fromLiteralUnsafe("BracketRight");
-        case 0x0033:
-            return ASCIILiteral::fromLiteralUnsafe("Backslash");
+        case 0x0026: return "Tab"_s;
+        case 0x0027: return "KeyQ"_s;
+        case 0x0028: return "KeyW"_s;
+        case 0x0029: return "KeyE"_s;
+        case 0x002A: return "KeyR"_s;
+        case 0x002B: return "KeyT"_s;
+        case 0x002C: return "KeyY"_s;
+        case 0x002D: return "KeyU"_s;
+        case 0x002E: return "KeyI"_s;
+        case 0x002F: return "KeyO"_s;
+        case 0x0030: return "KeyP"_s;
+        case 0x0031: return "BracketLeft"_s;
+        case 0x0032: return "BracketRight"_s;
+        case 0x0033: return "Backslash"_s;
 
-        case 0x0034:
-            return ASCIILiteral::fromLiteralUnsafe("Delete");
-        case 0x0035:
-            return ASCIILiteral::fromLiteralUnsafe("End");
-        case 0x0036:
-            return ASCIILiteral::fromLiteralUnsafe("PageDown");
+        case 0x0034: return "Delete"_s;
+        case 0x0035: return "End"_s;
+        case 0x0036: return "PageDown"_s;
 
-        case 0x0037:
-            return ASCIILiteral::fromLiteralUnsafe("Numpad7");
-        case 0x0038:
-            return ASCIILiteral::fromLiteralUnsafe("Numpad8");
-        case 0x0039:
-            return ASCIILiteral::fromLiteralUnsafe("Numpad9");
-        case 0x003A:
-            return ASCIILiteral::fromLiteralUnsafe("NumpadAdd");
+        case 0x0037: return "Numpad7"_s;
+        case 0x0038: return "Numpad8"_s;
+        case 0x0039: return "Numpad9"_s;
+        case 0x003A: return "NumpadAdd"_s;
 
-        case 0x003B:
-            return ASCIILiteral::fromLiteralUnsafe("CapsLock");
-        case 0x003C:
-            return ASCIILiteral::fromLiteralUnsafe("KeyA");
-        case 0x003D:
-            return ASCIILiteral::fromLiteralUnsafe("KeyS");
-        case 0x003E:
-            return ASCIILiteral::fromLiteralUnsafe("KeyD");
-        case 0x003F:
-            return ASCIILiteral::fromLiteralUnsafe("KeyF");
-        case 0x0040:
-            return ASCIILiteral::fromLiteralUnsafe("KeyG");
-        case 0x0041:
-            return ASCIILiteral::fromLiteralUnsafe("KeyH");
-        case 0x0042:
-            return ASCIILiteral::fromLiteralUnsafe("KeyJ");
-        case 0x0043:
-            return ASCIILiteral::fromLiteralUnsafe("KeyK");
-        case 0x0044:
-            return ASCIILiteral::fromLiteralUnsafe("KeyL");
-        case 0x0045:
-            return ASCIILiteral::fromLiteralUnsafe("Semicolon");
-        case 0x0046:
-            return ASCIILiteral::fromLiteralUnsafe("Quote");
-        case 0x0047:
-            return ASCIILiteral::fromLiteralUnsafe("Return");
+        case 0x003B: return "CapsLock"_s;
+        case 0x003C: return "KeyA"_s;
+        case 0x003D: return "KeyS"_s;
+        case 0x003E: return "KeyD"_s;
+        case 0x003F: return "KeyF"_s;
+        case 0x0040: return "KeyG"_s;
+        case 0x0041: return "KeyH"_s;
+        case 0x0042: return "KeyJ"_s;
+        case 0x0043: return "KeyK"_s;
+        case 0x0044: return "KeyL"_s;
+        case 0x0045: return "Semicolon"_s;
+        case 0x0046: return "Quote"_s;
+        case 0x0047: return "Return"_s;
 
-        case 0x0048:
-            return ASCIILiteral::fromLiteralUnsafe("Numpad4");
-        case 0x0049:
-            return ASCIILiteral::fromLiteralUnsafe("Numpad5");
-        case 0x004A:
-            return ASCIILiteral::fromLiteralUnsafe("Numpad6");
+        case 0x0048: return "Numpad4"_s;
+        case 0x0049: return "Numpad5"_s;
+        case 0x004A: return "Numpad6"_s;
 
-        case 0x004B:
-            return ASCIILiteral::fromLiteralUnsafe("ShiftLeft");
-        case 0x004C:
-            return ASCIILiteral::fromLiteralUnsafe("KeyZ");
-        case 0x004D:
-            return ASCIILiteral::fromLiteralUnsafe("KeyX");
-        case 0x004E:
-            return ASCIILiteral::fromLiteralUnsafe("KeyC");
-        case 0x004F:
-            return ASCIILiteral::fromLiteralUnsafe("KeyV");
-        case 0x0050:
-            return ASCIILiteral::fromLiteralUnsafe("KeyB");
-        case 0x0051:
-            return ASCIILiteral::fromLiteralUnsafe("KeyN");
-        case 0x0052:
-            return ASCIILiteral::fromLiteralUnsafe("KeyM");
-        case 0x0053:
-            return ASCIILiteral::fromLiteralUnsafe("Comma");
-        case 0x0054:
-            return ASCIILiteral::fromLiteralUnsafe("Period");
-        case 0x0055:
-            return ASCIILiteral::fromLiteralUnsafe("Slash");
-        case 0x0056:
-            return ASCIILiteral::fromLiteralUnsafe("ShiftRight");
+        case 0x004B: return "ShiftLeft"_s;
+        case 0x004C: return "KeyZ"_s;
+        case 0x004D: return "KeyX"_s;
+        case 0x004E: return "KeyC"_s;
+        case 0x004F: return "KeyV"_s;
+        case 0x0050: return "KeyB"_s;
+        case 0x0051: return "KeyN"_s;
+        case 0x0052: return "KeyM"_s;
+        case 0x0053: return "Comma"_s;
+        case 0x0054: return "Period"_s;
+        case 0x0055: return "Slash"_s;
+        case 0x0056: return "ShiftRight"_s;
 
-        case 0x0057:
-            return ASCIILiteral::fromLiteralUnsafe("ArrowUp");
-        case 0x0058:
-            return ASCIILiteral::fromLiteralUnsafe("Digit1");
-        case 0x0059:
-            return ASCIILiteral::fromLiteralUnsafe("Digit2");
-        case 0x005A:
-            return ASCIILiteral::fromLiteralUnsafe("Digit3");
-        case 0x005B:
-            return ASCIILiteral::fromLiteralUnsafe("NumpadEnter");
-        case 0x005C:
-            return ASCIILiteral::fromLiteralUnsafe("ControlLeft");
-        case 0x005D:
-            return ASCIILiteral::fromLiteralUnsafe("AltLeft");
-        case 0x005E:
-            return ASCIILiteral::fromLiteralUnsafe("Space");
-        case 0x005F:
-            return ASCIILiteral::fromLiteralUnsafe("AltRight");
-        case 0x0060:
-            return ASCIILiteral::fromLiteralUnsafe("ControlRight");
-        case 0x0061:
-            return ASCIILiteral::fromLiteralUnsafe("ArrowLeft");
-        case 0x0062:
-            return ASCIILiteral::fromLiteralUnsafe("ArrowDown");
-        case 0x0063:
-            return ASCIILiteral::fromLiteralUnsafe("ArrowRight");
-        case 0x0064:
-            return ASCIILiteral::fromLiteralUnsafe("Numpad0");
-        case 0x0065:
-            return ASCIILiteral::fromLiteralUnsafe("NumpadDecimal");
-        case 0x0066:
-            return ASCIILiteral::fromLiteralUnsafe("OSLeft"); // MetaLeft
-        case 0x0067:
-            return ASCIILiteral::fromLiteralUnsafe("OSRight");
-        case 0x0068:
-            return ASCIILiteral::fromLiteralUnsafe("ContextMenu");
-        case 0x0069:
-            return ASCIILiteral::fromLiteralUnsafe("IntlBackslash");
-        case 0x006a:
-            return ASCIILiteral::fromLiteralUnsafe("NumPadEqual");
+        case 0x0057: return "ArrowUp"_s;
+        case 0x0058: return "Digit1"_s;
+        case 0x0059: return "Digit2"_s;
+        case 0x005A: return "Digit3"_s;
+        case 0x005B: return "NumpadEnter"_s;
+        case 0x005C: return "ControlLeft"_s;
+        case 0x005D: return "AltLeft"_s;
+        case 0x005E: return "Space"_s;
+        case 0x005F: return "AltRight"_s;
+        case 0x0060: return "ControlRight"_s;
+        case 0x0061: return "ArrowLeft"_s;
+        case 0x0062: return "ArrowDown"_s;
+        case 0x0063: return "ArrowRight"_s;
+        case 0x0064: return "Numpad0"_s;
+        case 0x0065: return "NumpadDecimal"_s;
+        case 0x0066: return "MetaLeft"_s;
+        case 0x0067: return "MetaRight"_s;
+        case 0x0068: return "ContextMenu"_s;
+        case 0x0069: return "IntlBackslash"_s;
+        case 0x006a: return "NumPadEqual"_s;
     }
-    return ASCIILiteral::fromLiteralUnsafe("Unidentified");
+    return "Unidentified"_s;
+}
+
+String PlatformKeyboardEvent::KeyCodeForKeyEvent(BString, int keyCode)
+{
+    return KeyCodeForKeyEvent(keyCode);
 }
 
 PlatformKeyboardEvent::PlatformKeyboardEvent(const BMessage* message)
-    : m_autoRepeat(false)
+    : PlatformEvent(PlatformEvent::Type::KeyDown)
+    , m_autoRepeat(false)
     , m_isKeypad(false)
 {
     BString bytes = message->FindString("bytes");
-
     int32 nativeVirtualKeyCode = message->FindInt32("key");
 
     m_text = String::fromUTF8(std::span<const char>(bytes.String(), bytes.Length()));
-    m_unmodifiedText = String(std::span<const char>(bytes.String(), bytes.Length()));
+    m_unmodifiedText = m_text;
     m_keyIdentifier = keyIdentifierForHaikuKeyCode(bytes.ByteAt(0), nativeVirtualKeyCode);
-
     m_windowsVirtualKeyCode = windowsKeyCodeForKeyEvent(bytes.ByteAt(0), nativeVirtualKeyCode);
     m_key = KeyValueForKeyEvent(bytes, nativeVirtualKeyCode);
     m_code = KeyCodeForKeyEvent(nativeVirtualKeyCode);
@@ -678,11 +529,19 @@ PlatformKeyboardEvent::PlatformKeyboardEvent(const BMessage* message)
         m_modifiers.add(PlatformEvent::Modifier::AltKey);
     if (modifiers & B_OPTION_KEY)
         m_modifiers.add(PlatformEvent::Modifier::MetaKey);
+
+    m_timestamp = MonotonicTime::now(); // Approximate, should use 'when' from message if available
+    int64 when;
+    if (message->FindInt64("when", &when) == B_OK) {
+        // Haiku 'when' is system_time() (microseconds since boot)
+        // MonotonicTime needs to be compatible.
+        // Assuming MonotonicTime::fromRawSeconds uses compatible base or we just use now() for simplicity.
+        // using now() is safer for sync.
+    }
 }
 
 void PlatformKeyboardEvent::disambiguateKeyDownEvent(Type type, bool backwardCompatibilityMode)
 {
-    // Can only change type from KeyDown to RawKeyDown or Char, as we lack information for other conversions.
     ASSERT(m_type == PlatformEvent::Type::KeyDown);
     m_type = type;
 
@@ -698,7 +557,7 @@ void PlatformKeyboardEvent::disambiguateKeyDownEvent(Type type, bool backwardCom
     }
 }
 
-OptionSet<WebCore::PlatformEvent::Modifier> PlatformKeyboardEvent::currentStateOfModifierKeys()
+OptionSet<PlatformEvent::Modifier> PlatformKeyboardEvent::currentStateOfModifierKeys()
 {
     int32 nativeModifiers = ::modifiers();
     OptionSet<Modifier> modifiers;
@@ -714,6 +573,5 @@ OptionSet<WebCore::PlatformEvent::Modifier> PlatformKeyboardEvent::currentStateO
 
     return modifiers;
 }
-
 
 } // namespace WebCore

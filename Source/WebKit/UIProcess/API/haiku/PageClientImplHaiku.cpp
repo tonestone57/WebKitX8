@@ -54,9 +54,52 @@ namespace WebKit {
 
 using namespace WebCore;
 
+#if ENABLE(FULLSCREEN_API)
+class WebFullScreenManagerProxyClientHaiku final : public WebFullScreenManagerProxyClient {
+    WTF_MAKE_FAST_ALLOCATED;
+public:
+    WebFullScreenManagerProxyClientHaiku(WebViewBase& view) : m_view(view) { }
+
+    void closeFullScreenManager() override { }
+    bool isFullScreen() override {
+        if (auto* window = m_view.Window())
+            return window->IsFullScreen();
+        return false;
+    }
+    void enterFullScreen(WebCore::FloatSize, CompletionHandler<void(bool)>&& completionHandler) override {
+        if (auto* window = m_view.Window()) {
+            if (window->Lock()) {
+                window->SetFullScreen(true);
+                window->Unlock();
+                completionHandler(true);
+                return;
+            }
+        }
+        completionHandler(false);
+    }
+    void exitFullScreen(CompletionHandler<void()>&& completionHandler) override {
+        if (auto* window = m_view.Window()) {
+            if (window->Lock()) {
+                window->SetFullScreen(false);
+                window->Unlock();
+            }
+        }
+        completionHandler();
+    }
+    void beganEnterFullScreen(const WebCore::IntRect&, const WebCore::IntRect&, CompletionHandler<void(bool)>&& completionHandler) override { completionHandler(true); }
+    void beganExitFullScreen(const WebCore::IntRect&, const WebCore::IntRect&, CompletionHandler<void()>&& completionHandler) override { completionHandler(); }
+
+private:
+    WebViewBase& m_view;
+};
+#endif
+
 PageClientImpl::PageClientImpl(WebViewBase& view)
     : fWebView(view)
 {
+#if ENABLE(FULLSCREEN_API)
+    m_fullScreenManagerProxyClient = makeUnique<WebFullScreenManagerProxyClientHaiku>(view);
+#endif
 }
 
 WTF::Ref<DrawingAreaProxy> PageClientImpl::createDrawingAreaProxy(WebKit::WebProcessProxy& processProxy)
@@ -317,26 +360,23 @@ void PageClientImpl::wheelEventWasNotHandledByWebCore(const NativeWebWheelEvent&
 
 void PageClientImpl::didFinishLoadingDataForCustomContentProvider(const String&, std::span<const unsigned char>)
 {
+    // If we implement custom content providers (e.g. PDF viewer), this would be used.
 }
 
 void PageClientImpl::navigationGestureDidBegin()
 {
-    // Not implemented
 }
 
 void PageClientImpl::navigationGestureWillEnd(bool, WebBackForwardListItem&)
 {
-    // Not implemented
 }
 
 void PageClientImpl::navigationGestureDidEnd(bool, WebBackForwardListItem&)
 {
-    // Not implemented
 }
 
 void PageClientImpl::navigationGestureDidEnd()
 {
-    // Not implemented
 }
 
 void PageClientImpl::willRecordNavigationSnapshot(WebBackForwardListItem&)
@@ -577,21 +617,9 @@ RefPtr<WebDateTimePicker> PageClientImpl::createDateTimePicker(WebPageProxy& pag
 }
 
 #if ENABLE(FULLSCREEN_API)
-class WebFullScreenManagerProxyClientHaiku final : public WebFullScreenManagerProxyClient {
-    WTF_MAKE_FAST_ALLOCATED;
-public:
-    void closeFullScreenManager() override { }
-    bool isFullScreen() override { return false; }
-    void enterFullScreen(WebCore::FloatSize, CompletionHandler<void(bool)>&& completionHandler) override { completionHandler(false); }
-    void exitFullScreen(CompletionHandler<void()>&& completionHandler) override { completionHandler(); }
-    void beganEnterFullScreen(const WebCore::IntRect&, const WebCore::IntRect&, CompletionHandler<void(bool)>&& completionHandler) override { completionHandler(false); }
-    void beganExitFullScreen(const WebCore::IntRect&, const WebCore::IntRect&, CompletionHandler<void()>&& completionHandler) override { completionHandler(); }
-};
-
 WebFullScreenManagerProxyClient& PageClientImpl::fullScreenManagerProxyClient()
 {
-    static NeverDestroyed<WebFullScreenManagerProxyClientHaiku> client;
-    return client;
+    return *m_fullScreenManagerProxyClient;
 }
 #endif
 

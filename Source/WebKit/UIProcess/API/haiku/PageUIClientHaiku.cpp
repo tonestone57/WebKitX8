@@ -186,6 +186,10 @@ void PageUIClientHaiku::createNewPage(WebPageProxy& page, Ref<API::PageConfigura
         BMessage message(CREATE_NEW_PAGE);
         window->PostMessage(&message);
     }
+    // We cannot currently return the new WebPageProxy synchronously as it requires application cooperation.
+    // Returning nullptr indicates the creation is handled elsewhere or failed,
+    // but for window.open() this means the opener won't get a reference.
+    // Future improvement: Implement a mechanism to wait for the new page or create it directly.
     completionHandler(nullptr);
 }
 
@@ -312,6 +316,7 @@ void PageUIClientHaiku::mouseDidMoveOverElement(WebPageProxy& page, const WebHit
         BMessage message(MOUSE_DID_MOVE_OVER_ELEMENT);
         message.AddString("url", hitTestResult.absoluteImageURL.string().utf8().data());
         message.AddString("linkUrl", hitTestResult.absoluteLinkURL.string().utf8().data());
+        message.AddString("title", hitTestResult.linkTitle.utf8().data());
         window->PostMessage(&message);
     }
 }
@@ -366,7 +371,7 @@ void PageUIClientHaiku::setMenuBarIsVisible(WebPageProxy&, bool visible)
 
 void PageUIClientHaiku::statusBarIsVisible(WebPageProxy&, Function<void(bool)>&& completionHandler)
 {
-    completionHandler(true);
+    completionHandler(true); // Assuming visible by default or we can query app
 }
 
 void PageUIClientHaiku::setStatusBarIsVisible(WebPageProxy&, bool visible)

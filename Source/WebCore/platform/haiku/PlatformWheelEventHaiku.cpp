@@ -30,26 +30,54 @@
 #include "config.h"
 #include "PlatformWheelEvent.h"
 
-#include "Scrollbar.h"
-
 #include <InterfaceDefs.h>
 #include <Message.h>
-#include <Point.h>
-
+#include <View.h>
+#include <wtf/MonotonicTime.h>
 
 namespace WebCore {
 
-PlatformWheelEvent::PlatformWheelEvent(BMessage* message)
-    : m_position(message->FindPoint("be:view_where"))
-    , m_globalPosition(message->FindPoint("screen_where"))
-    , m_deltaX(-message->FindFloat("be:wheel_delta_x"))
-    , m_deltaY(-message->FindFloat("be:wheel_delta_y"))
-    , m_wheelTicksX(m_deltaX)
-    , m_wheelTicksY(m_deltaY)
-    , m_granularity(ScrollByPixelWheelEvent)
+PlatformWheelEvent::PlatformWheelEvent(const BMessage* message)
+    : PlatformEvent(PlatformEvent::Type::Wheel)
+    , m_granularity(PlatformWheelEventGranularity::ScrollByPixelWheelEvent)
 {
-    m_deltaX *= Scrollbar::pixelsPerLineStep();
-    m_deltaY *= Scrollbar::pixelsPerLineStep();
+    float deltaX = 0;
+    float deltaY = 0;
+    message->FindFloat("be:wheel_delta_x", &deltaX);
+    message->FindFloat("be:wheel_delta_y", &deltaY);
+
+    // Invert direction to match WebKit expectations (usually negative delta is up/left)
+    // Haiku delta: positive is down/right.
+    // WebKit delta: positive is Up/Left usually? Wait.
+    // On Mac: deltaY > 0 is scrolling UP (content moves down).
+    // On Windows: delta > 0 is scrolling UP.
+    // Haiku: deltaY > 0 is scrolling DOWN (content moves up).
+    // So we need to invert?
+    // Let's assume standard behavior:
+    // WebKit ScrollView::wheelEvent:
+    // deltaX/Y are passed to handleWheelEvent.
+    // Usually deltaY > 0 means scroll up.
+
+    m_deltaX = -deltaX;
+    m_deltaY = -deltaY;
+
+    m_wheelTicksX = m_deltaX;
+    m_wheelTicksY = m_deltaY;
+
+    // Scale by some factor? Usually browsers expect pixels.
+    // Haiku deltas are "ticks".
+    // 1 tick = ~40 pixels.
+    const float kStep = 40.0f;
+    m_deltaX *= kStep;
+    m_deltaY *= kStep;
+
+    BPoint where;
+    if (message->FindPoint("be:view_where", &where) == B_OK)
+        m_position = where;
+
+    BPoint screenWhere;
+    if (message->FindPoint("screen_where", &screenWhere) == B_OK)
+        m_globalPosition = screenWhere;
 
     int32 modifiers = message->FindInt32("modifiers");
     if (modifiers & B_SHIFT_KEY)
@@ -60,7 +88,12 @@ PlatformWheelEvent::PlatformWheelEvent(BMessage* message)
         m_modifiers.add(PlatformEvent::Modifier::AltKey);
     if (modifiers & B_OPTION_KEY)
         m_modifiers.add(PlatformEvent::Modifier::MetaKey);
+
+    int64 when;
+    if (message->FindInt64("when", &when) == B_OK)
+         m_timestamp = MonotonicTime::fromRawSeconds(when / 1000000.0);
+    else
+         m_timestamp = MonotonicTime::now();
 }
 
 } // namespace WebCore
-
