@@ -122,13 +122,8 @@ void NetworkProcess::platformInitializeNetworkProcess(const NetworkProcessCreati
 
 void NetworkProcess::allowSpecificHTTPSCertificateForHost(const CertificateInfo& certificateInfo, const String& host)
 {
-    // FIXME: Implement certificate exception handling using Haiku API.
-    // This requires a BUrlContext to store exceptions, but we currently use BUrlRequest
-    // which might need a global context or per-request configuration not fully exposed yet.
-    // Logging the request to acknowledge the UI process command.
-    fprintf(stderr, "NetworkProcess::allowSpecificHTTPSCertificateForHost: Allowing certificate for host %s\n", host.utf8().data());
-
-    // Store the host in our local set to bypass verification in NetworkDataTaskHaiku
+    // Store the host in our local set to bypass verification in NetworkDataTaskHaiku.
+    // This effectively persists the exception for this session and future sessions.
     addAllowedHTTPSCertificateHost(host);
     saveAllowedHosts();
 }

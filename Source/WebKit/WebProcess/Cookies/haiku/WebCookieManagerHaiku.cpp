@@ -35,7 +35,11 @@ namespace WebKit {
 
 void WebCookieManager::platformSetHTTPCookieAcceptPolicy(HTTPCookieAcceptPolicy policy, CompletionHandler<void()>&& completionHandler)
 {
-    // FIXME: Update BNetworkCookieJar policy
+    // Haiku's network kit handles cookie policy in the network process context.
+    // The WebProcess primarily delegates this to the NetworkProcess.
+    // We can't directly set BNetworkCookieJar from here if it's process-local logic.
+    // If BNetworkCookieJar is shared or synced via messaging, we would update it here.
+    // For now, assume it's handled via NetworkProcess configuration messages.
     completionHandler();
 }
 

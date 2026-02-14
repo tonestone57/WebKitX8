@@ -415,8 +415,13 @@ private:
         }
 
         WebCore::IntRect rect = m_pageRects[m_pageIndex];
-        // Scaling is handled by providing a larger bitmap size if needed, but currently 1:1
-        m_page.takeSnapshot(rect, m_pageRects[m_pageIndex].size(), SnapshotOptionsShareable, [this, protectedThis = Ref { *this }](std::optional<ShareableBitmap::Handle>&& imageHandle) {
+
+        WebCore::IntSize snapshotSize = rect.size();
+        if (m_scaleFactor != 1.0 && m_scaleFactor > 0) {
+            snapshotSize.scale(m_scaleFactor);
+        }
+
+        m_page.takeSnapshot(rect, snapshotSize, SnapshotOptionsShareable, [this, protectedThis = Ref { *this }](std::optional<ShareableBitmap::Handle>&& imageHandle) {
             if (imageHandle) {
                 m_snapshots.append(ShareableBitmap::create(WTFMove(*imageHandle)));
             } else {

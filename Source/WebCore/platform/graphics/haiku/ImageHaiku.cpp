@@ -45,9 +45,9 @@
 #include <Bitmap.h>
 #include <View.h>
 
-// This function loads resources from WebKit
+// This function loads resources from WebKit.
+// Defined in TemporaryLinkStubs.cpp or similar platform support file.
 Vector<char> loadResourceIntoArray(const char*);
-
 
 namespace WebCore {
 
