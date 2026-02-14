@@ -35,8 +35,11 @@
 #include <WebCore/CertificateInfo.h>
 #include <WebCore/InspectorFrontendClient.h>
 #include <WebCore/NotImplemented.h>
+#include <WebCore/Color.h>
 
 #include <Alert.h>
+#include <Bitmap.h>
+#include <Cursor.h>
 #include <Directory.h>
 #include <Entry.h>
 #include <File.h>
@@ -46,6 +49,7 @@
 #include <Path.h>
 #include <Rect.h>
 #include <Roster.h>
+#include <Screen.h>
 #include <Window.h>
 
 namespace WebKit {
@@ -62,10 +66,14 @@ public:
     ~InspectorWindow()
     {
         delete m_filePanel;
+        if (m_pickingColor)
+            cancelColorPicking();
     }
 
     bool QuitRequested() override
     {
+        if (m_pickingColor)
+            cancelColorPicking();
         // Prevent double-free: detach the window from the proxy before the proxy tries to close it.
         // The proxy will see m_inspectorWindow is null and won't call Quit().
         // We return true, so this window object is destroyed by the looper.
@@ -73,6 +81,24 @@ public:
         m_proxy.m_inspectorView = nullptr;
         m_proxy.close();
         return true;
+    }
+
+    void DispatchMessage(BMessage* message, BHandler* handler) override
+    {
+        if (m_pickingColor) {
+            if (message->what == B_MOUSE_DOWN) {
+                handleColorPick(message);
+                return;
+            }
+            if (message->what == B_KEY_DOWN) {
+                 int32 key;
+                 if (message->FindInt32("key", &key) == B_OK && key == B_ESCAPE) {
+                     cancelColorPicking();
+                     return;
+                 }
+            }
+        }
+        BWindow::DispatchMessage(message, handler);
     }
 
     void MessageReceived(BMessage* message) override
@@ -85,6 +111,38 @@ public:
             BWindow::MessageReceived(message);
             break;
         }
+    }
+
+    void startColorPicking(CompletionHandler<void(const std::optional<WebCore::Color>&)>&& handler)
+    {
+        if (m_colorPickingHandler)
+            m_colorPickingHandler(std::nullopt);
+
+        m_colorPickingHandler = WTFMove(handler);
+
+        BCursor cursor(B_CURSOR_ID_CROSS_HAIR);
+        if (auto* view = ChildAt(0)) {
+            if (Lock()) {
+                view->SetMouseEventMask(B_POINTER_EVENTS, B_LOCK_WINDOW_FOCUS | B_NO_POINTER_HISTORY);
+                view->SetViewCursor(&cursor);
+                m_pickingColor = true;
+                Unlock();
+            }
+        }
+    }
+
+    void cancelColorPicking()
+    {
+        m_pickingColor = false;
+        if (Lock()) {
+            if (auto* view = ChildAt(0)) {
+                view->SetMouseEventMask(0);
+                view->SetViewCursor(B_CURSOR_SYSTEM_DEFAULT);
+            }
+            Unlock();
+        }
+        if (m_colorPickingHandler)
+            m_colorPickingHandler(std::nullopt);
     }
 
     void save(const String& suggestedURL, const String& content, bool forceSaveAs)
@@ -118,8 +176,48 @@ private:
         }
     }
 
+    void handleColorPick(BMessage* message)
+    {
+        BPoint screenPoint;
+        if (message->FindPoint("screen_where", &screenPoint) != B_OK) {
+             // Fallback
+             BPoint where;
+             if (message->FindPoint("where", &where) == B_OK) {
+                 if (auto* view = ChildAt(0)) {
+                     if (Lock()) {
+                         screenPoint = view->ConvertToScreen(where);
+                         Unlock();
+                     }
+                 }
+             }
+        }
+
+        BScreen screen(this);
+        rgb_color color = screen.DesktopColor();
+
+        BBitmap bitmap(BRect(0, 0, 0, 0), B_RGB32);
+        if (screen.ReadBitmap(&bitmap, false, &BRect(screenPoint.x, screenPoint.y, screenPoint.x, screenPoint.y)) == B_OK) {
+             uint8* bits = (uint8*)bitmap.Bits();
+             color.blue = bits[0];
+             color.green = bits[1];
+             color.red = bits[2];
+             color.alpha = bits[3];
+        }
+
+        if (m_colorPickingHandler) {
+             // WebCore::Color expects SRGBA
+             m_colorPickingHandler(WebCore::Color(WebCore::SRGBA<uint8_t> { color.red, color.green, color.blue, color.alpha }));
+             // Prevent calling it again in cancelColorPicking
+             m_colorPickingHandler = nullptr;
+        }
+
+        cancelColorPicking();
+    }
+
     WebInspectorUIProxy& m_proxy;
     BFilePanel* m_filePanel;
+    CompletionHandler<void(const std::optional<WebCore::Color>&)> m_colorPickingHandler;
+    bool m_pickingColor { false };
 };
 
 RefPtr<WebPageProxy> WebInspectorUIProxy::platformCreateFrontendPage()
@@ -320,6 +418,12 @@ void WebInspectorUIProxy::platformLoad(const String& path, CompletionHandler<voi
 
 void WebInspectorUIProxy::platformPickColorFromScreen(CompletionHandler<void(const std::optional<WebCore::Color>&)>&& completionHandler)
 {
+    if (m_inspectorWindow) {
+        if (auto* window = dynamic_cast<InspectorWindow*>(m_inspectorWindow)) {
+            window->startColorPicking(WTFMove(completionHandler));
+            return;
+        }
+    }
     completionHandler(std::nullopt);
 }
 

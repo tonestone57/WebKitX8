@@ -26,6 +26,7 @@
 
 #include "config.h"
 
+#include "DataTransfer.h"
 #include "Document.h"
 #include "DragController.h"
 
@@ -51,7 +52,7 @@ const float DragController::DragImageAlpha = 0.75f;
 
 bool DragController::isCopyKeyDown(const DragData& /* dragData */)
 {
-    if (modifiers() & B_COMMAND_KEY)
+    if (modifiers() & B_CONTROL_KEY)
         return true;
 
     return false;
@@ -82,8 +83,10 @@ void DragController::cleanupAfterSystemDrag()
 {
 }
 
-void DragController::declareAndWriteDragImage(DataTransfer& /*clipboard*/, Element&, const URL&, const String& /*label*/)
+void DragController::declareAndWriteDragImage(DataTransfer& dataTransfer, Element&, const URL&, const String&)
 {
+    if (auto* dragImage = dataTransfer.dragImage())
+        Pasteboard::createForDragAndDrop(dataTransfer.pasteboardContext())->setDragImage(dragImage, dataTransfer.dragLocation());
 }
 
 void DragController::updateDragCursor(const DragData&, DragOperation operation)
