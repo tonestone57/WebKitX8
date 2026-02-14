@@ -335,9 +335,17 @@ void GraphicsContextHaiku::fillRect(const FloatRect& rect, const Color& color)
     // FillRect is much faster.
     const auto [r, g, b, a] = color.toColorTypeLossy<SRGBA<uint8_t>>().resolved();
 
-    if (compositeOperation() == CompositeOperator::SourceOver || compositeOperation() == CompositeOperator::Copy) {
+    if (compositeOperation() == CompositeOperator::SourceOver) {
         m_view->SetHighColor(r, g, b, a);
         m_view->FillRect(rect);
+        return;
+    }
+
+    if (compositeOperation() == CompositeOperator::Copy) {
+        m_view->SetHighColor(r, g, b, a);
+        m_view->SetDrawingMode(B_OP_COPY);
+        m_view->FillRect(rect);
+        m_view->SetDrawingMode(B_OP_ALPHA);
         return;
     }
 
@@ -419,10 +427,20 @@ void GraphicsContextHaiku::fillRoundedRectImpl(const FloatRoundedRect& roundRect
     }
 
     if (roundRect.radii().isUniformCornerRadius()) {
-        const auto [r, g, b, a] = color.toColorTypeLossy<SRGBA<uint8_t>>().resolved();
-        m_view->SetHighColor(r, g, b, a);
-        m_view->FillRoundRect(rect, topLeft.width(), topLeft.height());
-        return;
+        if (compositeOperation() == CompositeOperator::SourceOver) {
+            const auto [r, g, b, a] = color.toColorTypeLossy<SRGBA<uint8_t>>().resolved();
+            m_view->SetHighColor(r, g, b, a);
+            m_view->FillRoundRect(rect, topLeft.width(), topLeft.height());
+            return;
+        }
+        if (compositeOperation() == CompositeOperator::Copy) {
+            const auto [r, g, b, a] = color.toColorTypeLossy<SRGBA<uint8_t>>().resolved();
+            m_view->SetHighColor(r, g, b, a);
+            m_view->SetDrawingMode(B_OP_COPY);
+            m_view->FillRoundRect(rect, topLeft.width(), topLeft.height());
+            m_view->SetDrawingMode(B_OP_ALPHA);
+            return;
+        }
     }
 
     BPoint points[3];
