@@ -109,7 +109,7 @@ void DownloadManager::resumeDownload(PAL::SessionID sessionID, DownloadID downlo
     for (size_t i = 0; i < sizeof(uint64_t); ++i)
         offset |= static_cast<uint64_t>(resumeData[i]) << (i * 8);
 
-    String url = String::fromUTF8(resumeData.subspan(sizeof(uint64_t)).data(), resumeData.size() - sizeof(uint64_t));
+    String url = String::fromUTF8(reinterpret_cast<const char*>(resumeData.subspan(sizeof(uint64_t)).data()), resumeData.size() - sizeof(uint64_t));
     if (url.isEmpty())
         return;
 
