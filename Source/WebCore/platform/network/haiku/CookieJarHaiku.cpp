@@ -113,6 +113,18 @@ void stopObservingCookieChanges(NetworkStorageSession& storageSession)
         BPathMonitor::StopWatching(s_watcher);
         s_watcher->setCallback(nullptr);
     }
+
+    if (s_looper) {
+        if (s_looper->Lock()) {
+            if (s_watcher) {
+                s_looper->RemoveHandler(s_watcher);
+                delete s_watcher;
+                s_watcher = nullptr;
+            }
+            s_looper->Quit();
+            s_looper = nullptr;
+        }
+    }
 }
 
 } // namespace WebCore
