@@ -319,12 +319,13 @@ void PageUIClientHaiku::mouseDidMoveOverElement(WebPageProxy& page, const WebHit
 
 void PageUIClientHaiku::toolbarsAreVisible(WebPageProxy&, Function<void(bool)>&& completionHandler)
 {
-    bool visible = true;
+    bool visible = false;
     if (BWindow* window = m_webView.Window()) {
-        // Assume if window has a KeyMenuBar, it's visible?
-        // Actually, WebKit is asking if *browser* toolbars are visible.
-        // We can ask the window via a synchronous message if needed, but for now defaulting to true is okay.
-        // Or better, let's assume if there are any views other than us, there might be toolbars.
+        if (window->Lock()) {
+            if (window->KeyMenuBar() && !window->KeyMenuBar()->IsHidden())
+                visible = true;
+            window->Unlock();
+        }
     }
     completionHandler(visible);
 }

@@ -113,8 +113,23 @@ FloatRect screenAvailableRect(Widget* widget)
     return FloatRect(frame.left, frame.top, frame.Width() + 1, frame.Height() + 1);
 }
 
-bool screenSupportsExtendedColor(Widget*)
+bool screenSupportsExtendedColor(Widget* widget)
 {
+    BScreen screen;
+    if (widget) {
+        if (BView* view = widget->platformWidget()) {
+            if (BWindow* window = view->Window())
+                screen = BScreen(window);
+        }
+    }
+
+    if (!screen.IsValid())
+        return false;
+
+    // Check if the screen is using a wide gamut color space.
+    // Haiku's BScreen doesn't explicitly expose HDR/WideGamut flags easily yet,
+    // but we can check the color space.
+    // For now, return false as standard Haiku screens are sRGB.
     return false;
 }
 

@@ -220,7 +220,21 @@ void WebCore::Pasteboard::write(WebCore::PasteboardImage const& pasteboardImage)
 
 void Pasteboard::write(const PasteboardBuffer& buffer)
 {
-    // Not implemented for now as PasteboardBuffer structure is not verified.
+    AutoClipboardLocker locker(be_clipboard);
+    if (!locker.isLocked())
+        return;
+
+    be_clipboard->Clear();
+    BMessage* data = be_clipboard->Data();
+    if (!data)
+        return;
+
+    if (buffer.data) {
+        auto contiguous = buffer.data->makeContiguous();
+        data->AddData(buffer.type.utf8().data(), B_MIME_TYPE, contiguous->data(), contiguous->size());
+    }
+
+    be_clipboard->Commit();
 }
 
 void WebCore::Pasteboard::write(WebCore::PasteboardWebContent const& content)
@@ -492,8 +506,12 @@ void Pasteboard::clear()
 }
 
 #if ENABLE(DRAG_SUPPORT)
-void Pasteboard::setDragImage(DragImage, const IntPoint&)
+void Pasteboard::setDragImage(DragImage image, const IntPoint&)
 {
+    // FIXME: Store the drag image so it can be used by DragController.
+    // Currently we don't have a place to store it in the Pasteboard object.
+    // If we take ownership, we should delete it, but if it's used later, we shouldn't.
+    // Leaking for now to avoid crashes if it is used.
 }
 #endif
 

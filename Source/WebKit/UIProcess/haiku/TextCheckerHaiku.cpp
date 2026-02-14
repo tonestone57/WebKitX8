@@ -49,8 +49,9 @@ void TextChecker::setContinuousSpellCheckingEnabled(bool enabled)
     checkerState().isContinuousSpellCheckingEnabled = enabled;
 }
 
-void TextChecker::setGrammarCheckingEnabled(bool)
+void TextChecker::setGrammarCheckingEnabled(bool enabled)
 {
+    checkerState().isGrammarCheckingEnabled = enabled;
 }
 
 void TextChecker::continuousSpellCheckingEnabledStateChanged(bool)
@@ -78,6 +79,7 @@ void TextChecker::checkSpellingOfString(SpellDocumentTag, StringView text, int32
 
 void TextChecker::checkGrammarOfString(SpellDocumentTag, StringView, Vector<WebCore::GrammarDetail>&, int32_t&, int32_t&)
 {
+    // Grammar checking is not yet implemented.
 }
 
 bool TextChecker::spellingUIIsShowing()
