@@ -121,6 +121,7 @@ list(APPEND WebKit_INCLUDE_DIRECTORIES
     "${WEBKIT_DIR}/UIProcess/API/C/haiku"
     "${WEBKIT_DIR}/UIProcess/API/haiku"
     "${WEBKIT_DIR}/UIProcess/haiku"
+    "${WEBKIT_DIR}/UIProcess/Inspector/socket"
     "${WEBKIT_DIR}/UIProcess/CoordinatedGraphics"
     "${WEBKIT_DIR}/WebProcess/InjectedBundle"
     "${WEBKIT_DIR}/WebProcess/InjectedBundle/API/c"
