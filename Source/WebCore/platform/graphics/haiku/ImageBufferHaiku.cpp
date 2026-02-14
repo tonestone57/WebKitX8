@@ -29,6 +29,7 @@
 #include "BitmapImage.h"
 #include "ColorUtilities.h"
 #include "GraphicsContextHaiku.h"
+#include "MemoryPressureHandler.h"
 #include "ImageData.h"
 #include "IntRect.h"
 #include "MIMETypeRegistry.h"
@@ -59,8 +60,13 @@ ImageBufferData::ImageBufferData(const IntSize& size)
     if(size.isEmpty())
         return;
 
-    if (!m_image->IsLocked() || !m_image->IsValid())
+    if (!m_image->IsLocked() || !m_image->IsValid()) {
+        if (!m_image->IsValid()) {
+            // Allocation failed, likely due to memory pressure.
+            MemoryPressureHandler::singleton().triggerMemoryPressureEvent(true);
+        }
         return;
+    }
 
     m_view = new BView(m_image->Bounds(), "WebKit ImageBufferData", 0, 0);
     m_image->AddChild(m_view);
@@ -116,8 +122,13 @@ ImageBufferHaikuSurfaceBackend::create(const ImageBufferBackend::Parameters& par
     if (parameters.backendSize.isEmpty())
         return nullptr;
 
-    return std::unique_ptr<ImageBufferHaikuSurfaceBackend>(
+    auto backend = std::unique_ptr<ImageBufferHaikuSurfaceBackend>(
         new ImageBufferHaikuSurfaceBackend(parameters, parameters.backendSize));
+
+    if (!backend->m_data.m_context)
+        return nullptr;
+
+    return backend;
 }
 
 
