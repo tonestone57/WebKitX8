@@ -43,6 +43,7 @@ static String getProcessPath(const char* name)
     // This handles cases where we are running from a build directory or packaged app.
 
     // Get location of libWebKit.so
+    // Note: The library name might be libWebKit.so, libWebKit.so.1, etc.
     int32 cookie = 0;
     image_info info;
     while (get_next_image_info(B_CURRENT_TEAM, &cookie, &info) == B_OK) {
@@ -67,10 +68,33 @@ static String getProcessPath(const char* name)
             return String::fromUTF8(path.Path());
     }
 
-    // Fallback: Check standard install location /boot/system/lib/WebKit
-    BPath systemPath("/boot/system/lib/WebKit");
-    systemPath.Append(name);
-    return String::fromUTF8(systemPath.Path());
+    // Fallback: Check environment variable WEBKIT_EXEC_PATH
+    const char* envPath = getenv("WEBKIT_EXEC_PATH");
+    if (envPath) {
+        BPath path(envPath);
+        path.Append(name);
+        BEntry entry(path.Path());
+        if (entry.Exists())
+            return String::fromUTF8(path.Path());
+    }
+
+    // Fallback: Check standard install locations
+    // WebKit add-ons usually install helpers in /boot/system/lib/WebKit or /boot/home/config/non-packaged/lib/WebKit
+    const char* searchPaths[] = {
+        "/boot/system/lib/WebKit",
+        "/boot/home/config/non-packaged/lib/WebKit",
+        "/boot/system/non-packaged/lib/WebKit"
+    };
+
+    for (const char* searchPath : searchPaths) {
+        BPath path(searchPath);
+        path.Append(name);
+        BEntry entry(path.Path());
+        if (entry.Exists())
+            return String::fromUTF8(path.Path());
+    }
+
+    return String::fromUTF8(name); // Hope it's in PATH?
 }
 
 String executablePathOfWebProcess()

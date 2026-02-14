@@ -28,6 +28,9 @@
 #include "DNSResolveQueueHaiku.h"
 
 #include "NotImplemented.h"
+#include <netdb.h>
+#include <thread>
+#include <wtf/RunLoop.h>
 
 namespace WebCore {
 
@@ -39,14 +42,53 @@ void DNSResolveQueueHaiku::platformResolve(const String& /* hostname */)
 {
 }
 
-void DNSResolveQueueHaiku::resolve(const String& /* hostname */, uint64_t /* identifier */, DNSCompletionHandler&& completionHandler)
+void DNSResolveQueueHaiku::resolve(const String& hostname, uint64_t identifier, DNSCompletionHandler&& completionHandler)
 {
-    // FIXME: Implement async DNS resolution
-    completionHandler(DNSCompletionHandler::Result::UnknownError, { });
+    // Simple thread-based resolution
+    std::thread([hostname = hostname.isolatedCopy(), completionHandler = WTFMove(completionHandler)]() mutable {
+        struct addrinfo hints;
+        memset(&hints, 0, sizeof(hints));
+        hints.ai_family = AF_UNSPEC;
+        hints.ai_socktype = SOCK_STREAM;
+
+        struct addrinfo* result = nullptr;
+        int res = getaddrinfo(hostname.utf8().data(), nullptr, &hints, &result);
+
+        if (res != 0) {
+            RunLoop::main().dispatch([completionHandler = WTFMove(completionHandler)]() mutable {
+                completionHandler(DNSCompletionHandler::Result::UnknownError, { });
+            });
+            return;
+        }
+
+        std::optional<IPAddress> address;
+        for (struct addrinfo* p = result; p != nullptr; p = p->ai_next) {
+            if (p->ai_family == AF_INET) {
+                struct sockaddr_in* ipv4 = (struct sockaddr_in*)p->ai_addr;
+                address = IPAddress(ipv4->sin_addr);
+                break;
+            } else if (p->ai_family == AF_INET6) {
+                struct sockaddr_in6* ipv6 = (struct sockaddr_in6*)p->ai_addr;
+                address = IPAddress(ipv6->sin6_addr);
+                break;
+            }
+        }
+
+        freeaddrinfo(result);
+
+        RunLoop::main().dispatch([completionHandler = WTFMove(completionHandler), address]() mutable {
+            if (address)
+                completionHandler(DNSCompletionHandler::Result::Succeeded, { *address });
+            else
+                completionHandler(DNSCompletionHandler::Result::UnknownError, { });
+        });
+    }).detach();
 }
 
 void DNSResolveQueueHaiku::stopResolve(uint64_t /* identifier */)
 {
+    // We cannot easily cancel getaddrinfo running in a detached thread.
+    // Ideally we would track requests and ignore the callback if cancelled.
 }
 
 }
