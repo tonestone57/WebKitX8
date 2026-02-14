@@ -30,8 +30,6 @@
 #include "UIScriptContext.h"
 #include <WebView.h>
 
-extern BWebView* webView;
-
 namespace WTR {
 
 Ref<UIScriptController> UIScriptController::create(UIScriptContext& context)
