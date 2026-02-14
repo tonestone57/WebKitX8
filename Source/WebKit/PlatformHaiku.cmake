@@ -38,6 +38,8 @@ list(APPEND WebKit_SOURCES
     UIProcess/API/haiku/WebViewBase.cpp
     UIProcess/Inspector/haiku/RemoteWebInspectorUIProxyHaiku.cpp
     UIProcess/Inspector/haiku/WebInspectorUIProxyHaiku.cpp
+    UIProcess/Inspector/socket/RemoteInspectorClient.cpp
+    UIProcess/Inspector/socket/RemoteInspectorProtocolHandler.cpp
     UIProcess/haiku/BackingStoreHaiku.cpp
     UIProcess/haiku/TextCheckerHaiku.cpp
     UIProcess/haiku/WebPageProxyHaiku.cpp
