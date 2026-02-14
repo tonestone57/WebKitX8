@@ -38,6 +38,8 @@ list(APPEND WebKit_SOURCES
     UIProcess/API/haiku/WebViewBase.cpp
     UIProcess/Inspector/haiku/RemoteWebInspectorUIProxyHaiku.cpp
     UIProcess/Inspector/haiku/WebInspectorUIProxyHaiku.cpp
+    UIProcess/Inspector/socket/RemoteInspectorClient.cpp
+    UIProcess/Inspector/socket/RemoteInspectorProtocolHandler.cpp
     UIProcess/haiku/BackingStoreHaiku.cpp
     UIProcess/haiku/TextCheckerHaiku.cpp
     UIProcess/haiku/WebPageProxyHaiku.cpp
@@ -119,6 +121,7 @@ list(APPEND WebKit_INCLUDE_DIRECTORIES
     "${WEBKIT_DIR}/UIProcess/API/C/haiku"
     "${WEBKIT_DIR}/UIProcess/API/haiku"
     "${WEBKIT_DIR}/UIProcess/haiku"
+    "${WEBKIT_DIR}/UIProcess/Inspector/socket"
     "${WEBKIT_DIR}/UIProcess/CoordinatedGraphics"
     "${WEBKIT_DIR}/WebProcess/InjectedBundle"
     "${WEBKIT_DIR}/WebProcess/InjectedBundle/API/c"

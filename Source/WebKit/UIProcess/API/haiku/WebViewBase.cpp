@@ -28,6 +28,10 @@
 #include "APIPageConfiguration.h"
 #include "DrawingAreaProxy.h"
 
+#if ENABLE(REMOTE_INSPECTOR)
+#include "RemoteInspectorProtocolHandler.h"
+#endif
+
 #include "NativeWebMouseEvent.h"
 #include "NativeWebKeyboardEvent.h"
 #include "NativeWebWheelEvent.h"
@@ -63,6 +67,11 @@ WebViewBase::WebViewBase(const char* name, BRect rect, BWindow* parentWindow,
     WebProcessPool& processPool = config->processPool();
     fPage = processPool.createWebPage(*fPageClient, std::move(config));
     fPage->setUIClient(makeUnique<PageUIClientHaiku>(*this));
+
+#if ENABLE(REMOTE_INSPECTOR)
+    fPage->setURLSchemeHandlerForScheme(RemoteInspectorProtocolHandler::create(*fPage), "inspector"_s);
+#endif
+
     fPage->initializeWebPage(Site(aboutBlankURL()), {}, {});
 
     if (fPage->drawingArea()) {
