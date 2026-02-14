@@ -25,6 +25,7 @@ list(APPEND WebKit_SOURCES
     Shared/haiku/NativeWebMouseEventHaiku.cpp
     Shared/haiku/NativeWebKeyboardEventHaiku.cpp
     Shared/haiku/NativeWebWheelEventHaiku.cpp
+    Shared/haiku/NativeWebTouchEventHaiku.cpp
     Shared/haiku/ProcessExecutablePathHaiku.cpp
     Shared/haiku/WebEventFactory.cpp
     Shared/haiku/WebMemorySamplerHaiku.cpp
@@ -44,7 +45,7 @@ list(APPEND WebKit_SOURCES
     UIProcess/haiku/WebProcessPoolHaiku.cpp
     UIProcess/haiku/WebContextMenuProxyHaiku.cpp
     UIProcess/haiku/WebPopupMenuProxyHaiku.cpp
-    UIProcess/haiku/WebContextMenuProxyHaiku.cpp
+    UIProcess/haiku/NotificationProviderHaiku.cpp
     UIProcess/Launcher/haiku/ProcessLauncherHaiku.cpp
     UIProcess/WebsiteData/haiku/WebsiteDataStoreHaiku.cpp
 
