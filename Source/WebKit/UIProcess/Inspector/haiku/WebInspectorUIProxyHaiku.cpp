@@ -89,10 +89,12 @@ public:
 
     void save(const String& suggestedURL, const String& content, bool forceSaveAs)
     {
-        m_saveContent = content;
-
         if (!m_filePanel)
             m_filePanel = new BFilePanel(B_SAVE_PANEL, new BMessenger(this));
+
+        BMessage* message = new BMessage(B_SAVE_REQUESTED);
+        message->AddString("content", content.utf8().data());
+        m_filePanel->SetMessage(message);
 
         if (!suggestedURL.isEmpty())
             m_filePanel->SetSaveText(suggestedURL.utf8().data());
@@ -105,17 +107,19 @@ private:
     {
         entry_ref ref;
         const char* name;
-        if (message->FindRef("directory", &ref) == B_OK && message->FindString("name", &name) == B_OK) {
+        const char* content;
+        if (message->FindRef("directory", &ref) == B_OK
+            && message->FindString("name", &name) == B_OK
+            && message->FindString("content", &content) == B_OK) {
             BDirectory dir(&ref);
             BFile file(&dir, name, B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
             if (file.InitCheck() == B_OK)
-                file.Write(m_saveContent.utf8().data(), m_saveContent.utf8().length());
+                file.Write(content, strlen(content));
         }
     }
 
     WebInspectorUIProxy& m_proxy;
     BFilePanel* m_filePanel;
-    String m_saveContent;
 };
 
 RefPtr<WebPageProxy> WebInspectorUIProxy::platformCreateFrontendPage()
