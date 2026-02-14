@@ -40,6 +40,7 @@
 #include "WebCore/Region.h"
 #include "WebFrameProxy.h"
 #include "ShareableBitmap.h"
+#include "WebFullScreenManagerProxy.h"
 
 #include <View.h>
 #include <Window.h>
@@ -297,13 +298,18 @@ void PageClientImpl::didChangeContentSize(const IntSize& size)
     }
 }
 
-void PageClientImpl::didCommitLoadForMainFrame(const String& /* mimeType */, bool /* useCustomContentProvider */ )
+void PageClientImpl::didCommitLoadForMainFrame(const String&, bool)
 {
+    if (BWindow* window = fWebView.Window())
+        window->PostMessage(LOAD_COMMITTED);
 }
 
 void PageClientImpl::wheelEventWasNotHandledByWebCore(const NativeWebWheelEvent& event)
 {
-    // Pass back to BView?
+    // If the wheel event wasn't handled, we might want to propagate it to the parent view.
+    // However, BView event handling is usually done via MessageReceived.
+    // If we want standard BView scrolling behavior when web content doesn't scroll, we might need to invoke it here.
+    // For now, let's leave it as a no-op or maybe beep?
 }
 
 void PageClientImpl::didFinishLoadingDataForCustomContentProvider(const String&, std::span<const unsigned char>)
@@ -336,6 +342,8 @@ void PageClientImpl::didRemoveNavigationGestureSnapshot()
 
 void PageClientImpl::didFirstVisuallyNonEmptyLayoutForMainFrame()
 {
+    if (BWindow* window = fWebView.Window())
+        window->PostMessage(DID_FIRST_VISUALLY_NON_EMPTY_LAYOUT);
 }
 
 class AsyncPrinter : public RefCounted<AsyncPrinter> {
@@ -473,14 +481,20 @@ void PageClientImpl::printFrame(WebFrameProxy& frame)
 
 void PageClientImpl::didFinishNavigation(API::Navigation*)
 {
+    if (BWindow* window = fWebView.Window())
+        window->PostMessage(DID_FINISH_NAVIGATION);
 }
 
 void PageClientImpl::didFailNavigation(API::Navigation*)
 {
+    if (BWindow* window = fWebView.Window())
+        window->PostMessage(DID_FAIL_NAVIGATION);
 }
 
 void PageClientImpl::didSameDocumentNavigationForMainFrame(SameDocumentNavigationType)
 {
+    if (BWindow* window = fWebView.Window())
+        window->PostMessage(DID_SAME_DOCUMENT_NAVIGATION);
 }
 
 void PageClientImpl::didChangeBackgroundColor()
@@ -521,6 +535,8 @@ void PageClientImpl::isPlayingAudioDidChange()
 
 void PageClientImpl::refView()
 {
+    // The view is owned by the BWindow hierarchy, but PageClient might be refcounted.
+    // However, PageClientImpl is owned by WebViewBase uniquely.
 }
 
 void PageClientImpl::derefView()
@@ -538,11 +554,21 @@ RefPtr<WebDateTimePicker> PageClientImpl::createDateTimePicker(WebPageProxy& pag
 }
 
 #if ENABLE(FULLSCREEN_API)
+class WebFullScreenManagerProxyClientHaiku final : public WebFullScreenManagerProxyClient {
+    WTF_MAKE_FAST_ALLOCATED;
+public:
+    void closeFullScreenManager() override { }
+    bool isFullScreen() override { return false; }
+    void enterFullScreen(WebCore::FloatSize, CompletionHandler<void(bool)>&& completionHandler) override { completionHandler(false); }
+    void exitFullScreen(CompletionHandler<void()>&& completionHandler) override { completionHandler(); }
+    void beganEnterFullScreen(const WebCore::IntRect&, const WebCore::IntRect&, CompletionHandler<void(bool)>&& completionHandler) override { completionHandler(false); }
+    void beganExitFullScreen(const WebCore::IntRect&, const WebCore::IntRect&, CompletionHandler<void()>&& completionHandler) override { completionHandler(); }
+};
+
 WebFullScreenManagerProxyClient& PageClientImpl::fullScreenManagerProxyClient()
 {
-    // FIXME: Implement full screen support
-    RELEASE_ASSERT_NOT_REACHED();
-    return *static_cast<WebFullScreenManagerProxyClient*>(nullptr);
+    static NeverDestroyed<WebFullScreenManagerProxyClientHaiku> client;
+    return client;
 }
 #endif
 

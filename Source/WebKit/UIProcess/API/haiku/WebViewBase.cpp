@@ -92,7 +92,7 @@ void WebViewBase::MessageReceived(BMessage* message)
     {
         case B_MOUSE_WHEEL_CHANGED:
             callOnMainRunLoop([this, message = *message](){
-                fPage->handleNativeWheelEvent(NativeWebWheelEvent(&message));
+                fPage->handleWheelEvent(NativeWebWheelEvent(&message));
             });
             break;
         case B_MOUSE_UP:
@@ -138,6 +138,13 @@ void WebViewBase::Draw(BRect update)
 
 void WebViewBase::paint(const IntRect& dirtyRect)
 {
+    // The DrawingAreaProxy handles painting updates, usually triggering Draw().
+    // If this is called explicitly (e.g. for testing or forced update),
+    // we should invalidate the region.
+    if (LockLooper()) {
+        Invalidate(BRect(dirtyRect));
+        UnlockLooper();
+    }
 }
 
 void WebViewBase::setCursor(const WebCore::Cursor& cursor)

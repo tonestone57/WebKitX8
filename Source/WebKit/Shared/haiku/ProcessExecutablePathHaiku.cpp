@@ -28,24 +28,67 @@
 #include "ProcessExecutablePath.h"
 
 #include <Entry.h>
+#include <Path.h>
+#include <Roster.h>
 #include <String.h>
+#include <image.h>
 #include <wtf/NeverDestroyed.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebKit {
 
+static String getProcessPath(const char* name)
+{
+    // Try to find the executable relative to the current app/library location
+    // This handles cases where we are running from a build directory or packaged app.
+
+    // Get location of libWebKit.so
+    int32 cookie = 0;
+    image_info info;
+    while (get_next_image_info(B_CURRENT_TEAM, &cookie, &info) == B_OK) {
+        if (strstr(info.name, "libWebKit")) {
+            BPath path(info.name);
+            path.GetParent(&path);
+            path.Append(name);
+            BEntry entry(path.Path());
+            if (entry.Exists())
+                return String::fromUTF8(path.Path());
+        }
+    }
+
+    // Fallback: Check if it's in the same directory as the app executable
+    app_info appInfo;
+    if (be_app && be_app->GetAppInfo(&appInfo) == B_OK) {
+        BPath path(&appInfo.ref);
+        path.GetParent(&path);
+        path.Append(name);
+        BEntry entry(path.Path());
+        if (entry.Exists())
+            return String::fromUTF8(path.Path());
+    }
+
+    // Fallback: Check standard install location /boot/system/lib/WebKit
+    BPath systemPath("/boot/system/lib/WebKit");
+    systemPath.Append(name);
+    return String::fromUTF8(systemPath.Path());
+}
+
 String executablePathOfWebProcess()
 {
-    return "./bin/WebProcess"_s;
+    static NeverDestroyed<String> path = getProcessPath("WebProcess");
+    return path;
 }
 
 String executablePathOfPluginProcess()
 {
-    return "./bin/PluginProcess"_s;
+    static NeverDestroyed<String> path = getProcessPath("PluginProcess");
+    return path;
 }
 
 String executablePathOfNetworkProcess()
 {
-    return "./bin/NetworkProcess"_s;
+    static NeverDestroyed<String> path = getProcessPath("NetworkProcess");
+    return path;
 }
 
 } // namespace WebKit

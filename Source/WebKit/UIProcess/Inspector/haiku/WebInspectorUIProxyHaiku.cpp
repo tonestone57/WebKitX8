@@ -37,8 +37,10 @@
 #include <WebCore/NotImplemented.h>
 
 #include <Alert.h>
+#include <Directory.h>
 #include <Entry.h>
 #include <File.h>
+#include <FilePanel.h>
 #include <FindDirectory.h>
 #include <Message.h>
 #include <Path.h>
@@ -53,7 +55,13 @@ public:
     InspectorWindow(BRect frame, WebInspectorUIProxy& proxy)
         : BWindow(frame, "Web Inspector", B_TITLED_WINDOW, B_ASYNCHRONOUS_CONTROLS)
         , m_proxy(proxy)
+        , m_filePanel(nullptr)
     {
+    }
+
+    ~InspectorWindow()
+    {
+        delete m_filePanel;
     }
 
     bool QuitRequested() override
@@ -67,8 +75,51 @@ public:
         return true;
     }
 
+    void MessageReceived(BMessage* message) override
+    {
+        switch (message->what) {
+        case B_SAVE_REQUESTED:
+            handleSaveRequest(message);
+            break;
+        default:
+            BWindow::MessageReceived(message);
+            break;
+        }
+    }
+
+    void save(const String& suggestedURL, const String& content, bool forceSaveAs)
+    {
+        if (!m_filePanel)
+            m_filePanel = new BFilePanel(B_SAVE_PANEL, new BMessenger(this));
+
+        BMessage* message = new BMessage(B_SAVE_REQUESTED);
+        message->AddString("content", content.utf8().data());
+        m_filePanel->SetMessage(message);
+
+        if (!suggestedURL.isEmpty())
+            m_filePanel->SetSaveText(suggestedURL.utf8().data());
+
+        m_filePanel->Show();
+    }
+
 private:
+    void handleSaveRequest(BMessage* message)
+    {
+        entry_ref ref;
+        const char* name;
+        const char* content;
+        if (message->FindRef("directory", &ref) == B_OK
+            && message->FindString("name", &name) == B_OK
+            && message->FindString("content", &content) == B_OK) {
+            BDirectory dir(&ref);
+            BFile file(&dir, name, B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
+            if (file.InitCheck() == B_OK)
+                file.Write(content, strlen(content));
+        }
+    }
+
     WebInspectorUIProxy& m_proxy;
+    BFilePanel* m_filePanel;
 };
 
 RefPtr<WebPageProxy> WebInspectorUIProxy::platformCreateFrontendPage()
@@ -194,37 +245,48 @@ void WebInspectorUIProxy::platformSetSheetRect(const WebCore::FloatRect&)
 
 void WebInspectorUIProxy::platformStartWindowDrag()
 {
-    platformBringToFront();
+    if (m_inspectorWindow) {
+        if (m_inspectorWindow->Lock()) {
+            // Initiate window dragging if mouse is down.
+            // BWindow handles dragging via B_WINDOW_MOVE messages usually,
+            // or we just let standard window manager decorations handle it.
+            // If this is triggered from web content (e.g. custom titlebar), we might need to simulate drag.
+            // For now, activating is a safe fallback.
+            m_inspectorWindow->Activate(true);
+            m_inspectorWindow->Unlock();
+        }
+    }
 }
 
 void WebInspectorUIProxy::platformRevealFileExternally(const String& path)
 {
-    BEntry entry(path.utf8().data());
-    BEntry parent;
-    if (entry.InitCheck() == B_OK && entry.GetParent(&parent) == B_OK) {
-        entry_ref ref;
-        if (parent.GetRef(&ref) == B_OK) {
-            BMessenger tracker("application/x-vnd.Be-TRAK");
-            BMessage msg(B_REFS_RECEIVED);
-            msg.AddRef("refs", &ref);
-            tracker.SendMessage(&msg);
+    entry_ref ref;
+    if (get_ref_for_path(path.utf8().data(), &ref) == B_OK) {
+        // We want to open the *folder* containing the file and select it.
+        // Haiku's Tracker handles B_REFS_RECEIVED by opening the folder.
+        // If we pass the file ref, it might open the file (execute/edit).
+        // To reveal, usually we open parent and select child.
+
+        BEntry entry(&ref);
+        BEntry parent;
+        if (entry.GetParent(&parent) == B_OK) {
+            entry_ref parentRef;
+            if (parent.GetRef(&parentRef) == B_OK) {
+                 BMessage msg(B_REFS_RECEIVED);
+                 msg.AddRef("refs", &parentRef);
+                 // TODO: Select the specific file in the folder (requires scripting Tracker)
+                 be_roster->Launch("application/x-vnd.Be-TRAK", &msg);
+            }
         }
     }
 }
 
 void WebInspectorUIProxy::platformSave(Vector<WebCore::InspectorFrontendClient::SaveData>&& saveData, bool forceSaveAs)
 {
-    // Reuse logic from RemoteWebInspectorUIProxyHaiku if possible, or implement similarly.
-    // For now, iterate and save.
     for (const auto& data : saveData) {
         if (m_inspectorWindow) {
              if (auto* window = dynamic_cast<InspectorWindow*>(m_inspectorWindow)) {
-                 // Assuming InspectorWindow has a save method as in RemoteWebInspectorUIProxyHaiku
-                 // If not, we should probably add one or unify the implementation.
-                 // Ideally, we would use BFilePanel here.
-                 // For this "fix blockers" pass, we will note that full implementation requires BFilePanel logic duplication
-                 // or refactoring.
-                 // window->save(data.url, data.content, forceSaveAs);
+                 window->save(data.url, data.content, forceSaveAs);
              }
         }
     }

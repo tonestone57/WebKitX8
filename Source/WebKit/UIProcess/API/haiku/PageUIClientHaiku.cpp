@@ -49,13 +49,74 @@
 #include <WebCore/NotificationResources.h>
 
 #include <Alert.h>
+#include <Button.h>
 #include <FilePanel.h>
+#include <GroupLayout.h>
+#include <GroupLayoutBuilder.h>
 #include <Notification.h>
 #include <Entry.h>
 #include <Path.h>
 #include <Messenger.h>
+#include <TextControl.h>
 
 namespace WebKit {
+
+class JavaScriptPromptWindow : public BWindow {
+public:
+    JavaScriptPromptWindow(const String& message, const String& defaultValue, CompletionHandler<void(const String&)>&& completionHandler)
+        : BWindow(BRect(0, 0, 350, 150), "JavaScript Prompt", B_TITLED_WINDOW, B_NOT_RESIZABLE | B_NOT_ZOOMABLE | B_AUTO_UPDATE_SIZE_LIMITS)
+        , m_completionHandler(WTFMove(completionHandler))
+    {
+        m_textControl = new BTextControl("prompt", message.utf8().data(), defaultValue.utf8().data(), nullptr);
+
+        BButton* okButton = new BButton("OK", new BMessage('ok'));
+        BButton* cancelButton = new BButton("Cancel", new BMessage('cncl'));
+
+        okButton->MakeDefault(true);
+
+        SetLayout(new BGroupLayout(B_VERTICAL));
+        AddChild(BGroupLayoutBuilder(B_VERTICAL, 10)
+            .Add(m_textControl)
+            .AddGroup(B_HORIZONTAL, 10)
+                .AddGlue()
+                .Add(cancelButton)
+                .Add(okButton)
+            .End()
+            .SetInsets(10, 10, 10, 10)
+        );
+
+        CenterOnScreen();
+    }
+
+    void MessageReceived(BMessage* message) override {
+        switch(message->what) {
+            case 'ok':
+                if (m_completionHandler)
+                    m_completionHandler(String::fromUTF8(m_textControl->Text()));
+                m_completionHandler = nullptr;
+                Quit();
+                break;
+            case 'cncl':
+                if (m_completionHandler)
+                    m_completionHandler(String());
+                m_completionHandler = nullptr;
+                Quit();
+                break;
+            default:
+                BWindow::MessageReceived(message);
+        }
+    }
+
+    bool QuitRequested() override {
+        if (m_completionHandler)
+             m_completionHandler(String());
+        return true;
+    }
+
+private:
+    BTextControl* m_textControl;
+    CompletionHandler<void(const String&)> m_completionHandler;
+};
 
 class OpenPanelHandler : public BHandler {
 public:
@@ -232,9 +293,9 @@ void PageUIClientHaiku::runJavaScriptConfirm(WebPageProxy&, const String& messag
     completionHandler(button == 1);
 }
 
-void PageUIClientHaiku::runJavaScriptPrompt(WebPageProxy&, const String&, const String&, WebFrameProxy&, const WebCore::SecurityOriginData&, CompletionHandler<void(const String&)>&& completionHandler)
+void PageUIClientHaiku::runJavaScriptPrompt(WebPageProxy&, const String& message, const String& defaultValue, WebFrameProxy&, const WebCore::SecurityOriginData&, CompletionHandler<void(const String&)>&& completionHandler)
 {
-    completionHandler(String());
+    (new JavaScriptPromptWindow(message, defaultValue, WTFMove(completionHandler)))->Show();
 }
 
 void PageUIClientHaiku::setStatusText(WebPageProxy* page, const String& text)
@@ -258,7 +319,14 @@ void PageUIClientHaiku::mouseDidMoveOverElement(WebPageProxy& page, const WebHit
 
 void PageUIClientHaiku::toolbarsAreVisible(WebPageProxy&, Function<void(bool)>&& completionHandler)
 {
-    completionHandler(true);
+    bool visible = true;
+    if (BWindow* window = m_webView.Window()) {
+        // Assume if window has a KeyMenuBar, it's visible?
+        // Actually, WebKit is asking if *browser* toolbars are visible.
+        // We can ask the window via a synchronous message if needed, but for now defaulting to true is okay.
+        // Or better, let's assume if there are any views other than us, there might be toolbars.
+    }
+    completionHandler(visible);
 }
 
 void PageUIClientHaiku::setToolbarsAreVisible(WebPageProxy&, bool visible)
@@ -272,15 +340,27 @@ void PageUIClientHaiku::setToolbarsAreVisible(WebPageProxy&, bool visible)
 
 void PageUIClientHaiku::menuBarIsVisible(WebPageProxy&, Function<void(bool)>&& completionHandler)
 {
-    completionHandler(true);
+    bool visible = false;
+    if (BWindow* window = m_webView.Window()) {
+        if (window->Lock()) {
+            if (window->KeyMenuBar())
+                visible = !window->KeyMenuBar()->IsHidden();
+            window->Unlock();
+        }
+    }
+    completionHandler(visible);
 }
 
 void PageUIClientHaiku::setMenuBarIsVisible(WebPageProxy&, bool visible)
 {
     if (BWindow* window = m_webView.Window()) {
-        BMessage message(MENU_BAR_VISIBILITY_CHANGED);
-        message.AddBool("visible", visible);
-        window->PostMessage(&message);
+        if (window->Lock()) {
+            if (BMenuBar* bar = window->KeyMenuBar()) {
+                if (visible) bar->Show();
+                else bar->Hide();
+            }
+            window->Unlock();
+        }
     }
 }
 
@@ -301,19 +381,21 @@ void PageUIClientHaiku::setStatusBarIsVisible(WebPageProxy&, bool visible)
 void PageUIClientHaiku::setIsResizable(WebPageProxy&, bool resizable)
 {
     if (BWindow* window = m_webView.Window()) {
-        BMessage message(RESIZABLE_CHANGED);
-        message.AddBool("resizable", resizable);
-        window->PostMessage(&message);
+        if (window->Lock()) {
+            uint32 flags = window->Flags();
+            if (resizable)
+                flags &= ~B_NOT_RESIZABLE;
+            else
+                flags |= B_NOT_RESIZABLE;
+            window->SetFlags(flags);
+            window->Unlock();
+        }
     }
 }
 
 void PageUIClientHaiku::setWindowFrame(WebPageProxy&, const WebCore::FloatRect& frame)
 {
     if (BWindow* window = m_webView.Window()) {
-        BMessage message(WINDOW_FRAME_CHANGED);
-        message.AddRect("frame", BRect(frame));
-        window->PostMessage(&message);
-
         if (window->Lock()) {
             window->MoveTo(frame.x(), frame.y());
             window->ResizeTo(frame.width(), frame.height());

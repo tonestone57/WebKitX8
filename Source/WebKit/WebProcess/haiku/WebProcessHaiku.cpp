@@ -29,6 +29,7 @@
 #include "LogInitialization.h"
 #include "WebProcessCreationParameters.h"
 #include <WebCore/LogInitialization.h>
+#include <WebCore/MemoryCache.h>
 #include <WebCore/PlatformDisplayHaiku.h>
 #include <wtf/Language.h>
 #include <wtf/LogInitialization.h>
@@ -51,8 +52,11 @@ void WebProcess::platformInitializeProcess(const AuxiliaryProcessInitializationP
 {
 }
 
-void WebProcess::platformSetWebsiteDataStoreParameters(WebProcessDataStoreParameters&&)
+void WebProcess::platformSetWebsiteDataStoreParameters(WebProcessDataStoreParameters&& parameters)
 {
+    // On Haiku, most data store paths are standard, but if we need to customize per-process storage
+    // (e.g. for private browsing or isolation), we would apply those parameters here.
+    // For now, BNetworkCookieJar and other Haiku kits handle this globally or via their own contexts.
 }
 
 void WebProcess::platformTerminate()
@@ -61,6 +65,10 @@ void WebProcess::platformTerminate()
 
 void WebProcess::platformSetCacheModel(CacheModel cacheModel)
 {
+    if (cacheModel == CacheModel::DocumentViewer)
+        MemoryCache::singleton().setDisabled(true);
+    else
+        MemoryCache::singleton().setDisabled(false);
 }
 
 void WebProcess::grantAccessToAssetServices(WTF::Vector<WebKit::SandboxExtension::Handle>&&)
