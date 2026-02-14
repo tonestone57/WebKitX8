@@ -28,6 +28,7 @@
 #include "config.h"
 #include "Pasteboard.h"
 
+#include "PasteboardContextHaiku.h"
 #include "Color.h"
 #include "DocumentFragment.h"
 #include "DragData.h"
@@ -61,6 +62,11 @@ namespace WebCore {
 #if ENABLE(DRAG_SUPPORT)
 std::unique_ptr<Pasteboard> Pasteboard::createForDragAndDrop(std::unique_ptr<PasteboardContext>&& context)
 {
+    // If no specific context is provided, we should create one backed by a "Drag" clipboard
+    // to avoid clobbering the system clipboard during drag initiation.
+    if (!context)
+        context = makeUnique<PasteboardContextHaiku>(nullptr); // Marker for "use drag clipboard"
+
     return createForCopyAndPaste(std::move(context));
 }
 
@@ -70,34 +76,61 @@ std::unique_ptr<Pasteboard> Pasteboard::create(const DragData& dragData)
 }
 #endif
 
-Pasteboard::Pasteboard(std::unique_ptr<WebCore::PasteboardContext, std::default_delete<WebCore::PasteboardContext> >&&)
+Pasteboard::Pasteboard(std::unique_ptr<WebCore::PasteboardContext, std::default_delete<WebCore::PasteboardContext> >&& context)
+    : m_context(std::move(context))
 {
 }
 
 
-// BClipboard unfortunately does not derive from BLocker, so we cannot use BAutolock.
-class AutoClipboardLocker {
+class PasteboardTransaction {
 public:
-    AutoClipboardLocker(BClipboard* clipboard)
-        : m_clipboard(clipboard)
-        , m_isLocked(clipboard && clipboard->Lock())
+    PasteboardTransaction(const PasteboardContext* context)
     {
+        // 1. Try to get BMessage from context
+        if (auto* hContext = dynamic_cast<const PasteboardContextHaiku*>(context))
+            m_message = hContext->message();
+
+        // 2. If no BMessage, check if we should use the "Drag" clipboard
+        if (!m_message) {
+            // Check if context is a PasteboardContextHaiku but with null message (marker for drag clipboard)
+            // But dynamic_cast above handles it. If hContext->message() is null, m_message is null.
+            if (auto* hContext = dynamic_cast<const PasteboardContextHaiku*>(context)) {
+                // It's a drag context but no message provided -> Use "WebKitDrag" clipboard
+                m_customClipboard = makeUnique<BClipboard>("WebKitDrag");
+                m_clipboard = m_customClipboard.get();
+            } else {
+                // Default context -> Use System clipboard
+                m_clipboard = be_clipboard;
+            }
+
+            if (m_clipboard->Lock()) {
+                m_clipboardLocked = true;
+                m_message = m_clipboard->Data();
+            }
+        }
     }
 
-    ~AutoClipboardLocker()
+    ~PasteboardTransaction()
     {
-        if (m_isLocked)
+        if (m_clipboardLocked) {
+            if (m_committed)
+                m_clipboard->Commit();
             m_clipboard->Unlock();
+        }
     }
 
-    bool isLocked() const
-    {
-        return m_isLocked;
-    }
+    BMessage* message() const { return m_message; }
+    bool isValid() const { return m_message != nullptr; }
+
+    void commit() { m_committed = true; }
+    void clear() { if (m_message) m_message->MakeEmpty(); }
 
 private:
-    BClipboard* m_clipboard;
-    bool m_isLocked;
+    BMessage* m_message = nullptr;
+    BClipboard* m_clipboard = nullptr;
+    std::unique_ptr<BClipboard> m_customClipboard;
+    bool m_clipboardLocked = false;
+    bool m_committed = false;
 };
 
 void Pasteboard::writeTrustworthyWebURLsPboardType(const PasteboardURL& url)
@@ -107,36 +140,35 @@ void Pasteboard::writeTrustworthyWebURLsPboardType(const PasteboardURL& url)
 
 void Pasteboard::writeString(const String& type, const String& data)
 {
-    if (be_clipboard->Lock()) {
-        bool result = false;
-        BMessage* bdata = be_clipboard->Data();
+    PasteboardTransaction transaction(context());
+    if (!transaction.isValid())
+        return;
 
-        if (bdata) {
-            CString typeUTF8 = type.utf8();
-            bdata->RemoveName(typeUTF8.data());
+    BMessage* bdata = transaction.message();
+    bool result = false;
 
-            CString dataUTF8 = data.utf8();
-            if (bdata->AddData(typeUTF8.data(), B_MIME_TYPE,
-                    dataUTF8.data(), dataUTF8.length()) == B_OK)
-                result = true;
-        }
+    if (bdata) {
+        CString typeUTF8 = type.utf8();
+        bdata->RemoveName(typeUTF8.data());
 
-        if (result)
-            be_clipboard->Commit();
-        else
-            be_clipboard->Revert();
-        be_clipboard->Unlock();
+        CString dataUTF8 = data.utf8();
+        if (bdata->AddData(typeUTF8.data(), B_MIME_TYPE,
+                dataUTF8.data(), dataUTF8.length()) == B_OK)
+            result = true;
     }
+
+    if (result)
+        transaction.commit();
 }
 
 void Pasteboard::writeSelection(const std::optional<SimpleRange>& selectedRange, bool canSmartCopyOrDelete, LocalFrame& frame, ShouldSerializeSelectedTextForDataTransfer)
 {
-    AutoClipboardLocker locker(be_clipboard);
-    if (!locker.isLocked())
+    PasteboardTransaction transaction(context());
+    if (!transaction.isValid())
         return;
 
-    be_clipboard->Clear();
-    BMessage* data = be_clipboard->Data();
+    transaction.clear();
+    BMessage* data = transaction.message();
     if (!data)
         return;
 
@@ -151,23 +183,23 @@ void Pasteboard::writeSelection(const std::optional<SimpleRange>& selectedRange,
     BString markupString(serializePreservingVisualAppearance(*selectedRange, nullptr, AnnotateForInterchange::Yes));
     data->AddData("text/html", B_MIME_TYPE, markupString.String(), markupString.Length());
 
-    be_clipboard->Commit();
+    transaction.commit();
 }
 
 void Pasteboard::writePlainText(const String& text, SmartReplaceOption smartReplaceOption)
 {
-    AutoClipboardLocker locker(be_clipboard);
-    if (!locker.isLocked())
+    PasteboardTransaction transaction(context());
+    if (!transaction.isValid())
         return;
 
-    be_clipboard->Clear();
-    BMessage* data = be_clipboard->Data();
+    transaction.clear();
+    BMessage* data = transaction.message();
     if (!data)
         return;
 
     BString string(text);
     data->AddData("text/plain", B_MIME_TYPE, string.String(), string.Length());
-    be_clipboard->Commit();
+    transaction.commit();
 }
 
 
@@ -185,12 +217,12 @@ void WebCore::Pasteboard::write(WebCore::PasteboardImage const& pasteboardImage)
     if (!platformImage)
         return;
 
-    AutoClipboardLocker locker(be_clipboard);
-    if (!locker.isLocked())
+    PasteboardTransaction transaction(context());
+    if (!transaction.isValid())
         return;
 
-    be_clipboard->Clear();
-    BMessage* data = be_clipboard->Data();
+    transaction.clear();
+    BMessage* data = transaction.message();
     if (!data)
         return;
 
@@ -215,17 +247,17 @@ void WebCore::Pasteboard::write(WebCore::PasteboardImage const& pasteboardImage)
         stream.DetachBitmap(&tmp);
     }
 
-    be_clipboard->Commit();
+    transaction.commit();
 }
 
 void Pasteboard::write(const PasteboardBuffer& buffer)
 {
-    AutoClipboardLocker locker(be_clipboard);
-    if (!locker.isLocked())
+    PasteboardTransaction transaction(context());
+    if (!transaction.isValid())
         return;
 
-    be_clipboard->Clear();
-    BMessage* data = be_clipboard->Data();
+    transaction.clear();
+    BMessage* data = transaction.message();
     if (!data)
         return;
 
@@ -234,17 +266,17 @@ void Pasteboard::write(const PasteboardBuffer& buffer)
         data->AddData(buffer.type.utf8().data(), B_MIME_TYPE, contiguous->data(), contiguous->size());
     }
 
-    be_clipboard->Commit();
+    transaction.commit();
 }
 
 void WebCore::Pasteboard::write(WebCore::PasteboardWebContent const& content)
 {
-    AutoClipboardLocker locker(be_clipboard);
-    if (!locker.isLocked())
+    PasteboardTransaction transaction(context());
+    if (!transaction.isValid())
         return;
 
-    be_clipboard->Clear();
-    BMessage* data = be_clipboard->Data();
+    transaction.clear();
+    BMessage* data = transaction.message();
     if (!data)
         return;
 
@@ -252,23 +284,23 @@ void WebCore::Pasteboard::write(WebCore::PasteboardWebContent const& content)
 
     data->AddData("text/plain", B_MIME_TYPE, content.text.utf8().data(), content.text.utf8().length());
 
-    be_clipboard->Commit();
+    transaction.commit();
 }
 
 void WebCore::Pasteboard::writeMarkup(WTF::String const& text)
 {
-    AutoClipboardLocker locker(be_clipboard);
-    if (!locker.isLocked())
+    PasteboardTransaction transaction(context());
+    if (!transaction.isValid())
         return;
 
-    be_clipboard->Clear();
-    BMessage* data = be_clipboard->Data();
+    transaction.clear();
+    BMessage* data = transaction.message();
     if (!data)
         return;
 
     BString string(text);
     data->AddData("text/html", B_MIME_TYPE, string.String(), string.Length());
-    be_clipboard->Commit();
+    transaction.commit();
 }
 
 
@@ -277,29 +309,38 @@ void Pasteboard::write(const PasteboardURL& url)
 {
     ASSERT(!url.url.isEmpty());
 
-    AutoClipboardLocker locker(be_clipboard);
-    if (!locker.isLocked())
+    PasteboardTransaction transaction(context());
+    if (!transaction.isValid())
         return;
 
-    be_clipboard->Clear();
+    transaction.clear();
 
-    BMessage* data = be_clipboard->Data();
+    BMessage* data = transaction.message();
     if (!data)
         return;
 
     BString string(url.url.string());
     data->AddData("text/plain", B_MIME_TYPE, string.String(), string.Length());
-    be_clipboard->Commit();
+
+    if (url.url.protocolIs("file"_s)) {
+        BEntry entry(url.url.fileSystemPath().utf8().data());
+        entry_ref ref;
+        if (entry.GetRef(&ref) == B_OK) {
+            data->AddRef("refs", &ref);
+        }
+    }
+
+    transaction.commit();
 }
 
 void Pasteboard::write(const Color& color)
 {
-    AutoClipboardLocker locker(be_clipboard);
-    if (!locker.isLocked())
+    PasteboardTransaction transaction(context());
+    if (!transaction.isValid())
         return;
 
-    be_clipboard->Clear();
-    BMessage* data = be_clipboard->Data();
+    transaction.clear();
+    BMessage* data = transaction.message();
     if (!data)
         return;
 
@@ -311,16 +352,16 @@ void Pasteboard::write(const Color& color)
     BString hexStr(hex.utf8().data());
     data->AddData("text/plain", B_MIME_TYPE, hexStr.String(), hexStr.Length());
 
-    be_clipboard->Commit();
+    transaction.commit();
 }
 
 Pasteboard::FileContentState Pasteboard::fileContentState()
 {
-    AutoClipboardLocker locker(be_clipboard);
-    if (!locker.isLocked())
+    PasteboardTransaction transaction(context());
+    if (!transaction.isValid())
         return FileContentState::NoFileOrImageData;
 
-    BMessage* data = be_clipboard->Data();
+    BMessage* data = transaction.message();
     if (!data)
         return FileContentState::NoFileOrImageData;
 
@@ -341,11 +382,11 @@ bool Pasteboard::canSmartReplace()
 
 void Pasteboard::read(PasteboardWebContentReader& reader, WebContentReadingPolicy, std::optional<long unsigned int>)
 {
-    AutoClipboardLocker locker(be_clipboard);
-    if (!locker.isLocked())
+    PasteboardTransaction transaction(context());
+    if (!transaction.isValid())
         return;
 
-    BMessage* data = be_clipboard->Data();
+    BMessage* data = transaction.message();
     if (!data)
         return;
 
@@ -375,11 +416,11 @@ void Pasteboard::read(PasteboardWebContentReader& reader, WebContentReadingPolic
 
 void Pasteboard::read(PasteboardPlainText& text, WebCore::PlainTextURLReadingPolicy, std::optional<long unsigned int>)
 {
-    AutoClipboardLocker locker(be_clipboard);
-    if (!locker.isLocked())
+    PasteboardTransaction transaction(context());
+    if (!transaction.isValid())
         return;
 
-    BMessage* data = be_clipboard->Data();
+    BMessage* data = transaction.message();
     if (!data)
         return;
 
@@ -395,11 +436,11 @@ RefPtr<DocumentFragment> Pasteboard::documentFragment(LocalFrame& frame, const S
 {
     chosePlainText = false;
 
-    AutoClipboardLocker locker(be_clipboard);
-    if (!locker.isLocked())
+    PasteboardTransaction transaction(this->context());
+    if (!transaction.isValid())
         return nullptr;
 
-    BMessage* data = be_clipboard->Data();
+    BMessage* data = transaction.message();
     if (!data)
         return nullptr;
 
@@ -435,31 +476,25 @@ RefPtr<DocumentFragment> Pasteboard::documentFragment(LocalFrame& frame, const S
 
 bool Pasteboard::hasData()
 {
-    bool result = false;
+    PasteboardTransaction transaction(context());
+    if (!transaction.isValid()) return false;
 
-    if (be_clipboard->Lock()) {
-        BMessage* data = be_clipboard->Data();
+    BMessage* data = transaction.message();
+    if (data)
+        return !data->IsEmpty();
 
-        if (data)
-            result = !data->IsEmpty();
-
-        be_clipboard->Unlock();
-    }
-
-    return result;
+    return false;
 }
 
 void Pasteboard::clear(const String& type)
 {
-    if (be_clipboard->Lock()) {
-        BMessage* data = be_clipboard->Data();
+    PasteboardTransaction transaction(context());
+    if (!transaction.isValid()) return;
 
-        if (data) {
-            data->RemoveName(BString(type).String());
-            be_clipboard->Commit();
-        }
-
-        be_clipboard->Unlock();
+    BMessage* data = transaction.message();
+    if (data) {
+        data->RemoveName(BString(type).String());
+        transaction.commit();
     }
 }
 
@@ -473,9 +508,9 @@ String Pasteboard::readString(const String& type)
 {
     BString result;
 
-    if (be_clipboard->Lock()) {
-        BMessage* data = be_clipboard->Data();
-
+    PasteboardTransaction transaction(context());
+    if (transaction.isValid()) {
+        BMessage* data = transaction.message();
         const char* buffer;
         ssize_t bufferLength;
         if (data) {
@@ -483,8 +518,6 @@ String Pasteboard::readString(const String& type)
                 reinterpret_cast<const void**>(&buffer), &bufferLength);
         }
         result.SetTo(buffer, bufferLength);
-
-        be_clipboard->Unlock();
     }
 
     return String::fromUTF8(result.String());
@@ -497,12 +530,11 @@ String Pasteboard::readStringInCustomData(const String& type)
 
 void Pasteboard::clear()
 {
-    AutoClipboardLocker locker(be_clipboard);
-    if (!locker.isLocked())
-        return;
+    PasteboardTransaction transaction(context());
+    if (!transaction.isValid()) return;
 
-    be_clipboard->Clear();
-    be_clipboard->Commit();
+    transaction.clear();
+    transaction.commit();
 }
 
 #if ENABLE(DRAG_SUPPORT)
@@ -528,9 +560,9 @@ Vector<String> Pasteboard::typesForLegacyUnsafeBindings()
 {
     Vector<String> result;
 
-    if (be_clipboard->Lock()) {
-        BMessage* data = be_clipboard->Data();
-
+    PasteboardTransaction transaction(context());
+    if (transaction.isValid()) {
+        BMessage* data = transaction.message();
         if (data) {
             char* name;
             uint32 type;
@@ -542,8 +574,6 @@ Vector<String> Pasteboard::typesForLegacyUnsafeBindings()
                 result.append(String::fromUTF8(name));
             }
         }
-
-        be_clipboard->Unlock();
     }
 
     return result;
@@ -566,13 +596,11 @@ void Pasteboard::writeCustomData(const WTF::Vector<PasteboardCustomData>& data)
 
 void Pasteboard::read(WebCore::PasteboardFileReader& reader, std::optional<unsigned long>)
 {
-    AutoClipboardLocker locker(be_clipboard);
-    if (!locker.isLocked())
-        return;
+    PasteboardTransaction transaction(context());
+    if (!transaction.isValid()) return;
 
-    BMessage* data = be_clipboard->Data();
-    if (!data)
-        return;
+    BMessage* data = transaction.message();
+    if (!data) return;
 
     entry_ref ref;
     for (int32 i = 0; data->FindRef("refs", i, &ref) == B_OK; i++) {

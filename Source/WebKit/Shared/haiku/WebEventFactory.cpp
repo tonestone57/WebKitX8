@@ -29,6 +29,7 @@
 #include "WebEventModifier.h"
 #include "WebMouseEventButton.h"
 #include "WebEventType.h"
+#include "NativeWebTouchEvent.h"
 
 #include "WebCore/PlatformKeyboardEvent.h"
 #include <WebCore/IntPoint.h>
@@ -259,6 +260,59 @@ WebWheelEvent WebEventFactory::createWebWheelEvent(const BMessage* message)
         FloatSize(0,0),// wheelticks
         WebWheelEvent::Granularity::ScrollByPixelWheelEvent// granularity
         );
+}
+
+WebTouchEvent WebEventFactory::createWebTouchEvent(const BMessage* message)
+{
+    WebEventType type;
+    switch (message->what) {
+        case B_TOUCH_DOWN: type = WebEventType::TouchStart; break;
+        case B_TOUCH_UP: type = WebEventType::TouchEnd; break;
+        case B_TOUCH_MOVED: type = WebEventType::TouchMove; break;
+        case B_TOUCH_CANCEL: type = WebEventType::TouchCancel; break;
+        default: type = WebEventType::TouchCancel; break;
+    }
+
+    OptionSet<WebEventModifier> modifiers;
+    int32 nativeModifiers;
+    if (message->FindInt32("modifiers", &nativeModifiers) == B_OK) {
+        if (nativeModifiers & B_SHIFT_KEY) modifiers.add(WebEventModifier::ShiftKey);
+        if (nativeModifiers & B_COMMAND_KEY) modifiers.add(WebEventModifier::ControlKey);
+        if (nativeModifiers & B_CONTROL_KEY) modifiers.add(WebEventModifier::AltKey);
+        if (nativeModifiers & B_OPTION_KEY) modifiers.add(WebEventModifier::MetaKey);
+        if (nativeModifiers & B_CAPS_LOCK) modifiers.add(WebEventModifier::CapsLockKey);
+    }
+
+    int64 when;
+    MonotonicTime timestamp = MonotonicTime::now();
+    if (message->FindInt64("when", &when) == B_OK)
+        timestamp = MonotonicTime::fromRawSeconds(when / 1000000.0);
+
+    Vector<WebPlatformTouchPoint> touchPoints;
+
+    int32 touchId;
+    for (int32 i = 0; message->FindInt32("be:touch_id", i, &touchId) == B_OK; i++) {
+        BPoint location;
+        if (message->FindPoint("be:view_where", i, &location) != B_OK)
+            location = BPoint(0,0);
+
+        BPoint screenLocation;
+        if (message->FindPoint("be:screen_where", i, &screenLocation) != B_OK)
+             screenLocation = BPoint(0,0);
+
+        WebPlatformTouchPoint::TouchPointState state = WebPlatformTouchPoint::TouchPointState::Stationary;
+        switch (type) {
+            case WebEventType::TouchStart: state = WebPlatformTouchPoint::TouchPointState::Pressed; break;
+            case WebEventType::TouchEnd: state = WebPlatformTouchPoint::TouchPointState::Released; break;
+            case WebEventType::TouchMove: state = WebPlatformTouchPoint::TouchPointState::Moved; break;
+            case WebEventType::TouchCancel: state = WebPlatformTouchPoint::TouchPointState::Cancelled; break;
+            default: break;
+        }
+
+        touchPoints.append(WebPlatformTouchPoint(touchId, state, IntPoint(screenLocation), IntPoint(location)));
+    }
+
+    return WebTouchEvent(WebEvent { type, modifiers, timestamp }, WTFMove(touchPoints), { }, { });
 }
 
 }

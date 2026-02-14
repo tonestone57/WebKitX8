@@ -25,29 +25,26 @@
 
 #pragma once
 
-#include "WebMouseEvent.h"
-#include "WebKeyboardEvent.h"
-#include "WebWheelEvent.h"
 #include "WebTouchEvent.h"
+#include <Message.h>
 
-class BMessage;
+#ifndef B_TOUCH_DOWN
+#define B_TOUCH_DOWN 0x0060
+#define B_TOUCH_UP 0x0061
+#define B_TOUCH_MOVED 0x0062
+#define B_TOUCH_CANCEL 0x0063
+#endif
 
 namespace WebKit {
-class WebMouseEvent;
-class WebWheelEvent;
-class WebKeyboardEvent;
-class WebTouchEvent;
 
-class WebEventFactory {
+class NativeWebTouchEvent : public WebTouchEvent {
 public:
-    static WebMouseEvent createWebMouseEvent(const BMessage*);
-    static WebWheelEvent createWebWheelEvent(const BMessage*);
-    static WebKeyboardEvent createWebKeyboardEvent(const BMessage*);
-    static WebTouchEvent createWebTouchEvent(const BMessage*);
+    NativeWebTouchEvent(const BMessage*);
+
+    const BMessage* nativeEvent() const { return &m_nativeEvent; }
 
 private:
-    static int32_t currentMouseButtons;
-    static WebMouseEventButton currentMouseButton;
+    BMessage m_nativeEvent;
 };
 
 } // namespace WebKit

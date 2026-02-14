@@ -26,6 +26,8 @@
 #include "config.h"
 #include "WebProcessPool.h"
 
+#include "NotificationProviderHaiku.h"
+#include "WebNotificationManagerProxy.h"
 #include "WebProcessCreationParameters.h"
 #include <wtf/MainThread.h>
 #include <wtf/RunLoop.h>
@@ -36,6 +38,9 @@ namespace WebKit {
 
 void WebProcessPool::platformInitialize(NeedsGlobalStaticInitialization)
 {
+    if (auto* manager = ensureSupplement<WebNotificationManagerProxy>())
+        manager->setProvider(makeUnique<NotificationProviderHaiku>());
+
     // Check memory status periodically
     static bool memoryPressureHandlerInitialized = false;
     if (!memoryPressureHandlerInitialized) {

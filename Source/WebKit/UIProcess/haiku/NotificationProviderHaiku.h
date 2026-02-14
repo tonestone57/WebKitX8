@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 Haiku Inc. All rights reserved.
+ * Copyright (C) 2024 Haiku, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,29 +25,23 @@
 
 #pragma once
 
-#include "WebMouseEvent.h"
-#include "WebKeyboardEvent.h"
-#include "WebWheelEvent.h"
-#include "WebTouchEvent.h"
-
-class BMessage;
+#include "APINotificationProvider.h"
+#include <wtf/HashMap.h>
+#include <wtf/UUID.h>
 
 namespace WebKit {
-class WebMouseEvent;
-class WebWheelEvent;
-class WebKeyboardEvent;
-class WebTouchEvent;
 
-class WebEventFactory {
+class NotificationProviderHaiku final : public API::NotificationProvider {
 public:
-    static WebMouseEvent createWebMouseEvent(const BMessage*);
-    static WebWheelEvent createWebWheelEvent(const BMessage*);
-    static WebKeyboardEvent createWebKeyboardEvent(const BMessage*);
-    static WebTouchEvent createWebTouchEvent(const BMessage*);
+    NotificationProviderHaiku();
+    ~NotificationProviderHaiku();
 
-private:
-    static int32_t currentMouseButtons;
-    static WebMouseEventButton currentMouseButton;
+    bool show(WebPageProxy*, WebNotification&, RefPtr<WebCore::NotificationResources>&&) override;
+    void cancel(WebNotification&) override;
+    void didDestroyNotification(WebNotification&) override;
+    void clearNotifications(const Vector<WebNotificationIdentifier>&) override;
+
+    HashMap<WTF::String, bool> notificationPermissions() override;
 };
 
 } // namespace WebKit

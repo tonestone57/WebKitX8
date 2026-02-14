@@ -75,6 +75,7 @@ void WebContextMenuProxyHaiku::populateMenu(BMenu* menu, const Vector<WebContext
             }
             case WebCore::ContextMenuItemType::Action:
             case WebCore::ContextMenuItemType::CheckableAction: {
+                // Standard actions, including "Inspect Element", are handled here.
                 // We store the pointer to the item data in the message.
                 // Since this function runs synchronously during showContextMenuWithItems,
                 // the data will remain valid until the menu closes.

@@ -40,4 +40,4 @@ list(APPEND WTF_INCLUDE_DIRECTORIES
     /system/develop/headers/private/system
 )
 
-add_definitions(-D_DEFAULT_SOURCE)
+add_definitions(-D_DEFAULT_SOURCE -DENABLE_TOUCH_EVENTS=1)

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 Haiku Inc. All rights reserved.
+ * Copyright (C) 2024 Haiku, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,31 +23,55 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma once
+#include "config.h"
+#include "NotificationProviderHaiku.h"
 
-#include "WebMouseEvent.h"
-#include "WebKeyboardEvent.h"
-#include "WebWheelEvent.h"
-#include "WebTouchEvent.h"
+#include "WebNotification.h"
+#include "WebPageProxy.h"
+#include <WebCore/NotificationData.h>
+#include <WebCore/NotificationResources.h>
 
-class BMessage;
+#include <Notification.h>
+#include <String.h>
 
 namespace WebKit {
-class WebMouseEvent;
-class WebWheelEvent;
-class WebKeyboardEvent;
-class WebTouchEvent;
 
-class WebEventFactory {
-public:
-    static WebMouseEvent createWebMouseEvent(const BMessage*);
-    static WebWheelEvent createWebWheelEvent(const BMessage*);
-    static WebKeyboardEvent createWebKeyboardEvent(const BMessage*);
-    static WebTouchEvent createWebTouchEvent(const BMessage*);
+NotificationProviderHaiku::NotificationProviderHaiku()
+{
+}
 
-private:
-    static int32_t currentMouseButtons;
-    static WebMouseEventButton currentMouseButton;
-};
+NotificationProviderHaiku::~NotificationProviderHaiku()
+{
+}
+
+bool NotificationProviderHaiku::show(WebPageProxy* page, WebNotification& webNotification, RefPtr<WebCore::NotificationResources>&& resources)
+{
+    BNotification notification(B_INFORMATION_NOTIFICATION);
+    notification.SetTitle(webNotification.title().utf8().data());
+    notification.SetContent(webNotification.body().utf8().data());
+    notification.SetMessageID(webNotification.coreNotificationID().toString().utf8().data());
+
+    notification.Send();
+
+    return true;
+}
+
+void NotificationProviderHaiku::cancel(WebNotification& webNotification)
+{
+    // Haiku BNotification currently does not support programmatic cancellation via ID easily.
+}
+
+void NotificationProviderHaiku::didDestroyNotification(WebNotification&)
+{
+}
+
+void NotificationProviderHaiku::clearNotifications(const Vector<WebNotificationIdentifier>&)
+{
+}
+
+HashMap<WTF::String, bool> NotificationProviderHaiku::notificationPermissions()
+{
+    return { };
+}
 
 } // namespace WebKit
