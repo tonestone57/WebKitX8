@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 Apple Inc. All rights reserved.
+ * Copyright (C) 2019 Haiku, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,43 +23,35 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma once
+#include "config.h"
+#include "Download.h"
 
-#if PLATFORM(COCOA)
-#include "WebSocketTaskCocoa.h"
-#elif USE(SOUP)
-#include "WebSocketTaskSoup.h"
-#elif USE(CURL)
-#include "WebSocketTaskCurl.h"
-#elif PLATFORM(HAIKU)
-#include "WebSocketTaskHaiku.h"
-#else
-#include <wtf/TZoneMallocInlines.h>
-#include <wtf/ThreadSafeWeakPtr.h>
+#include <wtf/text/CString.h>
 
 namespace WebKit {
-class WebSocketTask;
+
+void Download::platformCancelNetworkLoad(CompletionHandler<void(std::span<const uint8_t>)>&& completionHandler)
+{
+    // Serialize URL as resume data.
+    String url = m_download->firstRequest().url().string();
+    CString utf8 = url.utf8();
+    Vector<uint8_t> resumeData;
+    resumeData.append(reinterpret_cast<const uint8_t*>(utf8.data()), utf8.length());
+
+    completionHandler(std::span<const uint8_t>(resumeData.data(), resumeData.size()));
 }
 
-namespace WebKit {
+void Download::platformDestroyDownload()
+{
+}
 
-struct SessionSet;
+void Download::platformDidFinish(CompletionHandler<void()>&& completionHandler)
+{
+    completionHandler();
+}
 
-class WebSocketTask : public ThreadSafeRefCountedAndCanMakeThreadSafeWeakPtr<WebSocketTask> {
-    WTF_MAKE_TZONE_ALLOCATED_INLINE(WebSocketTask);
-public:
-    typedef uint64_t TaskIdentifier;
-
-    void sendString(std::span<const uint8_t>, CompletionHandler<void()>&&) { }
-    void sendData(std::span<const uint8_t>, CompletionHandler<void()>&&) { }
-    void close(int32_t code, const String& reason) { }
-
-    void cancel() { }
-    void resume() { }
-    
-    SessionSet* sessionSet() { return nullptr; }
-};
+void Download::resume(std::span<const uint8_t> resumeData, const String& path, SandboxExtension::Handle&& sandboxExtensionHandle, std::span<const uint8_t> activityAccessToken)
+{
+}
 
 } // namespace WebKit
-
-#endif

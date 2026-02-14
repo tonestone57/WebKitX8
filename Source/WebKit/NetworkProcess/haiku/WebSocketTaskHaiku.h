@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 Apple Inc. All rights reserved.
+ * Copyright (C) 2019 Haiku, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,41 +25,43 @@
 
 #pragma once
 
-#if PLATFORM(COCOA)
-#include "WebSocketTaskCocoa.h"
-#elif USE(SOUP)
-#include "WebSocketTaskSoup.h"
-#elif USE(CURL)
-#include "WebSocketTaskCurl.h"
-#elif PLATFORM(HAIKU)
-#include "WebSocketTaskHaiku.h"
-#else
-#include <wtf/TZoneMallocInlines.h>
+#include "NetworkSocketChannel.h"
+#include <WebCore/ClientOrigin.h>
+#include <WebCore/ResourceRequest.h>
+#include <WebCore/StoredCredentialsPolicy.h>
+#include <wtf/TZoneMalloc.h>
 #include <wtf/ThreadSafeWeakPtr.h>
-
-namespace WebKit {
-class WebSocketTask;
-}
+#include <wtf/CompletionHandler.h>
+#include <wtf/Ref.h>
 
 namespace WebKit {
 
 struct SessionSet;
 
 class WebSocketTask : public ThreadSafeRefCountedAndCanMakeThreadSafeWeakPtr<WebSocketTask> {
-    WTF_MAKE_TZONE_ALLOCATED_INLINE(WebSocketTask);
+    WTF_MAKE_TZONE_ALLOCATED(WebSocketTask);
 public:
     typedef uint64_t TaskIdentifier;
 
-    void sendString(std::span<const uint8_t>, CompletionHandler<void()>&&) { }
-    void sendData(std::span<const uint8_t>, CompletionHandler<void()>&&) { }
-    void close(int32_t code, const String& reason) { }
+    static Ref<WebSocketTask> create(NetworkSocketChannel&, const WebCore::ResourceRequest&, const String& protocol);
 
-    void cancel() { }
-    void resume() { }
-    
+    virtual ~WebSocketTask();
+
+    void sendString(std::span<const uint8_t>, CompletionHandler<void()>&&);
+    void sendData(std::span<const uint8_t>, CompletionHandler<void()>&&);
+    void close(int32_t code, const String& reason);
+
+    void cancel();
+    void resume();
+
     SessionSet* sessionSet() { return nullptr; }
+
+private:
+    WebSocketTask(NetworkSocketChannel&, const WebCore::ResourceRequest&, const String& protocol);
+
+    NetworkSocketChannel& m_channel;
+    WebCore::ResourceRequest m_request;
+    String m_protocol;
 };
 
 } // namespace WebKit
-
-#endif

@@ -28,6 +28,8 @@
 #include "WebsiteDataStoreParameters.h"
 
 #include <WebCore/NotImplemented.h>
+#include <FindDirectory.h>
+#include <Path.h>
 
 namespace WebKit {
 
@@ -50,7 +52,13 @@ String WebsiteDataStore::cacheDirectoryFileSystemRepresentation(const String& di
 {
     if (!baseCacheDirectory.isNull())
         return FileSystem::pathByAppendingComponent(baseCacheDirectory, directoryName);
-    return FileSystem::pathByAppendingComponent("/app0"_s, directoryName);
+
+    BPath path;
+    if (find_directory(B_USER_CACHE_DIRECTORY, &path) == B_OK) {
+        path.Append("WebKit");
+        return FileSystem::pathByAppendingComponent(String::fromUTF8(path.Path()), directoryName);
+    }
+    return FileSystem::pathByAppendingComponent("/boot/home/config/cache/WebKit"_s, directoryName);
 }
 
 String WebsiteDataStore::websiteDataDirectoryFileSystemRepresentation(const String& directoryName,
@@ -58,7 +66,13 @@ String WebsiteDataStore::websiteDataDirectoryFileSystemRepresentation(const Stri
 {
     if (!baseDataDirectory.isNull())
         return FileSystem::pathByAppendingComponent(baseDataDirectory, directoryName);
-    return FileSystem::pathByAppendingComponent("/app0"_s, directoryName);
+
+    BPath path;
+    if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK) {
+        path.Append("WebKit/WebsiteData");
+        return FileSystem::pathByAppendingComponent(String::fromUTF8(path.Path()), directoryName);
+    }
+    return FileSystem::pathByAppendingComponent("/boot/home/config/settings/WebKit/WebsiteData"_s, directoryName);
 }
 
 UnifiedOriginStorageLevel WebsiteDataStore::defaultUnifiedOriginStorageLevel()

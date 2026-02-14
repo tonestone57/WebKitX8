@@ -82,6 +82,8 @@ if (NOT USE_CURL)
         NetworkProcess/haiku/NetworkDataTaskHaiku.cpp
         NetworkProcess/haiku/NetworkProcessHaiku.cpp
         NetworkProcess/haiku/NetworkSessionHaiku.cpp
+        NetworkProcess/haiku/WebSocketTaskHaiku.cpp
+        NetworkProcess/Downloads/haiku/DownloadHaiku.cpp
 
         WebProcess/Cookies/haiku/WebCookieManagerHaiku.cpp
         WebProcess/WebCoreSupport/haiku/WebFrameNetworkingContext.cpp
