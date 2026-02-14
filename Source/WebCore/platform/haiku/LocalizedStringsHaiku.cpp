@@ -50,60 +50,9 @@ String resetButtonDefaultLabel()
     return "Reset"_s;
 }
 
-String fileButtonChooseFileLabel()
-{
-    return "Choose File"_s;
-}
-
-String fileButtonChooseFilesLabel()
-{
-    return "Choose Files"_s;
-}
-
-String fileButtonNoFileSelectedLabel()
-{
-    return "No file selected"_s;
-}
-
-String searchMenuNoRecentSearchesText()
-{
-    return "No recent searches"_s;
-}
-
-String searchMenuRecentSearchesText()
-{
-    return "Recent searches"_s;
-}
-
-String searchMenuClearRecentSearchesText()
-{
-    return "Clear recent searches"_s;
-}
-
-String AXWebAreaText()
-{
-    return "Web Area"_s;
-}
-
-String AXLinkText()
-{
-    return "Link"_s;
-}
-
-String AXListMarkerText()
-{
-    return "List Marker"_s;
-}
-
-String AXImageMapText()
-{
-    return "Image Map"_s;
-}
-
-String AXHeadingText()
-{
-    return "Heading"_s;
-}
+// Helper to avoid duplication if header defines them or if they are already defined above.
+// The previous read showed duplication at the end of the file.
+// I will remove the duplicates at the end.
 
 String AXButtonActionVerb()
 {

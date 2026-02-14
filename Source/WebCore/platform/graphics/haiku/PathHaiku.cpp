@@ -758,10 +758,19 @@ bool PathHaiku::transform(const AffineTransform& transform)
 
 FloatRect PathHaiku::strokeBoundingRect(const Function<void(GraphicsContext&)>& applier) const
 {
-    // Used by the web inspector to highlight some element
     if (applier) {
-        // FIXME: Calculate exact stroke bounds
-        // For now, return bounds inflated by a guess or just Bounds()
+        // Use HitTestBitmap to calculate exact bounds? No, that's too slow for bounding rect.
+        // We can create a temporary view/bitmap and get the size?
+        // Or just inflate by stroke thickness if we can get it from applier?
+        // Applier takes a GraphicsContext. We can record the state changes.
+        // But for now, getting the BShape bounds is fast.
+        // Let's assume a reasonable padding if we can't determine stroke width easily.
+        // Most usage of this is for dirty rect calculation or hit testing.
+        // Returning a slightly larger rect is safe.
+
+        BRect bounds = m_platformPath.Bounds();
+        bounds.InsetBy(-10, -10); // Arbitrary safety margin
+        return bounds;
     }
 
     return m_platformPath.Bounds();

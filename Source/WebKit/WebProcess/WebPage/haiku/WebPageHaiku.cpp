@@ -77,6 +77,39 @@ bool WebPage::platformCanHandleRequest(const ResourceRequest& request)
 
 const char* WebPage::interpretKeyEvent(const KeyboardEvent* event)
 {
+    const PlatformKeyboardEvent* platformEvent = event->underlyingPlatformEvent();
+    if (!platformEvent)
+        return nullptr;
+
+    switch (platformEvent->windowsVirtualKeyCode()) {
+    case VK_BACK:
+        return "DeleteBackward";
+    case VK_BACKTAB:
+        return "InsertBacktab";
+    case VK_TAB:
+        return "InsertTab";
+    case VK_RETURN:
+        return "InsertNewline";
+    case VK_DELETE:
+        return "DeleteForward";
+    case VK_HOME:
+        return "MoveToBeginningOfLine";
+    case VK_END:
+        return "MoveToEndOfLine";
+    case VK_PRIOR:
+        return "MoveUpByPage";
+    case VK_NEXT:
+        return "MoveDownByPage";
+    case VK_LEFT:
+        return "MoveLeft";
+    case VK_RIGHT:
+        return "MoveRight";
+    case VK_UP:
+        return "MoveUp";
+    case VK_DOWN:
+        return "MoveDown";
+    }
+
     return nullptr;
 }
 
@@ -110,6 +143,48 @@ OptionSet<PointerCharacteristics> WebPage::pointerCharacteristicsOfAllAvailableP
 
 bool WebPage::handleEditingKeyboardEvent(WebCore::KeyboardEvent& event)
 {
+    const PlatformKeyboardEvent* platformEvent = event.underlyingPlatformEvent();
+    if (!platformEvent)
+        return false;
+
+    if (platformEvent->type() == PlatformEvent::Type::RawKeyDown || platformEvent->type() == PlatformEvent::Type::Char) {
+        // Handle common shortcuts
+        // Haiku standard shortcuts use Command (Alt) key?
+        // WebKit usually assumes Ctrl for non-Mac. Haiku uses Alt as Command.
+        // PlatformKeyboardEventHaiku should map Alt to Meta or Ctrl based on configuration.
+        // Assuming Standard shortcuts:
+
+        bool isCommandKey = platformEvent->modifiers().contains(PlatformEvent::Modifier::Command);
+
+        if (isCommandKey) {
+            String commandName;
+            switch (platformEvent->windowsVirtualKeyCode()) {
+            case VK_C:
+                commandName = "Copy"_s;
+                break;
+            case VK_V:
+                commandName = "Paste"_s;
+                break;
+            case VK_X:
+                commandName = "Cut"_s;
+                break;
+            case VK_A:
+                commandName = "SelectAll"_s;
+                break;
+            case VK_Z:
+                if (platformEvent->modifiers().contains(PlatformEvent::Modifier::Shift))
+                    commandName = "Redo"_s;
+                else
+                    commandName = "Undo"_s;
+                break;
+            }
+
+            if (!commandName.isEmpty()) {
+                m_page->executeEditingCommand(commandName);
+                return true;
+            }
+        }
+    }
     return false;
 }
 

@@ -145,7 +145,10 @@ void PageClientImpl::toolTipChanged(const String&, const String& newToolTip)
 
 void PageClientImpl::setCursor(const WebCore::Cursor& cursor)
 {
-    fWebView.setCursor(cursor);
+    if (fWebView.LockLooper()) {
+        fWebView.SetViewCursor(cursor.platformCursor());
+        fWebView.UnlockLooper();
+    }
 }
 
 void PageClientImpl::setCursorHiddenUntilMouseMoves(bool hiddenUntilMouseMoves)
@@ -318,18 +321,22 @@ void PageClientImpl::didFinishLoadingDataForCustomContentProvider(const String&,
 
 void PageClientImpl::navigationGestureDidBegin()
 {
+    // Not implemented
 }
 
 void PageClientImpl::navigationGestureWillEnd(bool, WebBackForwardListItem&)
 {
+    // Not implemented
 }
 
 void PageClientImpl::navigationGestureDidEnd(bool, WebBackForwardListItem&)
 {
+    // Not implemented
 }
 
 void PageClientImpl::navigationGestureDidEnd()
 {
+    // Not implemented
 }
 
 void PageClientImpl::willRecordNavigationSnapshot(WebBackForwardListItem&)
