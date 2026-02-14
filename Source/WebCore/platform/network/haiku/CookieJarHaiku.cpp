@@ -38,11 +38,46 @@
 
 #include <wtf/HashMap.h>
 #include <wtf/text/CString.h>
+#include <wtf/RunLoop.h>
+
+#include <PathMonitor.h>
+#include <Handler.h>
+#include <Looper.h>
+#include <Path.h>
+#include <FindDirectory.h>
 
 #define TRACE_COOKIE_JAR 0
 
 
 namespace WebCore {
+
+class CookieWatcher : public BHandler {
+public:
+    CookieWatcher() : BHandler("CookieWatcher") {}
+
+    void MessageReceived(BMessage* message) override
+    {
+        if (message->what == B_PATH_MONITOR) {
+            RunLoop::main().dispatch([this] {
+                if (m_callback)
+                    m_callback();
+            });
+        } else {
+            BHandler::MessageReceived(message);
+        }
+    }
+
+    void setCallback(WTF::Function<void()>&& callback)
+    {
+        m_callback = WTFMove(callback);
+    }
+
+private:
+    WTF::Function<void()> m_callback;
+};
+
+static CookieWatcher* s_watcher = nullptr;
+static BLooper* s_looper = nullptr;
 
 void setCookieStoragePrivateBrowsingEnabled(bool)
 {
@@ -50,10 +85,34 @@ void setCookieStoragePrivateBrowsingEnabled(bool)
 
 void startObservingCookieChanges(NetworkStorageSession& storageSession, WTF::Function<void ()>&& callback)
 {
+    if (storageSession.sessionID().isEphemeral())
+        return;
+
+    if (!s_looper) {
+        s_looper = new BLooper("CookieMonitorLooper");
+        s_watcher = new CookieWatcher();
+        s_looper->AddHandler(s_watcher);
+        s_looper->Run();
+    }
+
+    s_watcher->setCallback(WTFMove(callback));
+
+    BPath path;
+    if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK) {
+        path.Append("WebKit/Cookies");
+        BPathMonitor::StartWatching(path.Path(), B_WATCH_STAT | B_WATCH_FILES_ONLY, s_watcher);
+    }
 }
 
 void stopObservingCookieChanges(NetworkStorageSession& storageSession)
 {
+    if (storageSession.sessionID().isEphemeral())
+        return;
+
+    if (s_watcher) {
+        BPathMonitor::StopWatching(s_watcher);
+        s_watcher->setCallback(nullptr);
+    }
 }
 
 } // namespace WebCore

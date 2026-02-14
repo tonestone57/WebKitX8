@@ -25,6 +25,7 @@
 #include "config.h"
 #include "PageClientImplHaiku.h"
 
+#include <WebCore/DragItem.h>
 #include "DrawingAreaProxy.h"
 #include "WebProcessProxy.h"
 #include "WebColorPicker.h"
@@ -626,7 +627,7 @@ WebFullScreenManagerProxyClient& PageClientImpl::fullScreenManagerProxyClient()
 }
 #endif
 
-void PageClientImpl::startDrag(const WebCore::DragItem&, WebCore::ShareableBitmap::Handle&& dragImageHandle, const std::optional<WebCore::NodeIdentifier>&)
+void PageClientImpl::startDrag(const WebCore::DragItem& dragItem, WebCore::ShareableBitmap::Handle&& dragImageHandle, const std::optional<WebCore::NodeIdentifier>&)
 {
     if (!fWebView.LockLooper())
         return;
@@ -637,51 +638,23 @@ void PageClientImpl::startDrag(const WebCore::DragItem&, WebCore::ShareableBitma
     BClipboard clipboard("WebKitDrag");
     if (clipboard.Lock()) {
         if (BMessage* data = clipboard.Data()) {
-            // We can't assign *data to dragMessage directly if it has system fields?
-            // Actually we just want the user fields.
-            // BMessage assignment operator copies data.
             dragMessage = *data;
         }
         clipboard.Unlock();
     }
 
-    // Fallback or addition: if dragMessage is empty, we might want to populate it from DragItem?
-    // But DragItem content structure is platform specific or minimal in generic case.
-    // We rely on PasteboardHaiku having done the work.
-
     BBitmap* dragBitmap = nullptr;
     auto shareableBitmap = ShareableBitmap::create(WTFMove(dragImageHandle));
     if (shareableBitmap) {
-        // createBBitmap returns a unique_ptr, we need to release it or manage it.
-        // BView::DragMessage takes ownership of the bitmap? No, "The view does not take ownership of the bitmap."
-        // We need to delete it after drag? BView::DragMessage documentation says:
-        // "The bitmap is not deleted by DragMessage(). You can delete it once the function returns."
-        // Wait, DragMessage is asynchronous? No, it initiates the drag loop.
-        // Actually on Haiku, DragMessage returns immediately?
-        // "Initiates a drag-and-drop session."
-        // If we delete the bitmap immediately, it might be gone before it's drawn?
-        // Usually one passes a bitmap that the system copies or uses.
-        // Let's assume we need to keep it alive or pass ownership?
-        // Haiku Book: "The bitmap is not deleted...".
-        // If we want it to be valid during drag, we might need to hold it.
-        // But ShareableBitmap creates a new BBitmap.
-        // Let's check `createBBitmap` implementation (I don't have it, but assuming it returns `std::unique_ptr<BBitmap>`).
         auto bitmap = shareableBitmap->createBBitmap();
         if (bitmap)
             dragBitmap = bitmap.release();
     }
 
-    // Center the bitmap on mouse?
-    // BView::DragMessage(BMessage* msg, BBitmap* image, BPoint offset, ...)
-    // We don't have the exact click location relative to the bitmap here easily unless passed.
-    // DragItem doesn't seem to have hotspot?
-    // GTK startDrag has hotspot. Generic one doesn't?
-    // WebPageProxy::startDrag (generic) calls startDrag with just DragItem and Image.
-    // DragItem struct might have it.
-    // But PageClient::startDrag signature doesn't expose it separately.
-    // Let's assume (0,0) or center for now.
+    // Use the anchor point from DragItem to position the image correctly relative to the cursor
+    BPoint offset(-dragItem.imageAnchorPoint.x(), -dragItem.imageAnchorPoint.y());
 
-    fWebView.DragMessage(&dragMessage, dragBitmap, B_OP_ALPHA, BPoint(0, 0));
+    fWebView.DragMessage(&dragMessage, dragBitmap, B_OP_ALPHA, offset);
 
     if (dragBitmap)
         delete dragBitmap;
