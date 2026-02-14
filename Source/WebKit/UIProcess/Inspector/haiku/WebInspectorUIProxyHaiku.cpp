@@ -245,20 +245,38 @@ void WebInspectorUIProxy::platformSetSheetRect(const WebCore::FloatRect&)
 
 void WebInspectorUIProxy::platformStartWindowDrag()
 {
-    platformBringToFront();
+    if (m_inspectorWindow) {
+        if (m_inspectorWindow->Lock()) {
+            // Initiate window dragging if mouse is down.
+            // BWindow handles dragging via B_WINDOW_MOVE messages usually,
+            // or we just let standard window manager decorations handle it.
+            // If this is triggered from web content (e.g. custom titlebar), we might need to simulate drag.
+            // For now, activating is a safe fallback.
+            m_inspectorWindow->Activate(true);
+            m_inspectorWindow->Unlock();
+        }
+    }
 }
 
 void WebInspectorUIProxy::platformRevealFileExternally(const String& path)
 {
-    BEntry entry(path.utf8().data());
-    BEntry parent;
-    if (entry.InitCheck() == B_OK && entry.GetParent(&parent) == B_OK) {
-        entry_ref ref;
-        if (parent.GetRef(&ref) == B_OK) {
-            BMessenger tracker("application/x-vnd.Be-TRAK");
-            BMessage msg(B_REFS_RECEIVED);
-            msg.AddRef("refs", &ref);
-            tracker.SendMessage(&msg);
+    entry_ref ref;
+    if (get_ref_for_path(path.utf8().data(), &ref) == B_OK) {
+        // We want to open the *folder* containing the file and select it.
+        // Haiku's Tracker handles B_REFS_RECEIVED by opening the folder.
+        // If we pass the file ref, it might open the file (execute/edit).
+        // To reveal, usually we open parent and select child.
+
+        BEntry entry(&ref);
+        BEntry parent;
+        if (entry.GetParent(&parent) == B_OK) {
+            entry_ref parentRef;
+            if (parent.GetRef(&parentRef) == B_OK) {
+                 BMessage msg(B_REFS_RECEIVED);
+                 msg.AddRef("refs", &parentRef);
+                 // TODO: Select the specific file in the folder (requires scripting Tracker)
+                 be_roster->Launch("application/x-vnd.Be-TRAK", &msg);
+            }
         }
     }
 }

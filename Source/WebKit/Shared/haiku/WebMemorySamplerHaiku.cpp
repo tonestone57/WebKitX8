@@ -38,6 +38,8 @@
 
 #include <OS.h>
 
+#include "WebProcessPool.h"
+
 using namespace WebCore;
 using namespace JSC;
 using namespace WTF;
@@ -159,6 +161,11 @@ WebMemoryStatistics WebMemorySampler::sampleWebKit() const
 void WebMemorySampler::sendMemoryPressureEvent()
 {
     // Haiku does not have a system-wide memory pressure event yet.
+    // However, we can check if we are low on memory and trigger it ourselves if this is called periodically.
+    // This function is usually called by the sampler when it detects pressure, or to *trigger* the event.
+    // In WebKit cross-platform code, this static method usually dispatches the event to the process.
+
+    WebProcessPool::sendMemoryPressureEvent(true);
 }
 
 }

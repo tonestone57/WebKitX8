@@ -138,6 +138,13 @@ void WebViewBase::Draw(BRect update)
 
 void WebViewBase::paint(const IntRect& dirtyRect)
 {
+    // The DrawingAreaProxy handles painting updates, usually triggering Draw().
+    // If this is called explicitly (e.g. for testing or forced update),
+    // we should invalidate the region.
+    if (LockLooper()) {
+        Invalidate(BRect(dirtyRect));
+        UnlockLooper();
+    }
 }
 
 void WebViewBase::setCursor(const WebCore::Cursor& cursor)

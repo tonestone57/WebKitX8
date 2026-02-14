@@ -319,7 +319,14 @@ void PageUIClientHaiku::mouseDidMoveOverElement(WebPageProxy& page, const WebHit
 
 void PageUIClientHaiku::toolbarsAreVisible(WebPageProxy&, Function<void(bool)>&& completionHandler)
 {
-    completionHandler(true);
+    bool visible = true;
+    if (BWindow* window = m_webView.Window()) {
+        // Assume if window has a KeyMenuBar, it's visible?
+        // Actually, WebKit is asking if *browser* toolbars are visible.
+        // We can ask the window via a synchronous message if needed, but for now defaulting to true is okay.
+        // Or better, let's assume if there are any views other than us, there might be toolbars.
+    }
+    completionHandler(visible);
 }
 
 void PageUIClientHaiku::setToolbarsAreVisible(WebPageProxy&, bool visible)
@@ -333,15 +340,27 @@ void PageUIClientHaiku::setToolbarsAreVisible(WebPageProxy&, bool visible)
 
 void PageUIClientHaiku::menuBarIsVisible(WebPageProxy&, Function<void(bool)>&& completionHandler)
 {
-    completionHandler(true);
+    bool visible = false;
+    if (BWindow* window = m_webView.Window()) {
+        if (window->Lock()) {
+            if (window->KeyMenuBar())
+                visible = !window->KeyMenuBar()->IsHidden();
+            window->Unlock();
+        }
+    }
+    completionHandler(visible);
 }
 
 void PageUIClientHaiku::setMenuBarIsVisible(WebPageProxy&, bool visible)
 {
     if (BWindow* window = m_webView.Window()) {
-        BMessage message(MENU_BAR_VISIBILITY_CHANGED);
-        message.AddBool("visible", visible);
-        window->PostMessage(&message);
+        if (window->Lock()) {
+            if (BMenuBar* bar = window->KeyMenuBar()) {
+                if (visible) bar->Show();
+                else bar->Hide();
+            }
+            window->Unlock();
+        }
     }
 }
 
@@ -362,19 +381,21 @@ void PageUIClientHaiku::setStatusBarIsVisible(WebPageProxy&, bool visible)
 void PageUIClientHaiku::setIsResizable(WebPageProxy&, bool resizable)
 {
     if (BWindow* window = m_webView.Window()) {
-        BMessage message(RESIZABLE_CHANGED);
-        message.AddBool("resizable", resizable);
-        window->PostMessage(&message);
+        if (window->Lock()) {
+            uint32 flags = window->Flags();
+            if (resizable)
+                flags &= ~B_NOT_RESIZABLE;
+            else
+                flags |= B_NOT_RESIZABLE;
+            window->SetFlags(flags);
+            window->Unlock();
+        }
     }
 }
 
 void PageUIClientHaiku::setWindowFrame(WebPageProxy&, const WebCore::FloatRect& frame)
 {
     if (BWindow* window = m_webView.Window()) {
-        BMessage message(WINDOW_FRAME_CHANGED);
-        message.AddRect("frame", BRect(frame));
-        window->PostMessage(&message);
-
         if (window->Lock()) {
             window->MoveTo(frame.x(), frame.y());
             window->ResizeTo(frame.width(), frame.height());

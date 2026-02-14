@@ -52,8 +52,11 @@ void WebProcess::platformInitializeProcess(const AuxiliaryProcessInitializationP
 {
 }
 
-void WebProcess::platformSetWebsiteDataStoreParameters(WebProcessDataStoreParameters&&)
+void WebProcess::platformSetWebsiteDataStoreParameters(WebProcessDataStoreParameters&& parameters)
 {
+    // On Haiku, most data store paths are standard, but if we need to customize per-process storage
+    // (e.g. for private browsing or isolation), we would apply those parameters here.
+    // For now, BNetworkCookieJar and other Haiku kits handle this globally or via their own contexts.
 }
 
 void WebProcess::platformTerminate()
