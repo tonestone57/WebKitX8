@@ -32,9 +32,11 @@
 #include <wtf/Lock.h>
 #include <wtf/Threading.h>
 
-class BMediaRecorder;
+class BBuffer;
 
 namespace WebCore {
+
+class MediaCaptureNode;
 
 class RealtimeIncomingAudioSourceHaiku final : public RealtimeMediaSource {
 public:
@@ -50,15 +52,13 @@ private:
     const RealtimeMediaSourceCapabilities& capabilities() final;
     const RealtimeMediaSourceSettings& settings() final;
 
-    void captureLoop();
+    void handleBuffer(BBuffer*);
 
     RealtimeMediaSourceCapabilities m_capabilities;
     RealtimeMediaSourceSettings m_settings;
 
-    BMediaRecorder* m_recorder;
-    RefPtr<Thread> m_captureThread;
+    MediaCaptureNode* m_node;
     bool m_isCapturing;
-    Lock m_lock;
 };
 
 class RealtimeIncomingVideoSourceHaiku final : public RealtimeMediaSource {
@@ -75,15 +75,13 @@ private:
     const RealtimeMediaSourceCapabilities& capabilities() final;
     const RealtimeMediaSourceSettings& settings() final;
 
-    void captureLoop();
+    void handleBuffer(BBuffer*);
 
     RealtimeMediaSourceCapabilities m_capabilities;
     RealtimeMediaSourceSettings m_settings;
 
-    BMediaRecorder* m_recorder;
-    RefPtr<Thread> m_captureThread;
+    MediaCaptureNode* m_node;
     bool m_isCapturing;
-    Lock m_lock;
 };
 
 } // namespace WebCore

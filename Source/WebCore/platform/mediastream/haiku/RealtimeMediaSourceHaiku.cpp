@@ -36,10 +36,13 @@
 #include "VideoFrame.h"
 #include "PixelBuffer.h"
 #include "VideoFrameTimeMetadata.h"
-#include <MediaRecorder.h>
 #include <MediaRoster.h>
 #include <Buffer.h>
+#include <BufferConsumer.h>
+#include <MediaEventLooper.h>
 #include <wtf/NeverDestroyed.h>
+#include <cstring>
+#include <span>
 
 namespace WebCore {
 
@@ -64,6 +67,87 @@ private:
     Vector<uint8_t> m_data;
 };
 
+// Custom BBufferConsumer to capture data
+class MediaCaptureNode : public BBufferConsumer {
+public:
+    using Callback = Function<void(BBuffer*)>;
+
+    MediaCaptureNode(const char* name, media_type type, Callback&& callback)
+        : BBufferConsumer(B_MEDIA_RAW_AUDIO) // flavor doesn't matter much here
+        , m_name(name)
+        , m_type(type)
+        , m_callback(WTF::move(callback))
+        , m_input()
+    {
+        // Must be registered to work
+    }
+
+    ~MediaCaptureNode()
+    {
+        Quit();
+    }
+
+    status_t Start(bigtime_t performance_time) override
+    {
+        return BBufferConsumer::Start(performance_time);
+    }
+
+    status_t Stop(bigtime_t performance_time, bool immediate) override
+    {
+        return BBufferConsumer::Stop(performance_time, immediate);
+    }
+
+    void BufferReceived(BBuffer* buffer) override
+    {
+        if (m_callback)
+            m_callback(buffer);
+        else
+            buffer->Recycle();
+    }
+
+    status_t AcceptFormat(const media_destination& dest, media_format* format) override
+    {
+        if (format->type != m_type && format->type != B_MEDIA_WILDCARD)
+            return B_MEDIA_BAD_FORMAT;
+        return B_OK;
+    }
+
+    status_t Connected(const media_source& producer, const media_destination& where, const media_format& with_format, media_input* out_input) override
+    {
+        m_input.source = producer;
+        m_input.destination = where;
+        m_input.format = with_format;
+        m_input.node = Node();
+        sprintf(m_input.name, "%s input", m_name.utf8().data());
+        *out_input = m_input;
+        return B_OK;
+    }
+
+    void Disconnected(const media_source& producer, const media_destination& where) override
+    {
+        memset(&m_input, 0, sizeof(m_input));
+    }
+
+    status_t GetNextInput(int32* cookie, media_input* out_input) override
+    {
+        if (*cookie != 0) return B_ERROR;
+        *out_input = m_input;
+        *cookie = 1;
+        return B_OK;
+    }
+
+    void DisposeInputCookie(int32 cookie) override {}
+
+    media_input Input() { return m_input; }
+
+private:
+    String m_name;
+    media_type m_type;
+    Callback m_callback;
+    media_input m_input;
+};
+
+
 CaptureSourceOrError RealtimeIncomingAudioSourceHaiku::create(const CaptureDevice& device, const MediaConstraints* constraints, String&& hashSalt, std::optional<PageIdentifier> pageIdentifier)
 {
     auto source = adoptRef(*new RealtimeIncomingAudioSourceHaiku(device, constraints, WTF::move(hashSalt), pageIdentifier));
@@ -78,11 +162,10 @@ CaptureSourceOrError RealtimeIncomingAudioSourceHaiku::create(const CaptureDevic
 
 RealtimeIncomingAudioSourceHaiku::RealtimeIncomingAudioSourceHaiku(const CaptureDevice& device, const MediaConstraints* constraints, String&& hashSalt, std::optional<PageIdentifier> pageIdentifier)
     : RealtimeMediaSource(device, constraints, WTF::move(hashSalt), pageIdentifier)
-    , m_recorder(nullptr)
+    , m_node(nullptr)
     , m_isCapturing(false)
 {
     m_capabilities.setDeviceId(device.persistentId());
-    // TODO: query actual device capabilities if possible
 }
 
 RealtimeIncomingAudioSourceHaiku::~RealtimeIncomingAudioSourceHaiku()
@@ -100,110 +183,113 @@ void RealtimeIncomingAudioSourceHaiku::startProducingData()
         nodeId = idStr.toInt();
 
     if (nodeId == 0) {
-        LOG(Media, "RealtimeIncomingAudioSourceHaiku: Invalid node ID");
         captureFailed();
         return;
     }
 
-    media_node node;
     BMediaRoster* roster = BMediaRoster::Roster();
-    if (!roster || roster->GetNodeFor(nodeId, &node) != B_OK) {
-        LOG(Media, "RealtimeIncomingAudioSourceHaiku: Failed to get node");
+    if (!roster) {
         captureFailed();
         return;
     }
 
-    m_recorder = new BMediaRecorder("WebAudio Input", false);
-    if (m_recorder->InitCheck() != B_OK) {
-        LOG(Media, "RealtimeIncomingAudioSourceHaiku: Failed to init recorder");
-        delete m_recorder;
-        m_recorder = nullptr;
+    media_node producerNode;
+    if (roster->GetNodeFor(nodeId, &producerNode) != B_OK) {
         captureFailed();
         return;
     }
 
-    // Connect to the node
+    m_node = new MediaCaptureNode("WebAudio Capture", B_MEDIA_RAW_AUDIO, [this](BBuffer* buffer) {
+        handleBuffer(buffer);
+    });
+
+    if (roster->RegisterNode(m_node) != B_OK) {
+        delete m_node;
+        m_node = nullptr;
+        captureFailed();
+        return;
+    }
+
+    // Connect
+    media_output output;
+    int32 count = 0;
+    if (roster->GetFreeOutputsFor(producerNode, &output, 1, &count, B_MEDIA_RAW_AUDIO) != B_OK || count == 0) {
+        stopProducingData();
+        captureFailed();
+        return;
+    }
+
+    media_input input;
+    count = 0;
+    if (roster->GetFreeInputsFor(m_node->Node(), &input, 1, &count, B_MEDIA_RAW_AUDIO) != B_OK || count == 0) {
+        stopProducingData();
+        captureFailed();
+        return;
+    }
+
     media_format format;
     format.type = B_MEDIA_RAW_AUDIO;
     format.u.raw_audio = media_raw_audio_format::wildcard;
-    // Request float format as we assume it in the callback
     format.u.raw_audio.format = media_raw_audio_format::B_AUDIO_FLOAT;
 
-    if (m_recorder->Connect(node, &format) != B_OK) {
-        LOG(Media, "RealtimeIncomingAudioSourceHaiku: Failed to connect recorder");
-        delete m_recorder;
-        m_recorder = nullptr;
+    if (roster->Connect(output.source, input.destination, &format, &output, &input) != B_OK) {
+        stopProducingData();
         captureFailed();
         return;
     }
 
+    roster->StartNode(m_node->Node(), 0);
+    roster->StartNode(producerNode, 0);
+
     m_isCapturing = true;
-    m_captureThread = Thread::create("Audio Capture", [this] {
-        captureLoop();
-    });
 }
 
 void RealtimeIncomingAudioSourceHaiku::stopProducingData()
 {
-    if (!m_isCapturing) return;
+    if (m_node) {
+        BMediaRoster* roster = BMediaRoster::Roster();
+        if (roster) {
+            roster->StopNode(m_node->Node(), 0);
 
+            // Disconnect
+            media_input input = m_node->Input();
+            if (input.source != media_source::null) {
+                roster->Disconnect(input.source, input.destination);
+            }
+
+            roster->UnregisterNode(m_node);
+        }
+        m_node->Release(); // BMediaNode is refcounted, Release() calls delete when done
+        m_node = nullptr;
+    }
     m_isCapturing = false;
-
-    if (m_recorder) {
-        m_recorder->Disconnect();
-        // Stop() should unblock WaitForBuffer
-        m_recorder->Stop();
-    }
-
-    if (m_captureThread) {
-        m_captureThread->waitForCompletion();
-        m_captureThread = nullptr;
-    }
-
-    if (m_recorder) {
-        delete m_recorder;
-        m_recorder = nullptr;
-    }
 }
 
-void RealtimeIncomingAudioSourceHaiku::captureLoop()
+void RealtimeIncomingAudioSourceHaiku::handleBuffer(BBuffer* buffer)
 {
-    if (!m_recorder) return;
-    m_recorder->Start();
+     if (!m_isCapturing) {
+         buffer->Recycle();
+         return;
+     }
 
-    while (m_isCapturing) {
-        BBuffer* buffer = nullptr;
-        // Wait 100ms max, loop to check m_isCapturing
-        status_t err = m_recorder->WaitForBuffer(&buffer, 100000);
+     media_header* header = buffer->Header();
+     if (header->type == B_MEDIA_RAW_AUDIO) {
+         media_raw_audio_format* format = &header->u.raw_audio;
 
-        if (err == B_OK && buffer) {
-             media_header* header = buffer->Header();
-             if (header->type == B_MEDIA_RAW_AUDIO) {
-                 media_raw_audio_format* format = &header->u.raw_audio;
+         AudioStreamDescription description(format->frame_rate, format->channel_count, AudioStreamDescription::PCMFormat::Float32, true);
 
-                 // Construct description (assuming float, interleaved)
-                 AudioStreamDescription description(format->frame_rate, format->channel_count, AudioStreamDescription::PCMFormat::Float32, true);
+         size_t frameSize = (format->format & 0xf) * format->channel_count;
+         if (format->format == media_raw_audio_format::B_AUDIO_FLOAT) frameSize = 4 * format->channel_count;
+         else if (format->format == media_raw_audio_format::B_AUDIO_SHORT) frameSize = 2 * format->channel_count;
 
-                 // We need to calculate number of frames
-                 size_t frameSize = (format->format & 0xf) * format->channel_count; // Rough guess, format enum is complex
-                 if (format->format == media_raw_audio_format::B_AUDIO_FLOAT) frameSize = 4 * format->channel_count;
-                 else if (format->format == media_raw_audio_format::B_AUDIO_SHORT) frameSize = 2 * format->channel_count;
+         size_t numFrames = buffer->SizeUsed() / frameSize;
 
-                 size_t numFrames = buffer->SizeUsed() / frameSize;
+         auto audioData = PlatformAudioDataHaiku::create((const uint8_t*)buffer->Data(), buffer->SizeUsed());
+         MediaTime timestamp = MediaTime(header->start_time, 1000000);
 
-                 auto audioData = PlatformAudioDataHaiku::create((const uint8_t*)buffer->Data(), buffer->SizeUsed());
-
-                 // Timestamp conversion
-                 MediaTime timestamp = MediaTime(header->start_time, 1000000); // microseconds
-
-                 audioSamplesAvailable(timestamp, audioData, description, numFrames);
-             }
-             buffer->Recycle();
-        } else if (err != B_TIMED_OUT && err != B_OK) {
-            // Error
-            break;
-        }
-    }
+         audioSamplesAvailable(timestamp, audioData, description, numFrames);
+     }
+     buffer->Recycle();
 }
 
 const RealtimeMediaSourceCapabilities& RealtimeIncomingAudioSourceHaiku::capabilities()
@@ -232,7 +318,7 @@ CaptureSourceOrError RealtimeIncomingVideoSourceHaiku::create(const CaptureDevic
 
 RealtimeIncomingVideoSourceHaiku::RealtimeIncomingVideoSourceHaiku(const CaptureDevice& device, const MediaConstraints* constraints, String&& hashSalt, std::optional<PageIdentifier> pageIdentifier)
     : RealtimeMediaSource(device, constraints, WTF::move(hashSalt), pageIdentifier)
-    , m_recorder(nullptr)
+    , m_node(nullptr)
     , m_isCapturing(false)
 {
     m_capabilities.setDeviceId(device.persistentId());
@@ -257,113 +343,121 @@ void RealtimeIncomingVideoSourceHaiku::startProducingData()
         return;
     }
 
-    media_node node;
     BMediaRoster* roster = BMediaRoster::Roster();
-    if (!roster || roster->GetNodeFor(nodeId, &node) != B_OK) {
+    if (!roster) {
         captureFailed();
         return;
     }
 
-    m_recorder = new BMediaRecorder("WebVideo Input", false);
-    if (m_recorder->InitCheck() != B_OK) {
-        delete m_recorder;
-        m_recorder = nullptr;
+    media_node producerNode;
+    if (roster->GetNodeFor(nodeId, &producerNode) != B_OK) {
         captureFailed();
         return;
     }
 
-    // Connect to the node
+    m_node = new MediaCaptureNode("WebVideo Capture", B_MEDIA_RAW_VIDEO, [this](BBuffer* buffer) {
+        handleBuffer(buffer);
+    });
+
+    if (roster->RegisterNode(m_node) != B_OK) {
+        delete m_node;
+        m_node = nullptr;
+        captureFailed();
+        return;
+    }
+
+    // Connect
+    media_output output;
+    int32 count = 0;
+    if (roster->GetFreeOutputsFor(producerNode, &output, 1, &count, B_MEDIA_RAW_VIDEO) != B_OK || count == 0) {
+        stopProducingData();
+        captureFailed();
+        return;
+    }
+
+    media_input input;
+    count = 0;
+    if (roster->GetFreeInputsFor(m_node->Node(), &input, 1, &count, B_MEDIA_RAW_VIDEO) != B_OK || count == 0) {
+        stopProducingData();
+        captureFailed();
+        return;
+    }
+
     media_format format;
     format.type = B_MEDIA_RAW_VIDEO;
     format.u.raw_video = media_raw_video_format::wildcard;
-    format.u.raw_video.display.format = B_RGB32; // Prefer RGB32
+    format.u.raw_video.display.format = B_RGB32;
 
-    if (m_recorder->Connect(node, &format) != B_OK) {
-        delete m_recorder;
-        m_recorder = nullptr;
+    if (roster->Connect(output.source, input.destination, &format, &output, &input) != B_OK) {
+        stopProducingData();
         captureFailed();
         return;
     }
 
+    roster->StartNode(m_node->Node(), 0);
+    roster->StartNode(producerNode, 0);
+
     m_isCapturing = true;
-    m_captureThread = Thread::create("Video Capture", [this] {
-        captureLoop();
-    });
 }
 
 void RealtimeIncomingVideoSourceHaiku::stopProducingData()
 {
-    if (!m_isCapturing) return;
+    if (m_node) {
+        BMediaRoster* roster = BMediaRoster::Roster();
+        if (roster) {
+            roster->StopNode(m_node->Node(), 0);
+
+            media_input input = m_node->Input();
+            if (input.source != media_source::null) {
+                roster->Disconnect(input.source, input.destination);
+            }
+            roster->UnregisterNode(m_node);
+        }
+        m_node->Release();
+        m_node = nullptr;
+    }
     m_isCapturing = false;
-
-    if (m_recorder) {
-        m_recorder->Disconnect();
-        m_recorder->Stop();
-    }
-
-    if (m_captureThread) {
-        m_captureThread->waitForCompletion();
-        m_captureThread = nullptr;
-    }
-
-    if (m_recorder) {
-        delete m_recorder;
-        m_recorder = nullptr;
-    }
 }
 
-void RealtimeIncomingVideoSourceHaiku::captureLoop()
+void RealtimeIncomingVideoSourceHaiku::handleBuffer(BBuffer* buffer)
 {
-    if (!m_recorder) return;
-    m_recorder->Start();
+     if (!m_isCapturing) {
+         buffer->Recycle();
+         return;
+     }
 
-    while (m_isCapturing) {
-        BBuffer* buffer = nullptr;
-        status_t err = m_recorder->WaitForBuffer(&buffer, 100000);
+     media_header* header = buffer->Header();
+     if (header->type == B_MEDIA_RAW_VIDEO) {
+         media_raw_video_format* format = &header->u.raw_video;
 
-        if (err == B_OK && buffer) {
-             media_header* header = buffer->Header();
-             if (header->type == B_MEDIA_RAW_VIDEO) {
-                 media_raw_video_format* format = &header->u.raw_video;
+         int width = format->display.line_width;
+         int height = format->display.line_count;
 
-                 // Create VideoFrame
-                 // We need to wrap the buffer data.
-                 // Since BBuffer recycles, we must copy it if VideoFrame keeps it.
-                 // VideoFrame::createRGBA takes a span and copies it usually?
-                 // Let's check: createRGBA(std::span<const uint8_t>, ...)
+         if (width > 0 && height > 0) {
+             ComputedPlaneLayout layout;
+             layout.destinationOffset = 0;
+             layout.destinationStride = format->display.bytes_per_row;
+             layout.sourceTop = 0;
+             layout.sourceHeight = height;
+             layout.sourceLeftBytes = 0;
+             layout.sourceWidthBytes = width * 4;
 
-                 int width = format->display.line_width;
-                 int height = format->display.line_count;
+             PlatformVideoColorSpace colorSpace;
 
-                 if (width > 0 && height > 0) {
-                     ComputedPlaneLayout layout;
-                     layout.destinationOffset = 0;
-                     layout.destinationStride = format->display.bytes_per_row;
-                     layout.sourceTop = 0;
-                     layout.sourceHeight = height;
-                     layout.sourceLeftBytes = 0;
-                     layout.sourceWidthBytes = width * 4; // Assuming B_RGB32
+             auto frame = VideoFrame::createBGRA(
+                 std::span<const uint8_t>((const uint8_t*)buffer->Data(), buffer->SizeUsed()),
+                 width, height, layout, WTF::move(colorSpace)
+             );
 
-                     PlatformVideoColorSpace colorSpace; // Default
+             if (frame) {
+                 VideoFrameTimeMetadata metadata;
+                 metadata.captureTime = MonotonicTime::now();
 
-                     auto frame = VideoFrame::createRGBA(
-                         std::span<const uint8_t>((const uint8_t*)buffer->Data(), buffer->SizeUsed()),
-                         width, height, layout, WTF::move(colorSpace)
-                     );
-
-                     if (frame) {
-                         VideoFrameTimeMetadata metadata;
-                         metadata.captureTime = MonotonicTime::now(); // Use current time as fallback or construct from header->start_time if possible
-
-                         videoFrameAvailable(*frame, metadata);
-                     }
-                 }
+                 videoFrameAvailable(*frame, metadata);
              }
-             buffer->Recycle();
-        } else if (err != B_TIMED_OUT && err != B_OK) {
-            break;
-        }
-    }
+         }
+     }
+     buffer->Recycle();
 }
 
 
