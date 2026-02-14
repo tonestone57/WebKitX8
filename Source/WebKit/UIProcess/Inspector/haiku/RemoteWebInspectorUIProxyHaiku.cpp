@@ -52,15 +52,15 @@
 
 namespace WebKit {
 
-class InspectorWindow : public BWindow {
+class RemoteInspectorWindow : public BWindow {
 public:
-    InspectorWindow(BRect frame)
+    RemoteInspectorWindow(BRect frame)
         : BWindow(frame, "Web Inspector", B_TITLED_WINDOW, B_ASYNCHRONOUS_CONTROLS | B_QUIT_ON_WINDOW_CLOSE)
         , m_filePanel(nullptr)
     {
     }
 
-    ~InspectorWindow()
+    ~RemoteInspectorWindow()
     {
         delete m_filePanel;
         if (m_pickingColor)
@@ -203,7 +203,7 @@ WebPageProxy* RemoteWebInspectorUIProxy::platformCreateFrontendPageAndWindow()
 {
     BRect rect(100, 100, 900, 700);
     // window will be deleted when closed
-    InspectorWindow* window = new InspectorWindow(rect);
+    RemoteInspectorWindow* window = new RemoteInspectorWindow(rect);
 
     Ref<API::PageConfiguration> configuration = API::PageConfiguration::create();
     auto webView = WebViewBase::create("InspectorView", window->Bounds(), window, configuration.get());
@@ -250,7 +250,7 @@ void RemoteWebInspectorUIProxy::platformSave(Vector<WebCore::InspectorFrontendCl
         if (m_inspectorPage) {
              if (auto* client = static_cast<PageClientImpl*>(&m_inspectorPage->pageClient())) {
                  if (auto* view = client->viewWidget()) {
-                     if (auto* window = dynamic_cast<InspectorWindow*>(view->Window())) {
+                     if (auto* window = dynamic_cast<RemoteInspectorWindow*>(view->Window())) {
                          window->save(data.url, data.content, forceSaveAs);
                      }
                  }
@@ -285,7 +285,7 @@ void RemoteWebInspectorUIProxy::platformPickColorFromScreen(CompletionHandler<vo
     if (m_inspectorPage) {
          if (auto* client = static_cast<PageClientImpl*>(&m_inspectorPage->pageClient())) {
              if (auto* view = client->viewWidget()) {
-                 if (auto* window = dynamic_cast<InspectorWindow*>(view->Window())) {
+                 if (auto* window = dynamic_cast<RemoteInspectorWindow*>(view->Window())) {
                      window->startColorPicking(WTFMove(completionHandler));
                      return;
                  }
