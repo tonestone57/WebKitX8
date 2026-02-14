@@ -29,7 +29,6 @@
 #include "WebEventModifier.h"
 #include "WebMouseEventButton.h"
 #include "WebEventType.h"
-#include "WebPlatformTouchPoint.h"
 #include "NativeWebTouchEvent.h"
 
 #include "WebCore/PlatformKeyboardEvent.h"
