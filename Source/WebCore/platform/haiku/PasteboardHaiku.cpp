@@ -96,7 +96,8 @@ public:
             // But dynamic_cast above handles it. If hContext->message() is null, m_message is null.
             if (auto* hContext = dynamic_cast<const PasteboardContextHaiku*>(context)) {
                 // It's a drag context but no message provided -> Use "WebKitDrag" clipboard
-                m_clipboard = new BClipboard("WebKitDrag");
+                m_customClipboard = makeUnique<BClipboard>("WebKitDrag");
+                m_clipboard = m_customClipboard.get();
             } else {
                 // Default context -> Use System clipboard
                 m_clipboard = be_clipboard;
@@ -116,9 +117,6 @@ public:
                 m_clipboard->Commit();
             m_clipboard->Unlock();
         }
-
-        if (m_clipboard && m_clipboard != be_clipboard)
-            delete m_clipboard;
     }
 
     BMessage* message() const { return m_message; }
@@ -130,6 +128,7 @@ public:
 private:
     BMessage* m_message = nullptr;
     BClipboard* m_clipboard = nullptr;
+    std::unique_ptr<BClipboard> m_customClipboard;
     bool m_clipboardLocked = false;
     bool m_committed = false;
 };
