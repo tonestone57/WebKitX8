@@ -126,10 +126,7 @@ bool screenSupportsExtendedColor(Widget* widget)
     if (!screen.IsValid())
         return false;
 
-    // Check if the screen is using a wide gamut color space.
-    // Haiku's BScreen doesn't explicitly expose HDR/WideGamut flags easily yet,
-    // but we can check the color space.
-    // For now, return false as standard Haiku screens are sRGB.
+    // Haiku does not currently support wide gamut or HDR screens via BScreen.
     return false;
 }
 
