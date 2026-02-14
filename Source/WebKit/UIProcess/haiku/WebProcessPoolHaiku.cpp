@@ -38,7 +38,7 @@ namespace WebKit {
 
 void WebProcessPool::platformInitialize(NeedsGlobalStaticInitialization)
 {
-    if (auto* manager = supplement<WebNotificationManagerProxy>())
+    if (auto* manager = ensureSupplement<WebNotificationManagerProxy>())
         manager->setProvider(makeUnique<NotificationProviderHaiku>());
 
     // Check memory status periodically

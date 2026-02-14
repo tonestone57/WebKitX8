@@ -165,7 +165,7 @@ list(APPEND WebProcess_LIBRARIES
     ${SQLITE_LIBRARIES}
 )
 
-add_definitions(-DWEBKIT2_COMPILATION)
+add_definitions(-DWEBKIT2_COMPILATION -DENABLE_TOUCH_EVENTS=1)
 
 add_custom_target(forwarding-headerHaiku
     COMMAND ${PERL_EXECUTABLE} ${WEBKIT_DIR}/Scripts/generate-forwarding-headers.pl ${WEBKIT_DIR} ${DERIVED_SOURCES_WEBKIT_DIR}/include haiku

@@ -6,7 +6,7 @@ if (USE_TEXTURE_MAPPER)
 include(platform/TextureMapper.cmake)
 endif ()
 
-add_definitions(-D_DEFAULT_SOURCE)
+add_definitions(-D_DEFAULT_SOURCE -DENABLE_TOUCH_EVENTS=1)
 
 if (USE_CURL)
   include(platform/Curl.cmake)
