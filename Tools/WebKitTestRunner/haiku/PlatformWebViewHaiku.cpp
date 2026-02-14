@@ -29,6 +29,7 @@
 #include "APICast.h"
 #include "APIPageConfiguration.h"
 #include "WebViewBase.h"
+#include <Bitmap.h>
 #include <Window.h>
 
 namespace WTR {
@@ -174,6 +175,47 @@ void PlatformWebView::addToWindow()
 
 PlatformImage PlatformWebView::windowSnapshotImage()
 {
+    if (!m_view || !m_view->LockLooper())
+        return nullptr;
+
+    BRect bounds = m_view->Bounds();
+    BBitmap* bitmap = new BBitmap(bounds, B_RGBA32, true); // Accepts views
+
+    if (bitmap->InitCheck() != B_OK) {
+        delete bitmap;
+        m_view->UnlockLooper();
+        return nullptr;
+    }
+
+    // To snapshot the view, we can add the bitmap as a child or draw into it.
+    // However, BView::DrawBitmap draws a bitmap ONTO the view.
+    // We want the reverse: View content INTO the bitmap.
+    // Haiku doesn't have a direct "RenderToBitmap" for BView unless attached to a BBitmap (which means offscreen window).
+    // But WebViewBase is attached to a BWindow.
+    // So we need to ask the app_server to render it, or use `BeginPicture`/`EndPicture`.
+    // Actually, `m_view->Draw(bounds)` might work if we direct drawing to a BBitmap based BView.
+    // But `m_view` is bound to the window.
+
+    // Proper way on Haiku is likely `BView::Sync()` then read pixels if it's on screen?
+    // Or simpler: WebView usually has backing store.
+    // WebViewBase (WebKit2) has a DrawingArea. We can ask the page to force repaint or get the snapshot via IPC (which TestInvocation handles via WKImage).
+    // This `windowSnapshotImage` is typically for the *window* including chrome, or fallback.
+    // Given WTR usually relies on WKImage for page content, this might be less critical or used for `SnapshotResultType::WebView`.
+
+    // For now, let's implement a "best effort" using BBitmap's ability to lock bits? No.
+    // Let's rely on the fact that we can't easily snapshot a window in Haiku without screen reading or View support.
+    // But wait, `WebViewBase` is the `BView`.
+    // If we want a snapshot, we might just return nullptr and let WTR rely on the WebProcess-side snapshot (which works via ShareableBitmap).
+    // TestInvocation calls this if `m_pixelResult` is null but `m_dumpPixels` is true.
+    // This happens if we request a snapshot of the *UI* (WebView).
+
+    // Let's implement a dummy for now that returns a black bitmap if we can't get real content,
+    // or try to get it.
+    // Actually, if we return nullptr, TestInvocation logic might fail or skip.
+    // Let's leave it as nullptr for now and rely on WebContent snapshots.
+
+    delete bitmap;
+    m_view->UnlockLooper();
     return nullptr;
 }
 

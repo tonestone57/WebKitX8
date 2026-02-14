@@ -103,7 +103,10 @@ void EventSenderProxy::mouseDown(unsigned button, WKEventModifiers wkModifiers)
         screenWhere += view->Window()->Frame().LeftTop();
     msg.AddPoint("screen_where", screenWhere);
 
-    view->MessageReceived(&msg);
+    if (view->LockLooper()) {
+        view->MessageReceived(&msg);
+        view->UnlockLooper();
+    }
 }
 
 void EventSenderProxy::mouseUp(unsigned button, WKEventModifiers wkModifiers)
@@ -128,7 +131,10 @@ void EventSenderProxy::mouseUp(unsigned button, WKEventModifiers wkModifiers)
     m_clickPosition = m_position;
     m_clickTime = m_time;
 
-    view->MessageReceived(&msg);
+    if (view->LockLooper()) {
+        view->MessageReceived(&msg);
+        view->UnlockLooper();
+    }
 }
 
 void EventSenderProxy::mouseMoveTo(double x, double y)
@@ -155,7 +161,10 @@ void EventSenderProxy::mouseMoveTo(double x, double y)
 
     msg.AddInt32("transit", B_INSIDE_VIEW);
 
-    view->MessageReceived(&msg);
+    if (view->LockLooper()) {
+        view->MessageReceived(&msg);
+        view->UnlockLooper();
+    }
 }
 
 void EventSenderProxy::mouseScrollBy(int horizontal, int vertical)
@@ -171,7 +180,10 @@ void EventSenderProxy::mouseScrollBy(int horizontal, int vertical)
     msg.AddFloat("be:wheel_delta_x", (float)horizontal);
     msg.AddFloat("be:wheel_delta_y", (float)vertical);
 
-    view->MessageReceived(&msg);
+    if (view->LockLooper()) {
+        view->MessageReceived(&msg);
+        view->UnlockLooper();
+    }
 }
 
 void EventSenderProxy::continuousMouseScrollBy(int horizontal, int vertical, bool paged)
@@ -206,7 +218,10 @@ void EventSenderProxy::keyDown(WKStringRef keyRef, WKEventModifiers wkModifiers,
 
     msg.AddString("bytes", keyName.utf8().data());
 
-    view->MessageReceived(&msg);
+    if (view->LockLooper()) {
+        view->MessageReceived(&msg);
+        view->UnlockLooper();
+    }
 }
 
 }

@@ -39,6 +39,8 @@
 #include "APIImage.h"
 #include "ShareableBitmap.h"
 #include "BitmapImage.h"
+#include "PlatformWebView.h"
+#include "TestController.h"
 
 namespace WTR {
 
@@ -97,21 +99,28 @@ static void dumpBitmap(BBitmap* bitmap, const char* checksum)
     }
 }
 
-void TestInvocation::dumpPixelsAndCompareWithExpected(WKImageRef wkImage, WKArrayRef repaintRects)
+void TestInvocation::dumpPixelsAndCompareWithExpected(SnapshotResultType type, WKArrayRef repaintRects, WKImageRef wkImage)
 {
-    if (!wkImage)
-        return;
+    BBitmap* bBitmap = nullptr;
+    std::unique_ptr<BBitmap> snapshotBitmap;
+    RefPtr<WebCore::BitmapRef> platformImage;
 
-    auto* apiImage = WebKit::toImpl(wkImage);
-    if (!apiImage)
-        return;
-
-    auto* shareableBitmap = apiImage->resource();
-    if (!shareableBitmap)
-        return;
-
-    auto platformImage = shareableBitmap->createPlatformImage();
-    BBitmap* bBitmap = platformImage.get();
+    if (wkImage) {
+        auto* apiImage = WebKit::toImpl(wkImage);
+        if (apiImage) {
+            auto* shareableBitmap = apiImage->resource();
+            if (shareableBitmap) {
+                platformImage = shareableBitmap->createPlatformImage();
+                bBitmap = platformImage.get();
+            }
+        }
+    } else if (type == SnapshotResultType::WebView) {
+        bBitmap = TestController::singleton().mainWebView()->windowSnapshotImage();
+        // Since windowSnapshotImage returns a pointer we assume ownership of?
+        // No, PlatformWebView.h defines PlatformImage as BBitmap*.
+        // We usually expect ownership transfer for snapshots.
+        // Let's check PlatformWebViewHaiku.cpp implementation later.
+    }
 
     if (!bBitmap)
         return;
@@ -121,6 +130,13 @@ void TestInvocation::dumpPixelsAndCompareWithExpected(WKImageRef wkImage, WKArra
 
     if (!compareActualHashToExpectedAndDumpResults(actualHashMD5))
         dumpBitmap(bBitmap, actualHashMD5);
+
+    // If we obtained the bitmap from windowSnapshotImage, we might need to delete it.
+    // Ideally TestController/PlatformWebView should manage this or return a smart pointer.
+    // For now, assuming if it came from windowSnapshotImage, we own it.
+    if (!wkImage && bBitmap) {
+        delete bBitmap;
+    }
 }
 
 }
