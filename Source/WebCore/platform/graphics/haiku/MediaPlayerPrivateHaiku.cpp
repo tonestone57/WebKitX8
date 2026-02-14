@@ -23,6 +23,7 @@
 #if ENABLE(VIDEO)
 
 #include "GraphicsContext.h"
+#include "Logging.h"
 #include "wtf/text/CString.h"
 #include "wtf/NeverDestroyed.h"
 
@@ -450,32 +451,71 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
         for (int i = m_mediaFile->CountTracks() - 1; i >= 0; i--)
         {
             BMediaTrack* track = m_mediaFile->TrackAt(i);
+            if (!track) {
+                LOG(Media, "MediaPlayerPrivateHaiku: Failed to get track %d", i);
+                continue;
+            }
 
             media_format format;
-            track->DecodedFormat(&format);
+            memset(&format, 0, sizeof(format));
+
+            if (track->DecodedFormat(&format) != B_OK) {
+                 LOG(Media, "MediaPlayerPrivateHaiku: Failed to get decoded format for track %d", i);
+                 m_mediaFile->ReleaseTrack(track);
+                 continue;
+            }
 
             m_mediaLock.Lock();
             if (format.IsVideo()) {
                 if (!m_videoTrack) {
+                    // Request B_RGB32 for video to avoid software conversion during blit
+                    format.u.raw_video.display.format = B_RGB32;
+                    status_t err = track->DecodedFormat(&format);
+                    if (err != B_OK) {
+                         LOG(Media, "MediaPlayerPrivateHaiku: Failed to set RGB32 format for video track %d, retrying with wildcard", i);
+                         format.u.raw_video.display.format = 0; // Wildcard
+                         if (track->DecodedFormat(&format) != B_OK) {
+                             LOG(Media, "MediaPlayerPrivateHaiku: Failed to get any decoded format for video track %d", i);
+                             m_mediaFile->ReleaseTrack(track);
+                             m_mediaLock.Unlock();
+                             continue;
+                         }
+                    }
+
                     m_videoTrack = track;
                     m_frameBuffer = new BBitmap(
                         BRect(0, 0, format.Width() - 1, format.Height() - 1),
-                        B_RGB32);
+                        format.u.raw_video.display.format); // Use the negotiated format
+                } else {
+                    m_mediaFile->ReleaseTrack(track);
                 }
-            }
-
-            if (format.IsAudio()) {
+            } else if (format.IsAudio()) {
                 if (!m_audioTrack) {
                     m_audioTrack = track;
                     m_soundPlayer = new BSoundPlayer(&format.u.raw_audio,
                         "HTML5 Audio", playCallback, NULL, this);
-                    m_soundPlayer->SetVolume(m_volume);
-                    if (!m_paused)
-                        m_soundPlayer->Start();
+
+                    if (m_soundPlayer->InitCheck() != B_OK) {
+                        LOG(Media, "MediaPlayerPrivateHaiku: Failed to initialize BSoundPlayer");
+                        delete m_soundPlayer;
+                        m_soundPlayer = nullptr;
+                        m_audioTrack = nullptr;
+                        m_mediaFile->ReleaseTrack(track);
+                    } else {
+                        m_soundPlayer->SetVolume(m_volume);
+                        if (!m_paused)
+                            m_soundPlayer->Start();
+                    }
+                } else {
+                     m_mediaFile->ReleaseTrack(track);
                 }
+            } else {
+                m_mediaFile->ReleaseTrack(track);
             }
             m_mediaLock.Unlock();
         }
+    } else {
+        LOG(Media, "MediaPlayerPrivateHaiku: Failed to init BMediaFile: %s", strerror(err));
     }
 
     // Notify main thread
