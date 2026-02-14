@@ -171,8 +171,7 @@ unsigned ImageBufferHaikuSurfaceBackend::bytesPerRow() const
 }
 
 
-// TODO: quality
-Vector<uint8_t> encodeData(BBitmap* bitmap, const String& mimeType, std::optional<double> /*quality*/)
+Vector<uint8_t> encodeData(BBitmap* bitmap, const String& mimeType, std::optional<double> quality)
 {
     BString mimeTypeString(mimeType);
 
@@ -254,8 +253,16 @@ Vector<uint8_t> encodeData(BBitmap* bitmap, const String& mimeType, std::optiona
     Vector<uint8_t> result;
     VectorPositionIO translatedStream(result);
 
+    BMessage ioExtension;
+    if (quality) {
+        // Try common field names for quality (0.0 - 1.0)
+        float q = static_cast<float>(*quality);
+        ioExtension.AddFloat("quality", q);
+        ioExtension.AddFloat("jpeg_quality", q);
+    }
+
     BBitmap* tmp = NULL;
-    if (roster->Translate(&bitmapStream, 0, 0, &translatedStream, translatorType,
+    if (roster->Translate(&bitmapStream, NULL, &ioExtension, &translatedStream, translatorType,
                           B_TRANSLATOR_BITMAP, mimeType.utf8().data()) != B_OK) {
         bitmapStream.DetachBitmap(&tmp);
         return Vector<uint8_t>();

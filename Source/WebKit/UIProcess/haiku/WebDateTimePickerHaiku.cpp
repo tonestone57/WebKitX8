@@ -218,11 +218,6 @@ public:
                 }
 
                 if (m_hourMenu && m_hourMenu->Superitem()) {
-                    if (m_calendar) {
-                        // Append time to date string if both exist (datetimelocal)
-                    } else {
-                        // Time only
-                    }
                     BString timeStr;
                     timeStr << m_hourMenu->Superitem()->Label();
                     if (timeStr.Length() < 2) timeStr.Prepend("0");
@@ -230,6 +225,8 @@ public:
                     if (m_minuteMenu && m_minuteMenu->Superitem())
                         timeStr << m_minuteMenu->Superitem()->Label();
 
+                    // If we have a calendar, str already contains "yyyy-MM-ddT" due to format.
+                    // If not (Time type), str is empty.
                     str << timeStr;
                 }
 

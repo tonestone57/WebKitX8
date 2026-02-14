@@ -53,9 +53,14 @@ namespace WebCore {
 
 RefPtr<Image> Image::loadPlatformResource(const char* name)
 {
-    // TODO: We could implement resource loading from the app resources/executable.
-    // For now, return null.
-    return nullptr;
+    Vector<char> data = loadResourceIntoArray(name);
+    if (data.isEmpty())
+        return nullptr;
+
+    auto buffer = SharedBuffer::create(data.data(), data.size());
+    auto image = BitmapImage::create();
+    image->setData(std::move(buffer), true);
+    return image;
 }
 
 } // namespace WebCore

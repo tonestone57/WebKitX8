@@ -421,8 +421,8 @@ void PathHaiku::add(PathArc arc)
 
 void PathHaiku::add(PathClosedArc arc)
 {
-    // TODO what's special about a "closed" arc?
     add(arc.arc);
+    m_platformPath.Close();
 }
 
 
