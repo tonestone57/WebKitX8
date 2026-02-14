@@ -376,6 +376,10 @@ private:
     HWND m_inspectorViewWindow { nullptr };
     HWND m_inspectorDetachWindow { nullptr };
     RefPtr<WebView> m_inspectorView;
+#elif PLATFORM(HAIKU)
+    friend class InspectorWindow;
+    BWindow* m_inspectorWindow { nullptr };
+    class WebViewBase* m_inspectorView { nullptr };
 #endif
 };
 

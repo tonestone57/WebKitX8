@@ -532,7 +532,8 @@ rgb_color RenderThemeHaiku::colorForValue(color_which colorConstant, bool useDar
 
 String RenderThemeHaiku::mediaControlsBase64StringForIconNameAndType(const String& iconName, const String& iconType)
 {
-    // FIXME: Load icon from resources
+    // TODO: Load icon from resources using BResources and BAppInfo.
+    // For now, returning empty string relies on default or missing icons.
     return { };
 }
 

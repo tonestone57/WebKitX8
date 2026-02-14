@@ -116,6 +116,8 @@ public:
 
     DashArray m_dashArray;
     float m_dashOffset { 0 };
+
+    InterpolationQuality m_imageInterpolationQuality { InterpolationQuality::Default };
 };
 
 };

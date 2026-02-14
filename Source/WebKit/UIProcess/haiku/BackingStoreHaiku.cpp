@@ -62,9 +62,19 @@ BackingStore::~BackingStore()
 void BackingStore::paint(BView* into, const WebCore::IntRect& rect)
 {
     // Paint the contents of our bitmap into the BView.
+    // The backing store bitmap is scaled by m_deviceScaleFactor (physical pixels),
+    // while the destination BView and rect are in logical coordinates.
+    // We must scale the source rectangle to match the physical backing store.
+
+    BRect srcRect(rect);
+    srcRect.left *= m_deviceScaleFactor;
+    srcRect.top *= m_deviceScaleFactor;
+    srcRect.right = (srcRect.right + 1) * m_deviceScaleFactor - 1;
+    srcRect.bottom = (srcRect.bottom + 1) * m_deviceScaleFactor - 1;
+
     into->PushState();
     into->SetDrawingMode(B_OP_COPY);
-    into->DrawBitmap(&m_bitmap, rect, rect);
+    into->DrawBitmap(&m_bitmap, srcRect, rect);
     into->PopState();
 }
 

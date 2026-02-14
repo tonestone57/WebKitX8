@@ -25,15 +25,38 @@
 
 #include "config.h"
 #include "NetworkProcess.h"
+#include "NetworkProcessHaiku.h"
 
 #include "NetworkProcessCreationParameters.h"
 #include <WebCore/NotImplemented.h>
 #include <wtf/Language.h>
+#include <wtf/HashSet.h>
+#include <wtf/Lock.h>
+#include <wtf/NeverDestroyed.h>
 #include <stdio.h>
 
 namespace WebKit {
 
 using namespace WebCore;
+
+static Lock s_allowedHostsLock;
+static HashSet<String>& allowedHosts()
+{
+    static NeverDestroyed<HashSet<String>> hosts;
+    return hosts;
+}
+
+void addAllowedHTTPSCertificateHost(const String& host)
+{
+    Locker locker { s_allowedHostsLock };
+    allowedHosts().add(host);
+}
+
+bool isHTTPSCertificateHostAllowed(const String& host)
+{
+    Locker locker { s_allowedHostsLock };
+    return allowedHosts().contains(host);
+}
 
 void NetworkProcess::platformInitializeNetworkProcess(const NetworkProcessCreationParameters& parameters)
 {
@@ -42,7 +65,14 @@ void NetworkProcess::platformInitializeNetworkProcess(const NetworkProcessCreati
 
 void NetworkProcess::allowSpecificHTTPSCertificateForHost(const CertificateInfo& certificateInfo, const String& host)
 {
-    // FIXME: Implement certificate exception handling using Haiku API
+    // FIXME: Implement certificate exception handling using Haiku API.
+    // This requires a BUrlContext to store exceptions, but we currently use BUrlRequest
+    // which might need a global context or per-request configuration not fully exposed yet.
+    // Logging the request to acknowledge the UI process command.
+    fprintf(stderr, "NetworkProcess::allowSpecificHTTPSCertificateForHost: Allowing certificate for host %s\n", host.utf8().data());
+
+    // Store the host in our local set to bypass verification in NetworkDataTaskHaiku
+    addAllowedHTTPSCertificateHost(host);
 }
 
 void NetworkProcess::platformTerminate()
@@ -51,7 +81,9 @@ void NetworkProcess::platformTerminate()
 
 void NetworkProcess::clearDiskCache(WallTime modifiedSince, CompletionHandler<void()>&& completionHandler)
 {
-    // FIXME: Clear Haiku network kit cache if available
+    // Haiku's BUrlProtocol currently doesn't expose a global cache clearing mechanism easily
+    // without iterating context. This remains a TODO for when the network kit exposes it.
+    // For now, we ack the request.
     completionHandler();
 }
 

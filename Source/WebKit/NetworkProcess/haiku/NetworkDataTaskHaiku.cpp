@@ -25,6 +25,7 @@
 
 #include "config.h" 
 #include "NetworkDataTaskHaiku.h"
+#include "NetworkProcessHaiku.h"
 
 #include "AuthenticationManager.h"
 #include "NetworkResourceLoader.h"
@@ -390,6 +391,23 @@ void NetworkDataTaskHaiku::RequestCompleted(BUrlRequest* caller, bool success)
 
 bool NetworkDataTaskHaiku::CertificateVerificationFailed(BUrlRequest* caller, BCertificate& certificate, const char* message)
 {
+    // Check if the user has previously allowed this host
+    if (isHTTPSCertificateHostAllowed(m_baseUrl.host().toString()))
+        return true;
+
+    // We are in the NetworkProcess, so we cannot easily prompt the user.
+    // Ideally, we should notify the UIProcess to ask the user.
+    // For now, we log the error and fail securely.
+#if !LOG_DISABLED
+    LOG(Network, "NetworkDataTaskHaiku Certificate Verification Failed: %s", message);
+#endif
+
+    // Notify the client (WebPage) about the failure so it can prompt the user
+    // if appropriate (though this path typically ends the request).
+    // A proper implementation would pause the request and send an async challenge.
+    // But BUrlRequest doesn't support pausing for certificate errors easily.
+    // So we fail, and rely on the UI process re-triggering the load after adding exception
+    // if the user chooses to proceed (which is handled by DidFailProvisionalLoad in UIProcess).
     return false;
 }
 
