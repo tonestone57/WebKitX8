@@ -37,6 +37,7 @@
 #include <WebCore/ResourceError.h>
 #include <WebCore/ResourceRequest.h>
 
+#include <Directory.h>
 #include <File.h>
 #include <FindDirectory.h>
 #include <Looper.h>
@@ -88,7 +89,6 @@ void NavigationClient::didFailProvisionalNavigationWithError(WebPageProxy& page,
     // This is heuristic but practical given the current Haiku backend implementation.
     String errorText = error.localizedDescription();
     if (errorText.containsIgnoringASCIICase("Certificate")) {
-        // We must run the alert on the main thread
         // We must run the alert on the main thread
         RefPtr<WebPageProxy> pageRef = &page;
         callOnMainThread([url, errorText, pageRef] {
