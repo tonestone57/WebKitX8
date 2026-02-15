@@ -188,6 +188,12 @@ if (ENABLE_GRAPHICS_CONTEXT_3D)
     )
 endif ()
 
+if (ENABLE_WEBGL)
+    list(APPEND WebCore_SOURCES
+        platform/graphics/haiku/GraphicsContextGLHaiku.cpp
+    )
+endif ()
+
 if (ENABLE_WEB_AUDIO)
     list(APPEND WebCore_SOURCES
         platform/audio/haiku/AudioDestinationHaiku.cpp

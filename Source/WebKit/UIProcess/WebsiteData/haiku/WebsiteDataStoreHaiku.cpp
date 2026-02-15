@@ -27,6 +27,8 @@
 #include "WebsiteDataStore.h"
 #include "WebsiteDataStoreParameters.h"
 
+#include "NetworkProcessMessages.h"
+#include "WebProcessPool.h"
 #include <WebCore/NotImplemented.h>
 #include <FindDirectory.h>
 #include <Path.h>
@@ -44,6 +46,27 @@ void WebsiteDataStore::platformDestroy()
 #if !USE(CURL)
 void WebsiteDataStore::platformSetNetworkParameters(WebsiteDataStoreParameters&)
 {
+}
+#else
+void WebsiteDataStore::platformSetNetworkParameters(WebsiteDataStoreParameters& parameters)
+{
+    auto& directories = resolvedDirectories();
+    auto alternativeServiceStorageDirectory = directories.alternativeServicesDirectory;
+    SandboxExtension::Handle alternativeServiceStorageDirectoryExtensionHandle;
+    createHandleFromResolvedPathIfPossible(alternativeServiceStorageDirectory, alternativeServiceStorageDirectoryExtensionHandle);
+
+    parameters.networkSessionParameters.alternativeServiceDirectory = WTF::move(alternativeServiceStorageDirectory);
+    parameters.networkSessionParameters.alternativeServiceDirectoryExtensionHandle = WTF::move(alternativeServiceStorageDirectoryExtensionHandle);
+    parameters.networkSessionParameters.cookiePersistentStorageFile = directories.cookieStorageFile;
+    parameters.networkSessionParameters.proxySettings = m_proxySettings;
+}
+
+void WebsiteDataStore::setNetworkProxySettings(WebCore::CurlProxySettings&& proxySettings)
+{
+    m_proxySettings = WTF::move(proxySettings);
+
+    if (networkProcessIfExists())
+        networkProcess().send(Messages::NetworkProcess::SetNetworkProxySettings(m_sessionID, m_proxySettings), 0);
 }
 #endif
 

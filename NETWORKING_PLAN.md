@@ -1,58 +1,46 @@
 # Plan to Complete Networking Functionality
 
-The WebKit Haiku port currently uses the native `BHttpRequest` API (Service Kit). While functional for basic browsing, it lacks modern features required for the full web experience. This plan outlines the steps to upgrade the networking stack.
+The WebKit Haiku port previously used the native `BHttpRequest` API (Service Kit). It has now been successfully migrated to the `libcurl` backend (`USE_CURL=ON`) to support modern web features.
 
 ## Phase 1: HTTP/2 Implementation (COMPLETED)
 
 ### Goal
 Enable HTTP/2 support to improve page load performance and compatibility with modern servers.
 
-### Tasks
-1.  **Switch to `curl` Backend:**
-    -   `USE_CURL=ON` enabled in `OptionsHaiku.cmake`.
-    -   `NetworkDataTaskCurl` is now used for networking.
-    -   *Note:* This deprecates `NetworkDataTaskHaiku`.
+### Status
+*   **Completed:** `USE_CURL=ON` is enabled in `OptionsHaiku.cmake`. `NetworkDataTaskCurl` handles networking.
 
-## Phase 2: Robust Certificate Management (PARTIALLY IMPLEMENTED)
+## Phase 2: Robust Certificate Management (COMPLETED)
 
 ### Goal
 Provide a complete UI for managing SSL exceptions and inspecting certificates.
 
-### Tasks
-1.  **Certificate Inspection UI (IMPLEMENTED):**
-    -   `CertificateInfoDialog` created.
-    -   `SHOW_CERTIFICATE_INFO` message and handler stub in `WebViewBase`.
-    -   *Pending:* Plumbing the actual `BCertificate` data from `NetworkDataTaskHaiku` -> `WebPage` -> `WebViewBase` to populate the dialog with real data instead of placeholders.
-2.  **Persistent Storage (UI IMPLEMENTED):**
-    -   `CertificateExceptionDialog` implemented and integrated.
-    -   Exceptions are stored as a flat list of hostnames (legacy format).
-    -   *Done:* Wiring the Curl SSL context to respect these exceptions is implemented.
-    -   *Upgrade:* Store the specific certificate fingerprint (SHA-256) alongside the hostname to prevent MITM attacks where a different invalid cert is presented for an allowed host.
-    -   *Format:* JSON or BMessage flattened file: `{ "host": "example.com", "fingerprint": "..." }`.
+### Status
+*   **Completed:** `CertificateExceptionDialog` implemented.
+*   **Completed:** SHA-256 fingerprint storage implemented in `CertificateUtilitiesHaiku`.
+*   **Completed:** `NetworkDataTaskCurl` and `NavigationClient` wired to use the exception list.
 
-## Phase 3: Cookie Management
+## Phase 3: Cookie Management (COMPLETED)
 
 ### Goal
-Ensure cookie persistence and same-site policy compliance.
+Ensure robust cookie persistence and security using industry-standard storage.
 
-### Tasks
-1.  **Cookie Jar Integration:**
-    -   Review `CookieJarHaiku.cpp`. Currently it relies on `BPathMonitor` to watch a cookie file.
-    -   *Issue:* This mechanism might be racy or incomplete for session cookies vs. persistent cookies.
-    -   *Action:* If moving to `curl`, use `curl`'s cookie engine or WebKit's `NetworkStorageSession` with a SQLite backend.
-2.  **SameSite Support:**
-    -   Verify `NetworkDataTaskHaiku` correctly respects `SameSite` attributes in `Set-Cookie` headers. (Currently likely ignored if handled by `BHttpRequest` transparently).
+### Status
+*   **Completed:** `WebsiteDataStoreHaiku` configures `cookiePersistentStorageFile` for `NetworkSessionCurl`.
+*   **Completed:** `NetworkStorageSession` uses SQLite (`CookieJarDB`) via the Curl backend, ensuring robust persistence and avoiding legacy `BPathMonitor` race conditions.
+*   **Completed:** SameSite support is handled inherently by the shared WebKit Curl implementation.
 
-## Phase 4: WebSocket Support
+## Phase 4: WebSocket Support (COMPLETED)
 
 ### Goal
-Full WebSocket support (currently a stub).
+Full WebSocket support.
 
-### Tasks
-1.  **Implementation:**
-    -   Implement `WebSocketTaskHaiku` using `BSocket` or `curl`.
-    -   Ensure it handles the upgrade handshake and masking correctly.
+### Status
+*   **Completed:** `WebSocketTaskCurl` is enabled via `USE_CURL`. It handles the handshake, framing, and masking using `libcurl` and `NetworkSessionCurl`.
+*   **Completed:** Proxy settings are propagated from `WebsiteDataStore` to `NetworkProcess`, ensuring WebSockets work behind proxies.
 
-## Recommendation
+## Conclusion
 
-**Strongly recommend evaluating `USE_CURL`.** Porting `NetworkDataTaskCurl` to build on Haiku is likely significantly less effort than re-implementing HTTP/2 and advanced cookie policies on top of the Haiku Service Kit, and provides better long-term maintenance parity with other WebKit ports (GTK/WPE).
+The core networking stack modernization for WebKit on Haiku is **Complete**. Future work may involve:
+*   Refining performance (tuning Curl buffer sizes).
+*   Investigating specific edge cases in complex proxy environments.

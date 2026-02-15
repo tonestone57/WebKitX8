@@ -54,6 +54,7 @@ private:
     void didFailNavigationWithError(WebKit::WebPageProxy&, const WebKit::FrameInfoData&, API::Navigation*, const WTF::URL&, const WebCore::ResourceError&, API::Object*) override;
     void didSameDocumentNavigation(WebKit::WebPageProxy&, API::Navigation*, WebKit::SameDocumentNavigationType, API::Object*) override;
     void renderingProgressDidChange(WebKit::WebPageProxy&, OptionSet<WebCore::LayoutMilestone>) override;
+    void didReceiveAuthenticationChallenge(WebKit::WebPageProxy&, API::AuthenticationChallenge&) override;
 
     BWebView* m_webView;
 };
