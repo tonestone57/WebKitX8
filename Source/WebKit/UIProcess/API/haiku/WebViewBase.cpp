@@ -26,6 +26,7 @@
 #include "WebViewBase.h"
 
 #include "APIPageConfiguration.h"
+#include "CertificateInfoDialog.h"
 #include "DrawingAreaProxy.h"
 
 #if ENABLE(REMOTE_INSPECTOR)
@@ -45,6 +46,7 @@
 #include "WebCore/Cursor.h"
 #include "WebCore/IntRect.h"
 #include "WebCore/Region.h"
+#include "WebViewConstants.h"
 #include "wtf/MainThread.h"
 
 #include <Application.h>
@@ -100,6 +102,20 @@ void WebViewBase::MessageReceived(BMessage* message)
 {
     switch (message->what)
     {
+        case SHOW_CERTIFICATE_INFO: {
+            // TODO: Fetch actual certificate info from WebPage/NetworkProcess
+            // This requires plumping the cert info from NetworkDataTaskHaiku -> ResourceResponse -> PageLoadState
+            // For now, we show a stub to verify the UI.
+            CertificateInfoDialog::show(
+                currentURL(),
+                "Verified by Haiku WebKit",
+                "Stub Subject",
+                "Today",
+                "Tomorrow",
+                "SHA-256: ..."
+            );
+            break;
+        }
         case B_MOUSE_WHEEL_CHANGED:
             callOnMainRunLoop([this, message = *message](){
                 fPage->handleWheelEvent(NativeWebWheelEvent(&message));

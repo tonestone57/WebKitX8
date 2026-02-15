@@ -47,6 +47,8 @@ enum {
     DID_CHANGE_ACTIVE_URL = 'dcau',
     DID_CHANGE_NETWORK_REQUESTS = 'dcnr',
 
+    SHOW_CERTIFICATE_INFO = 'shci',
+
     // PageUIClient events
     CREATE_NEW_PAGE = 'crnp',
     SHOW_PAGE = 'shpg',

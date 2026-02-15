@@ -31,12 +31,17 @@
 #include "WebPageProxy.h"
 #include "WebView.h"
 #include "WebViewConstants.h"
+#include "CertificateExceptionDialog.h"
 
 #include <WebCore/LayoutMilestone.h>
 #include <WebCore/ResourceError.h>
 #include <WebCore/ResourceRequest.h>
 
+#include <Directory.h>
+#include <File.h>
+#include <FindDirectory.h>
 #include <Looper.h>
+#include <Path.h>
 #include <Message.h>
 #include <String.h>
 
@@ -70,6 +75,90 @@ void NavigationClient::didFinishNavigation(WebPageProxy& page, API::Navigation* 
 
 void NavigationClient::didFailProvisionalNavigationWithError(WebPageProxy& page, FrameInfoData&& frameInfo, API::Navigation* navigation, const WTF::URL& url, const WebCore::ResourceError& error, API::Object* userData)
 {
+    // Check if this is a certificate error (WebKit generally uses specific domains or error codes for this,
+    // but the localized description is often the most accessible way to filter for now in this port,
+    // or we check domain/error code if available).
+    // However, WebCore often wraps platform errors.
+    // In NetworkDataTaskHaiku, we create a ResourceError with domain "BUrlProtocol".
+
+    // A more robust check might be looking for specific error codes if we defined them.
+    // For now, we assume if it's an SSL error from our network backend, we might want to prompt.
+    // But since NetworkDataTaskHaiku fails securely, we get a generic failure here.
+
+    // If the error message mentions "Certificate", we try to show the dialog.
+    // This is heuristic but practical given the current Haiku backend implementation.
+    String errorText = error.localizedDescription();
+    if (errorText.containsIgnoringASCIICase("Certificate")) {
+        // We must run the alert on the main thread
+        RefPtr<WebPageProxy> pageRef = &page;
+        callOnMainThread([url, errorText, pageRef] {
+            if (!pageRef) return;
+            // Use static run method to avoid object lifecycle issues
+            if (CertificateExceptionDialog::run(url.host().utf8().data(), errorText.utf8().data())) {
+                 // User clicked allow. Add to exceptions file.
+                 BPath path;
+                 if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK) {
+                     path.Append("WebKit");
+                     create_directory(path.Path(), 0755);
+
+                     path.Append("certificate_exceptions");
+
+                     // Check if host is already in the exceptions list
+                     BFile readFile(path.Path(), B_READ_ONLY);
+                     bool alreadyExists = false;
+                     if (readFile.InitCheck() == B_OK) {
+                         off_t size;
+                         readFile.GetSize(&size);
+                         if (size > 0) {
+                             BString content;
+                             // Just read the whole file for simplicity; it's small config
+                             char* buffer = content.LockBuffer(size);
+                             readFile.Read(buffer, size);
+                             content.UnlockBuffer(size);
+
+                             // Check line by line to match exact hostnames
+                             BString host = url.host().utf8().data();
+                             int32 start = 0;
+                             int32 end = 0;
+                             while ((end = content.FindFirst('\n', start)) != B_ERROR) {
+                                 BString line;
+                                 content.CopyInto(line, start, end - start);
+                                 if (line == host) {
+                                     alreadyExists = true;
+                                     break;
+                                 }
+                                 start = end + 1;
+                             }
+                             // Check last line if no newline at end
+                             if (!alreadyExists && start < content.Length()) {
+                                 BString line;
+                                 content.CopyInto(line, start, content.Length() - start);
+                                 if (line == host) {
+                                     alreadyExists = true;
+                                 }
+                             }
+                         }
+                     }
+
+                     if (!alreadyExists) {
+                         BFile file(path.Path(), B_WRITE_ONLY | B_CREATE_FILE | B_OPEN_AT_END);
+                         if (file.InitCheck() == B_OK) {
+                             BString entry;
+                             entry << url.host().utf8().data() << "\n";
+                             file.Write(entry.String(), entry.Length());
+                         }
+                     }
+
+                     // Reload the page
+                     pageRef->reload({});
+                     return;
+                 }
+            }
+        });
+        // If we handled it (or user denied), we still notify the app of failure,
+        // unless we reloaded immediately.
+    }
+
     BMessage message(DID_FAIL_PROVISIONAL_NAVIGATION);
     message.AddString("url", url.string().utf8().data());
     message.AddString("error", error.localizedDescription().utf8().data());

@@ -32,11 +32,68 @@
 #include "CurlContext.h"
 #include "CurlSSLHandle.h"
 
+#if OS(HAIKU)
+#include <FindDirectory.h>
+#include <Path.h>
+#include <File.h>
+#include <String.h>
+#endif
+
 namespace WebCore {
 
-WTF_MAKE_TZONE_ALLOCATED_IMPL(x);
+WTF_MAKE_TZONE_ALLOCATED_IMPL(CurlSSLVerifier);
 
-CurlSSLVerifier::CurlSSLVerifier(void* sslCtx)
+#if OS(HAIKU)
+static bool checkIfHostIsAllowed(const String& host)
+{
+    BPath path;
+    if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) != B_OK)
+        return false;
+
+    path.Append("WebKit");
+    path.Append("certificate_exceptions");
+
+    BFile file(path.Path(), B_READ_ONLY);
+    if (file.InitCheck() != B_OK)
+        return false;
+
+    off_t size;
+    file.GetSize(&size);
+    if (size <= 0)
+        return false;
+
+    BString content;
+    char* buffer = content.LockBuffer(size);
+    ssize_t bytesRead = file.Read(buffer, size);
+    if (bytesRead < 0) {
+        content.UnlockBuffer(0);
+        return false;
+    }
+    content.UnlockBuffer(bytesRead);
+
+    BString hostStr(host.utf8().data());
+    int32 start = 0;
+    int32 end;
+    while ((end = content.FindFirst('\n', start)) != B_ERROR) {
+        BString line;
+        content.CopyInto(line, start, end - start);
+        if (line == hostStr)
+            return true;
+        start = end + 1;
+    }
+    if (start < content.Length()) {
+        BString line;
+        content.CopyInto(line, start, content.Length() - start);
+        if (line == hostStr)
+            return true;
+    }
+
+    return false;
+}
+#endif
+
+CurlSSLVerifier::CurlSSLVerifier(void* sslCtx, String&& host)
+    : m_host(WTF::move(host))
 {
     auto* ctx = static_cast<SSL_CTX*>(sslCtx);
 
@@ -77,7 +134,16 @@ int CurlSSLVerifier::verifyCallback(int preverified, X509_STORE_CTX* ctx)
 
     verifier->collectInfo(ctx);
     // whether the verification of the certificate in question was passed (preverified=1) or not (preverified=0)
-    return preverified;
+
+    if (preverified)
+        return 1;
+
+#if OS(HAIKU)
+    if (checkIfHostIsAllowed(verifier->m_host))
+        return 1;
+#endif
+
+    return 0;
 }
 
 }

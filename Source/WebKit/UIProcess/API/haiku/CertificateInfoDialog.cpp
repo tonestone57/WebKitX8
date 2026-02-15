@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 Haiku, Inc.
+ * Copyright (C) 2024 Haiku, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,45 +24,22 @@
  */
 
 #include "config.h"
-#include "MemoryPressureHandler.h"
+#include "CertificateInfoDialog.h"
 
-#include <OS.h>
-#include <wtf/MainThread.h>
-#include <wtf/RunLoop.h>
+#include <Alert.h>
+#include <InterfaceDefs.h>
+#include <String.h>
 
-namespace WebCore {
-
-void MemoryPressureHandler::platformReleaseMemory(Critical)
+void CertificateInfoDialog::show(const char* host, const char* issuer, const char* subject, const char* validFrom, const char* validUntil, const char* fingerprint)
 {
+    BString text;
+    text << "Certificate Information for \"" << host << "\"\n\n";
+    text << "Subject:\t" << subject << "\n";
+    text << "Issuer:\t" << issuer << "\n";
+    text << "Valid From:\t" << validFrom << "\n";
+    text << "Valid Until:\t" << validUntil << "\n";
+    text << "Fingerprint:\t" << fingerprint << "\n";
+
+    BAlert* alert = new BAlert("Page Info", text.String(), "Close", NULL, NULL, B_WIDTH_AS_USUAL, B_INFO_ALERT);
+    alert->Go();
 }
-
-std::optional<MemoryPressureHandler::ReliefLogger::MemoryUsage> MemoryPressureHandler::ReliefLogger::platformMemoryUsage()
-{
-    return std::nullopt;
-}
-
-void MemoryPressureHandler::install()
-{
-    if (m_installed)
-        return;
-
-    m_installed = true;
-
-    RunLoop::main().dispatchRepeating([] {
-        system_info info;
-        if (get_system_info(&info) == B_OK) {
-            // Include cached pages as available memory since Haiku caches aggressively
-            uint64_t freeMemory = (uint64_t)(info.free_memory + info.cached_pages) * B_PAGE_SIZE;
-            uint64_t totalMemory = (uint64_t)info.max_pages * B_PAGE_SIZE;
-
-            // Trigger if less than 64MB or 10% memory free
-            // Haiku VMs often run with 512MB RAM, so 128MB is too high (25%).
-            // 64MB is a safer floor for critical pressure.
-            if (freeMemory < 64 * 1024 * 1024 || (totalMemory > 0 && (double)freeMemory / totalMemory < 0.10)) {
-                MemoryPressureHandler::singleton().triggerMemoryPressureEvent(true);
-            }
-        }
-    }, 10_s);
-}
-
-} // namespace WebCore

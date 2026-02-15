@@ -59,6 +59,7 @@
 enum {
 	OPEN_LOCATION = 'open',
 	OPEN_INSPECTOR = 'insp',
+    SHOW_PAGE_INFO = 'shpi',
 	SAVE_PAGE = 'save',
     GO_BACK = 'goba',
     GO_FORWARD = 'gofo',
@@ -133,6 +134,17 @@ void LauncherWindow::MessageReceived(BMessage* message)
         inspectorWindow->Show();
 
         CurrentWebView()->SetInspectorView(inspectorWindow->CurrentWebView());
+        break;
+    }
+    case SHOW_PAGE_INFO: {
+        if (BWebView* webView = CurrentWebView()) {
+            if (BView* view = webView->getRenderView()) {
+                if (view->Looper()) {
+                    BMessage message(SHOW_CERTIFICATE_INFO);
+                    view->Looper()->PostMessage(&message, view);
+                }
+            }
+        }
         break;
     }
 	case SAVE_PAGE: {
@@ -370,6 +382,7 @@ void LauncherWindow::init(BWebView* webView, ToolbarPolicy toolbarPolicy)
         newItem->SetTarget(be_app);
         menu->AddItem(new BMenuItem("Open location", new BMessage(OPEN_LOCATION), 'L'));
         menu->AddItem(new BMenuItem("Inspect page", new BMessage(OPEN_INSPECTOR), 'I'));
+        menu->AddItem(new BMenuItem("Page info", new BMessage(SHOW_PAGE_INFO), 'P'));
 	    menu->AddItem(new BMenuItem("Save page", new BMessage(SAVE_PAGE), 'S'));
         menu->AddSeparatorItem();
         menu->AddItem(new BMenuItem("Close", new BMessage(B_QUIT_REQUESTED), 'W', B_SHIFT_KEY));

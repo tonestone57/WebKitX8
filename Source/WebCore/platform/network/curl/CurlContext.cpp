@@ -365,7 +365,7 @@ CURLcode CurlHandle::willSetupSslCtx(void* sslCtx)
         return CURLE_ABORTED_BY_CALLBACK;
 
     if (!m_sslVerifier)
-        m_sslVerifier = makeUnique<CurlSSLVerifier>(sslCtx);
+        m_sslVerifier = makeUnique<CurlSSLVerifier>(sslCtx, m_url.host().toString());
 
     return CURLE_OK;
 }
