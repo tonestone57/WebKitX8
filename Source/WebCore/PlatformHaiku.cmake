@@ -95,6 +95,7 @@ list(APPEND WebCore_SOURCES
   platform/haiku/PlatformKeyboardEventHaiku.cpp
   platform/haiku/PlatformMouseEventHaiku.cpp
   platform/haiku/PlatformScreenHaiku.cpp
+  platform/haiku/PlatformSpeechSynthesizerHaiku.cpp
   platform/haiku/PopupMenuHaiku.cpp
   platform/haiku/ScrollbarThemeHaiku.cpp
   platform/haiku/SearchPopupMenuHaiku.cpp
