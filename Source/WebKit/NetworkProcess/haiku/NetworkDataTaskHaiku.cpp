@@ -54,6 +54,7 @@
 #include <FindDirectory.h>
 #include <wtf/HashSet.h>
 #include <wtf/text/WTFString.h>
+#include <wtf/text/StringBuilder.h>
 
 static const int gMaxRecursionLimit = 10;
 
@@ -506,39 +507,54 @@ void NetworkDataTaskHaiku::AuthenticationNeeded(BHttpRequest* request, const Res
         while (realmPos != notFound) {
              // Ensure it is a whole word
              bool precedingCharOk = (realmPos == 0) || authHeader[realmPos - 1] == ' ' || authHeader[realmPos - 1] == '\t' || authHeader[realmPos - 1] == ',';
-             if (precedingCharOk)
-                 break;
+             if (!precedingCharOk) {
+                 realmPos = authHeader.findIgnoringASCIICase("realm", realmPos + 1);
+                 continue;
+             }
+
+             size_t ptr = realmPos + 5;
+             // Skip whitespace
+             while (ptr < authHeader.length() && (authHeader[ptr] == ' ' || authHeader[ptr] == '\t'))
+                 ptr++;
+
+             if (ptr < authHeader.length() && authHeader[ptr] == '=') {
+                 ptr++;
+                 // Skip whitespace
+                 while (ptr < authHeader.length() && (authHeader[ptr] == ' ' || authHeader[ptr] == '\t'))
+                     ptr++;
+
+                 if (ptr < authHeader.length()) {
+                     if (authHeader[ptr] == '"') {
+                         // Quoted realm
+                         ptr++;
+                         StringBuilder extractedRealm;
+                         while (ptr < authHeader.length()) {
+                             UChar c = authHeader[ptr];
+                             if (c == '\\' && ptr + 1 < authHeader.length()) {
+                                 ptr++;
+                                 extractedRealm.append(authHeader[ptr]);
+                             } else if (c == '"') {
+                                 realm = extractedRealm.toString();
+                                 break;
+                             } else {
+                                 extractedRealm.append(c);
+                             }
+                             ptr++;
+                         }
+                         if (realm == "realm"_s && !extractedRealm.isEmpty())
+                              realm = extractedRealm.toString();
+                         break;
+                     } else {
+                         // Token realm (unquoted)
+                         size_t start = ptr;
+                         while (ptr < authHeader.length() && authHeader[ptr] != ',' && authHeader[ptr] != ' ' && authHeader[ptr] != '\t')
+                             ptr++;
+                         realm = authHeader.substring(start, ptr - start);
+                         break;
+                     }
+                 }
+             }
              realmPos = authHeader.findIgnoringASCIICase("realm", realmPos + 1);
-        }
-
-        if (realmPos != notFound) {
-            size_t ptr = realmPos + 5;
-            // Skip whitespace
-            while (ptr < authHeader.length() && (authHeader[ptr] == ' ' || authHeader[ptr] == '\t'))
-                ptr++;
-
-            if (ptr < authHeader.length() && authHeader[ptr] == '=') {
-                ptr++;
-                // Skip whitespace
-                while (ptr < authHeader.length() && (authHeader[ptr] == ' ' || authHeader[ptr] == '\t'))
-                    ptr++;
-
-                if (ptr < authHeader.length()) {
-                    if (authHeader[ptr] == '"') {
-                        // Quoted realm
-                        ptr++;
-                        size_t endPos = authHeader.find('"', ptr);
-                        if (endPos != notFound)
-                            realm = authHeader.substring(ptr, endPos - ptr);
-                    } else {
-                        // Token realm (unquoted)
-                        size_t endPos = ptr;
-                        while (endPos < authHeader.length() && authHeader[endPos] != ',' && authHeader[endPos] != ' ' && authHeader[endPos] != '\t')
-                            endPos++;
-                        realm = authHeader.substring(ptr, endPos - ptr);
-                    }
-                }
-            }
         }
     }
 
