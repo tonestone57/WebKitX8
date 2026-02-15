@@ -125,8 +125,10 @@ private:
         BMediaTrack* m_audioTrack;
         BMediaTrack* m_videoTrack;
         BSoundPlayer* m_soundPlayer;
-        BBitmap* m_frameBuffer;
+        BBitmap* m_videoBuffer;
+        BBitmap* m_drawBuffer;
         BLocker m_mediaLock;
+        BLocker m_drawLock;
         thread_id m_identifyThread;
         thread_id m_videoPlayThread;
         mutable PlatformTimeRanges m_buffered;

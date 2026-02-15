@@ -24,6 +24,10 @@
 
 #include "GraphicsContext.h"
 #include "Logging.h"
+#if ENABLE(MEDIA_SOURCE)
+#include "MediaSourcePrivateClient.h"
+#endif
+#include <algorithm>
 #include <cmath>
 #include "wtf/text/CString.h"
 #include "wtf/NeverDestroyed.h"
@@ -78,7 +82,8 @@ MediaPlayerPrivate::MediaPlayerPrivate(MediaPlayer& player)
     , m_audioTrack(nullptr)
     , m_videoTrack(nullptr)
     , m_soundPlayer(nullptr)
-    , m_frameBuffer(nullptr)
+    , m_videoBuffer(nullptr)
+    , m_drawBuffer(nullptr)
     , m_identifyThread(-1)
     , m_videoPlayThread(-1)
     , m_player(player)
@@ -106,13 +111,15 @@ MediaPlayerPrivate::~MediaPlayerPrivate()
     BAutolock lock(m_mediaLock);
 
     cancelLoad();
-    delete m_frameBuffer;
+    delete m_videoBuffer;
+    delete m_drawBuffer;
 }
 
 #if ENABLE(MEDIA_SOURCE)
-void MediaPlayerPrivate::load(const String& url, WebCore::MediaSourcePrivateClient*)
+void MediaPlayerPrivate::load(const String& /*url*/, WebCore::MediaSourcePrivateClient*)
 {
-    load(url);
+    // TODO: Implement MSE loading initialization.
+    // load(url);
 }
 #endif
 
@@ -161,6 +168,11 @@ void MediaPlayerPrivate::cancelLoad()
     m_mediaFile = nullptr;
     m_audioTrack = nullptr;
     m_videoTrack = nullptr;
+
+    delete m_videoBuffer;
+    m_videoBuffer = nullptr;
+    delete m_drawBuffer;
+    m_drawBuffer = nullptr;
 }
 
 void MediaPlayerPrivate::prepareToPlay()
@@ -205,9 +217,12 @@ void MediaPlayerPrivate::playCallback(void* cookie, void* buffer,
         {
             // Decode a video frame and show it on screen
             int64 count;
-            if (player->m_videoTrack->ReadFrames(player->m_frameBuffer->Bits(),
+            if (player->m_videoTrack->ReadFrames(player->m_videoBuffer->Bits(),
                 &count) != B_OK) {
                 player->m_videoTrack = nullptr;
+            } else {
+                 BAutolock lock(player->m_drawLock);
+                 std::swap(player->m_videoBuffer, player->m_drawBuffer);
             }
 
             WeakPtr<MediaPlayerPrivate> p = WeakPtr(player);
@@ -239,8 +254,13 @@ int32 MediaPlayerPrivate::videoPlayThread(void* cookie)
             if (lock.IsLocked() && player->m_videoTrack) {
                 int64 frames = 0;
                 media_header header;
-                if (player->m_videoTrack->ReadFrames(player->m_frameBuffer->Bits(), &frames, &header) == B_OK) {
+                if (player->m_videoTrack->ReadFrames(player->m_videoBuffer->Bits(), &frames, &header) == B_OK) {
                     player->m_currentTime = header.start_time / 1000000.f;
+
+                    {
+                        BAutolock lock(player->m_drawLock);
+                        std::swap(player->m_videoBuffer, player->m_drawBuffer);
+                    }
 
                     WeakPtr<MediaPlayerPrivate> p = WeakPtr(player);
                     callOnMainThread([p] {
@@ -293,10 +313,10 @@ void MediaPlayerPrivate::pause()
 
 FloatSize MediaPlayerPrivate::naturalSize() const
 {
-    if (!m_frameBuffer)
+    if (!m_videoBuffer)
         return FloatSize(0,0);
 
-    BRect r(m_frameBuffer->Bounds());
+    BRect r(m_videoBuffer->Bounds());
     return FloatSize(r.Width() + 1, r.Height() + 1);
 }
 
@@ -439,10 +459,11 @@ void MediaPlayerPrivate::paint(GraphicsContext& context, const FloatRect& r)
     if (context.paintingDisabled())
         return;
 
-    if (m_frameBuffer) {
+    BAutolock lock(m_drawLock);
+    if (m_drawBuffer) {
         BView* target = context.platformContext();
         target->SetDrawingMode(B_OP_COPY);
-        target->DrawBitmap(m_frameBuffer, r);
+        target->DrawBitmap(m_drawBuffer, r);
     }
 }
 
@@ -498,9 +519,12 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
                     }
 
                     m_videoTrack = track;
-                    m_frameBuffer = new BBitmap(
+                    m_videoBuffer = new BBitmap(
                         BRect(0, 0, format.Width() - 1, format.Height() - 1),
                         format.u.raw_video.display.format); // Use the negotiated format
+                    m_drawBuffer = new BBitmap(
+                        BRect(0, 0, format.Width() - 1, format.Height() - 1),
+                        format.u.raw_video.display.format);
                 } else {
                     m_mediaFile->ReleaseTrack(track);
                 }
