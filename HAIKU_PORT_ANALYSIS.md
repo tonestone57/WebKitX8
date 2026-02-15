@@ -14,8 +14,8 @@ However, the port lacks support for several modern web standards (WebAudio, WebG
 *   **Strengths:** Native integration, supports HTTP/1.1, redirects, and basic authentication.
 *   **Deficiencies:**
     *   **HTTP/2:** Not implemented. The current backend relies on `BHttpRequest` which is HTTP/1.1 only.
-    *   **SSL Exceptions:** Certificate verification is strict. Exceptions are read from a flat text file (`WebKit/certificate_exceptions`) with no user interface to add them. Users must manually edit this file.
-    *   **Authentication:** Basic and Digest auth are handled, but the parsing logic is custom and potentially fragile.
+    *   **SSL Exceptions:** Certificate verification is strict. Exceptions are read from a flat text file (`WebKit/certificate_exceptions`). A `CertificateExceptionDialog` (BAlert) is now implemented to prompt users to add exceptions on the fly.
+    *   **Authentication:** Basic and Digest auth are handled. The parsing logic has been hardened to support quoted realms and escaped characters.
 
 ### 2. Graphics & Rendering
 *   **Status:** **Functional**
@@ -54,9 +54,9 @@ However, the port lacks support for several modern web standards (WebAudio, WebG
 
 The following areas require significant work to achieve feature parity with other ports:
 
-1.  **Certificate Exception UI:**
-    *   *Required:* Implement a dialog in UIProcess to prompt the user when a certificate error occurs, and write the exception to the settings file.
-    *   *Current Workaround:* Manual text file editing.
+1.  **Certificate Exception UI (IMPLEMENTED):**
+    *   *Status:* A `CertificateExceptionDialog` prompts the user on SSL errors. Exceptions are persisted to `~/config/settings/WebKit/certificate_exceptions`.
+    *   *Next Steps:* Backend integration to reload the context immediately without a full restart might be needed if `BHttpRequest` caches the exception list.
 
 2.  **HTTP/2 Support:**
     *   *Required:* Update `NetworkDataTaskHaiku` to support HTTP/2, potentially by updating the underlying Haiku Service Kit usage or evaluating `curl` (currently disabled) as an alternative backend.
@@ -72,6 +72,7 @@ The following areas require significant work to achieve feature parity with othe
 
 ## Recommendations
 
-1.  **Immediate Priority:** Implement the **Certificate Exception UI**. This is a major usability hurdle for browsing the modern web where SSL errors are common on legacy/niche platforms due to root store issues.
-2.  **Performance:** Refine the `MemoryPressureHandler` thresholds. 10% free memory might be too aggressive or too lenient depending on the system RAM.
-3.  **Stability:** Audit the custom HTTP Authentication header parsing in `NetworkDataTaskHaiku.cpp` for robustness.
+1.  **Immediate Priority:** **Completed.** The Certificate Exception UI is implemented.
+2.  **Performance:** **Completed.** `MemoryPressureHandler` threshold lowered to 64MB to suit low-RAM VMs.
+3.  **Stability:** **Completed.** `NetworkDataTaskHaiku` authentication parsing logic has been robustified.
+4.  **Next Priority:** Evaluate `USE_CURL` to enable HTTP/2 and standard WebKit networking features (Cookies, Caching) as per `NETWORKING_PLAN.md`.

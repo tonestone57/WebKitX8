@@ -18,17 +18,19 @@ Enable HTTP/2 support to improve page load performance and compatibility with mo
 3.  **Alternative: Enhance `NetworkDataTaskHaiku`:**
     -   If keeping the native backend is prioritized, implement HTTP/2 framing and stream management on top of raw `BSocket` instead of `BHttpRequest`. (High Effort).
 
-## Phase 2: Robust Certificate Management
+## Phase 2: Robust Certificate Management (PARTIALLY IMPLEMENTED)
 
 ### Goal
 Provide a complete UI for managing SSL exceptions and inspecting certificates.
 
 ### Tasks
-1.  **Certificate Inspection UI:**
-    -   Create a new window `CertificateInfoDialog` that displays details (Issuer, Subject, Expiration) from the `BCertificate` object.
-    -   Trigger this dialog from the "Page Info" or lock icon (to be implemented) in the UI.
-2.  **Persistent Storage:**
-    -   Currently exceptions are stored as a flat list of hostnames.
+1.  **Certificate Inspection UI (IMPLEMENTED):**
+    -   `CertificateInfoDialog` created.
+    -   `SHOW_CERTIFICATE_INFO` message and handler stub in `WebViewBase`.
+    -   *Pending:* Plumbing the actual `BCertificate` data from `NetworkDataTaskHaiku` -> `WebPage` -> `WebViewBase` to populate the dialog with real data instead of placeholders.
+2.  **Persistent Storage (UI IMPLEMENTED):**
+    -   `CertificateExceptionDialog` implemented and integrated.
+    -   Exceptions are stored as a flat list of hostnames (legacy format).
     -   *Upgrade:* Store the specific certificate fingerprint (SHA-256) alongside the hostname to prevent MITM attacks where a different invalid cert is presented for an allowed host.
     -   *Format:* JSON or BMessage flattened file: `{ "host": "example.com", "fingerprint": "..." }`.
 
