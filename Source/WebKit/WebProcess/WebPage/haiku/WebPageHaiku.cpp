@@ -39,6 +39,10 @@
 
 #include "WebKeyboardEvent.h"
 
+#include "PrintInfo.h"
+#include <WebCore/PrintContext.h>
+#include <WebCore/ShareableBitmap.h>
+
 using namespace WebCore;
 
 namespace WebKit {
@@ -189,6 +193,44 @@ bool WebPage::handleEditingKeyboardEvent(WebCore::KeyboardEvent& event)
 
 void WebPage::getPlatformEditorState(LocalFrame& frame, EditorState& result) const
 {
+}
+
+void WebPage::drawRectToImage(WebCore::FrameIdentifier frameID, const PrintInfo&, const WebCore::IntRect& rect, const WebCore::IntSize& imageSize, CompletionHandler<void(std::optional<WebCore::ShareableBitmap::Handle>&&)>&& completionHandler)
+{
+    PrintContextAccessScope scope { *this };
+    RefPtr frame = WebProcess::singleton().webFrame(frameID);
+    RefPtr coreFrame = frame ? frame->coreLocalFrame() : nullptr;
+
+    RefPtr<WebCore::ShareableBitmap> image;
+
+    if (coreFrame) {
+        ShareableBitmap::Configuration configuration;
+        configuration.size = imageSize;
+        configuration.colorSpace = WebCore::DestinationColorSpace::SRGB();
+        image = WebCore::ShareableBitmap::create(configuration);
+        if (!image) {
+            completionHandler(std::nullopt);
+            return;
+        }
+
+        auto context = image->createGraphicsContext();
+        if (!context) {
+            completionHandler(std::nullopt);
+            return;
+        }
+
+        float printingScale = static_cast<float>(imageSize.width()) / rect.width();
+        context->scale(printingScale);
+
+        if (m_printContext)
+            Ref { *m_printContext }->spoolRect(*context, rect);
+    }
+
+    std::optional<WebCore::ShareableBitmap::Handle> handle;
+    if (image)
+        handle = image->createHandle(WebCore::SharedMemory::Protection::ReadOnly);
+
+    completionHandler(WTF::move(handle));
 }
 
 } // namespace WebKit

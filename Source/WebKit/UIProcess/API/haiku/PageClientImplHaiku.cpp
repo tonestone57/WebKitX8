@@ -42,6 +42,7 @@
 #include "ShareableBitmap.h"
 #include "WebCore/ShareableBitmap.h"
 #include "WebFullScreenManagerProxy.h"
+#include "PrintInfo.h"
 
 #include <View.h>
 #include <Window.h>
@@ -425,7 +426,7 @@ private:
         BRect printableRect = m_printJob->PrintableRect();
         m_view->UnlockLooper();
 
-        WebCore::PrintInfo printInfo;
+        PrintInfo printInfo;
         printInfo.pageSetupScaleFactor = 1.0;
         printInfo.availablePaperWidth = printableRect.Width();
         printInfo.availablePaperHeight = printableRect.Height();
@@ -464,7 +465,14 @@ private:
             snapshotSize.scale(m_scaleFactor);
         }
 
-        m_page.takeSnapshot(rect, snapshotSize, SnapshotOptionsShareable, [this, protectedThis = Ref { *this }](std::optional<ShareableBitmap::Handle>&& imageHandle) {
+        BRect printableRect = m_printJob->PrintableRect();
+        PrintInfo printInfo;
+        printInfo.pageSetupScaleFactor = 1.0;
+        printInfo.availablePaperWidth = printableRect.Width();
+        printInfo.availablePaperHeight = printableRect.Height();
+        printInfo.rect = IntRect(0, 0, (int)printableRect.Width(), (int)printableRect.Height());
+
+        m_page.drawRectToImage(m_frame.frameID(), printInfo, rect, snapshotSize, [this, protectedThis = Ref { *this }](std::optional<ShareableBitmap::Handle>&& imageHandle) {
             if (imageHandle) {
                 m_snapshots.append(ShareableBitmap::create(WTFMove(*imageHandle)));
             } else {
