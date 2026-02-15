@@ -29,19 +29,19 @@ Provide a complete UI for managing SSL exceptions and inspecting certificates.
     -   `CertificateUtilitiesHaiku` created to manage storage and verification.
     -   Wiring the Curl SSL context to respect these exceptions is implemented.
 
-## Phase 3: Cookie Management
+## Phase 3: Cookie Management (Priority: High)
 
 ### Goal
-Ensure cookie persistence and same-site policy compliance.
+Ensure robust cookie persistence and security using industry-standard storage.
 
 ### Tasks
-1.  **Cookie Jar Integration:**
-    -   Review `CookieJarHaiku.cpp`. Currently it relies on `BPathMonitor` to watch a cookie file.
-    -   *Issue:* This mechanism might be racy or incomplete for session cookies vs. persistent cookies.
-    -   *Action:* Since we are using `curl`, we should evaluate using `NetworkStorageSession` with a SQLite backend or ensure `CookieJarHaiku` correctly interfaces with Curl's cookie handling if necessary, though `NetworkDataTaskCurl` handles cookies via `NetworkStorageSession`.
-    -   *Check:* Verify if `NetworkStorageSessionCurl` is fully utilized and if it persists cookies correctly on Haiku.
+1.  **SQLite Integration:**
+    -   **Goal:** Migrate cookie storage from the legacy `BPathMonitor`-based `CookieJarHaiku` to WebKit's `NetworkStorageSession` backed by SQLite.
+    -   **Reason:** Prevents race conditions, ensures thread safety, and maintains compatibility with the Curl backend's cookie engine.
+    -   *Status:* Initial wiring for `cookiePersistentStorageFile` in `WebsiteDataStoreHaiku` is implemented. Needs full verification that `NetworkStorageSessionCurl` uses this path correctly and that the legacy `CookieJarHaiku` is effectively deprecated.
 2.  **SameSite Support:**
-    -   Verify `NetworkDataTaskHaiku` correctly respects `SameSite` attributes in `Set-Cookie` headers. (Currently likely ignored if handled by `BHttpRequest` transparently).
+    -   **Goal:** Verify correct handling of `SameSite` cookie attributes.
+    -   **Action:** Test `NetworkDataTaskCurl` behavior against sites requiring SameSite enforcement.
 
 ## Phase 4: WebSocket Support
 
@@ -50,8 +50,8 @@ Full WebSocket support (currently a stub).
 
 ### Tasks
 1.  **Implementation:**
-    -   Implement `WebSocketTaskHaiku` using `BSocket` or `curl`.
-    -   Ensure it handles the upgrade handshake and masking correctly.
+    -   **Goal:** Complete the implementation of `WebSocketTaskHaiku` or verify `WebSocketTaskCurl` is fully functional on Haiku.
+    -   **Requirements:** Ensure it handles the upgrade handshake, masking, and binary frames correctly.
 
 ## Recommendation
 
