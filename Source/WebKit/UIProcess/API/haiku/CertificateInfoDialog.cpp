@@ -27,6 +27,7 @@
 #include "CertificateInfoDialog.h"
 
 #include <Alert.h>
+#include <InterfaceDefs.h>
 #include <String.h>
 
 void CertificateInfoDialog::show(const char* host, const char* issuer, const char* subject, const char* validFrom, const char* validUntil, const char* fingerprint)

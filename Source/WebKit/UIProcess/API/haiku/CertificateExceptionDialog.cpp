@@ -1,6 +1,7 @@
 #include "config.h"
 #include "CertificateExceptionDialog.h"
 
+#include <InterfaceDefs.h>
 #include <String.h>
 
 // run() is a static method
