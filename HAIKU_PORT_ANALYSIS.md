@@ -9,11 +9,13 @@ However, the port lacks support for several modern web standards (WebAudio, WebG
 ## Detailed Feature Audit
 
 ### 1. Networking
-*   **Status:** **Functional / Modernized**
-*   **Implementation:** `libcurl` is now used (`USE_CURL=ON`) via `NetworkDataTaskCurl`.
-*   **Strengths:** Industry-standard stack, supports HTTP/2, robust cookie management, and advanced authentication.
+*   **Status:** **Functional / Incomplete**
+*   **Implementation:** Native `BHttpRequest` (Haiku Service Kit) is used in `NetworkDataTaskHaiku.cpp`.
+*   **Strengths:** Native integration, supports HTTP/1.1, redirects, and basic authentication.
 *   **Deficiencies:**
-    *   **SSL Exceptions:** The `CertificateExceptionDialog` prompts the user and writes to a legacy text file, but the Curl backend does not yet read this file. Integration is pending.
+    *   **HTTP/2:** Not implemented. The current backend relies on `BHttpRequest` which is HTTP/1.1 only.
+    *   **SSL Exceptions:** Certificate verification is strict. Exceptions are read from a flat text file (`WebKit/certificate_exceptions`). A `CertificateExceptionDialog` (BAlert) is now implemented to prompt users to add exceptions on the fly.
+    *   **Authentication:** Basic and Digest auth are handled. The parsing logic has been hardened to support quoted realms and escaped characters.
 
 ### 2. Graphics & Rendering
 *   **Status:** **Functional**
@@ -56,8 +58,8 @@ The following areas require significant work to achieve feature parity with othe
     *   *Status:* A `CertificateExceptionDialog` prompts the user on SSL errors. Exceptions are persisted to `~/config/settings/WebKit/certificate_exceptions`.
     *   *Next Steps:* Backend integration to reload the context immediately without a full restart might be needed if `BHttpRequest` caches the exception list.
 
-2.  **HTTP/2 Support (COMPLETED):**
-    *   *Status:* Enabled by switching to `libcurl`.
+2.  **HTTP/2 Support:**
+    *   *Required:* Update `NetworkDataTaskHaiku` to support HTTP/2, potentially by updating the underlying Haiku Service Kit usage or evaluating `curl` (currently disabled) as an alternative backend.
 
 3.  **WebAudio Support:**
     *   *Required:* Enable `ENABLE_WEB_AUDIO` and implement the necessary audio bus transformers using `ffmpeg` or native `BSoundPlayer` streams effectively.
@@ -73,4 +75,4 @@ The following areas require significant work to achieve feature parity with othe
 1.  **Immediate Priority:** **Completed.** The Certificate Exception UI is implemented.
 2.  **Performance:** **Completed.** `MemoryPressureHandler` threshold lowered to 64MB to suit low-RAM VMs.
 3.  **Stability:** **Completed.** `NetworkDataTaskHaiku` authentication parsing logic has been robustified.
-4.  **Next Priority:** Integrate `CertificateExceptionDialog` with the Curl backend (e.g. via `NetworkStorageSession` or a custom Curl context callback) to honor the user's exceptions.
+4.  **Next Priority:** Evaluate `USE_CURL` to enable HTTP/2 and standard WebKit networking features (Cookies, Caching) as per `NETWORKING_PLAN.md`.

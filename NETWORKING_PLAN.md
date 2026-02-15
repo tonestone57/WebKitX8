@@ -2,16 +2,21 @@
 
 The WebKit Haiku port currently uses the native `BHttpRequest` API (Service Kit). While functional for basic browsing, it lacks modern features required for the full web experience. This plan outlines the steps to upgrade the networking stack.
 
-## Phase 1: HTTP/2 Implementation (COMPLETED)
+## Phase 1: HTTP/2 Implementation
 
 ### Goal
 Enable HTTP/2 support to improve page load performance and compatibility with modern servers.
 
 ### Tasks
-1.  **Switch to `curl` Backend:**
-    -   `USE_CURL=ON` enabled in `OptionsHaiku.cmake`.
-    -   `NetworkDataTaskCurl` is now used for networking.
-    -   *Note:* This deprecates `NetworkDataTaskHaiku`.
+1.  **Investigate Backend Feasibility:**
+    -   Assess if Haiku's `BHttpRequest` supports HTTP/2 negotiation (ALPN).
+    -   *Constraint:* If `BHttpRequest` is strictly HTTP/1.1, we must switch backends.
+2.  **Evaluate `curl` Backend:**
+    -   The `USE_CURL` option exists in CMake but is currently disabled.
+    -   *Action:* Enable `USE_CURL=ON` in `OptionsHaiku.cmake` and verify if `NetworkDataTaskCurl` compiles and links against Haiku's `libcurl` port.
+    -   *Action:* If `curl` is viable, replace `NetworkDataTaskHaiku` with the standard `NetworkDataTaskCurl` implementation, which brings robust HTTP/2, cookies, and caching for free.
+3.  **Alternative: Enhance `NetworkDataTaskHaiku`:**
+    -   If keeping the native backend is prioritized, implement HTTP/2 framing and stream management on top of raw `BSocket` instead of `BHttpRequest`. (High Effort).
 
 ## Phase 2: Robust Certificate Management (PARTIALLY IMPLEMENTED)
 
