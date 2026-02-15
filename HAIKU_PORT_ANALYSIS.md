@@ -56,7 +56,7 @@ The following areas require significant work to achieve feature parity with othe
 
 1.  **Certificate Exception UI (IMPLEMENTED):**
     *   *Status:* A `CertificateExceptionDialog` prompts the user on SSL errors. Exceptions are persisted to `~/config/settings/WebKit/certificate_exceptions`.
-    *   *Next Steps:* Backend integration to reload the context immediately without a full restart might be needed if `BHttpRequest` caches the exception list.
+    *   *Limitation:* With `USE_CURL=ON`, the cross-platform Curl backend does not yet read this file. Wiring the Curl SSL context to respect these exceptions is the immediate next priority.
 
 2.  **HTTP/2 Support:**
     *   *Required:* Update `NetworkDataTaskHaiku` to support HTTP/2, potentially by updating the underlying Haiku Service Kit usage or evaluating `curl` (currently disabled) as an alternative backend.
