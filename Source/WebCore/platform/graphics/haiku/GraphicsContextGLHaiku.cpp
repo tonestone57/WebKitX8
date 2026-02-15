@@ -26,16 +26,15 @@
 #include "config.h"
 #include "GraphicsContextGL.h"
 
-#include "NotImplemented.h"
-
 #if ENABLE(WEBGL)
+
+#include "GraphicsContextGLTextureMapperANGLE.h"
 
 namespace WebCore {
 
 RefPtr<GraphicsContextGL> createWebProcessGraphicsContextGL(const GraphicsContextGLAttributes& attributes)
 {
-    notImplemented();
-    return nullptr;
+    return GraphicsContextGLTextureMapperANGLE::create(GraphicsContextGLAttributes { attributes });
 }
 
 } // namespace WebCore
