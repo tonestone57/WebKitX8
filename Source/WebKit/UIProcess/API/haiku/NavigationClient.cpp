@@ -116,11 +116,26 @@ void NavigationClient::didFailProvisionalNavigationWithError(WebPageProxy& page,
                              readFile.Read(buffer, size);
                              content.UnlockBuffer(size);
 
-                             // Simple substring check. Ideally we'd split lines.
-                             // Add newline to ensure we match whole lines if possible,
-                             // though finding just the host is likely sufficient to avoid dupes here.
-                             if (content.FindFirst(url.host().utf8().data()) >= 0) {
-                                 alreadyExists = true;
+                             // Check line by line to match exact hostnames
+                             BString host = url.host().utf8().data();
+                             int32 start = 0;
+                             int32 end = 0;
+                             while ((end = content.FindFirst('\n', start)) != B_ERROR) {
+                                 BString line;
+                                 content.CopyInto(line, start, end - start);
+                                 if (line == host) {
+                                     alreadyExists = true;
+                                     break;
+                                 }
+                                 start = end + 1;
+                             }
+                             // Check last line if no newline at end
+                             if (!alreadyExists && start < content.Length()) {
+                                 BString line;
+                                 content.CopyInto(line, start, content.Length() - start);
+                                 if (line == host) {
+                                     alreadyExists = true;
+                                 }
                              }
                          }
                      }
