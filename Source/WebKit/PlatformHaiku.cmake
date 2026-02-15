@@ -94,6 +94,13 @@ if (NOT USE_CURL)
     )
 else()
     list(APPEND WebKit_SOURCES
+        NetworkProcess/curl/NetworkDataTaskCurl.cpp
+        NetworkProcess/curl/NetworkProcessCurl.cpp
+        NetworkProcess/curl/NetworkSessionCurl.cpp
+        NetworkProcess/curl/WebSocketTaskCurl.cpp
+        NetworkProcess/Downloads/curl/DownloadCurl.cpp
+
+        WebProcess/Cookies/curl/WebCookieManagerCurl.cpp
         WebProcess/WebCoreSupport/curl/WebFrameNetworkingContext.cpp
     )
 endif()
