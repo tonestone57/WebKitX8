@@ -49,6 +49,12 @@
 #include <assert.h>
 #include "BeDC.h"
 
+#include <File.h>
+#include <Path.h>
+#include <FindDirectory.h>
+#include <wtf/HashSet.h>
+#include <wtf/text/WTFString.h>
+
 static const int gMaxRecursionLimit = 10;
 
 namespace WebKit {
@@ -389,6 +395,37 @@ void NetworkDataTaskHaiku::RequestCompleted(BUrlRequest* caller, bool success)
     });
 }
 
+static bool isHTTPSCertificateHostAllowed(const String& host)
+{
+    BPath path;
+    if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) != B_OK)
+        return false;
+
+    path.Append("WebKit/certificate_exceptions");
+
+    BFile file(path.Path(), B_READ_ONLY);
+    if (file.InitCheck() != B_OK)
+        return false;
+
+    off_t size;
+    file.GetSize(&size);
+    if (size <= 0)
+        return false;
+
+    Vector<char> buffer(size + 1);
+    file.Read(buffer.data(), size);
+    buffer[size] = '\0';
+
+    String content = String::fromUTF8(buffer.data());
+    Vector<String> lines = content.split('\n');
+    for (const auto& line : lines) {
+        if (line.stripWhiteSpace() == host)
+            return true;
+    }
+
+    return false;
+}
+
 bool NetworkDataTaskHaiku::CertificateVerificationFailed(BUrlRequest* caller, BCertificate& certificate, const char* message)
 {
     // Check if the user has previously allowed this host
@@ -520,14 +557,6 @@ void NetworkDataTaskHaiku::AuthenticationNeeded(BHttpRequest* request, const Res
             }
         }
     });
-}
-
-void NetworkDataTaskHaiku::runOnMainThread(Function<void()>&& task)
-{
-    if(isMainThread())
-        task();
-    else
-        callOnMainThreadAndWait(WTFMove(task));
 }
 
 }

@@ -51,7 +51,8 @@ void MemoryPressureHandler::install()
     RunLoop::main().dispatchRepeating([] {
         system_info info;
         if (get_system_info(&info) == B_OK) {
-            uint64_t freeMemory = (uint64_t)info.free_memory * B_PAGE_SIZE;
+            // Include cached pages as available memory since Haiku caches aggressively
+            uint64_t freeMemory = (uint64_t)(info.free_memory + info.cached_pages) * B_PAGE_SIZE;
             uint64_t totalMemory = (uint64_t)info.max_pages * B_PAGE_SIZE;
 
             // Trigger if less than 128MB or 10% memory free

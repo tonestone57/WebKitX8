@@ -321,6 +321,7 @@ void Pasteboard::write(const PasteboardURL& url)
 
     BString string(url.url.string());
     data->AddData("text/plain", B_MIME_TYPE, string.String(), string.Length());
+    data->AddData("text/uri-list", B_MIME_TYPE, string.String(), string.Length());
 
     if (url.url.protocolIs("file"_s)) {
         BEntry entry(url.url.fileSystemPath().utf8().data());

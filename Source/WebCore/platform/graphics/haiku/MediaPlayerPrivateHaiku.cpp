@@ -24,6 +24,7 @@
 
 #include "GraphicsContext.h"
 #include "Logging.h"
+#include <cmath>
 #include "wtf/text/CString.h"
 #include "wtf/NeverDestroyed.h"
 
@@ -223,8 +224,16 @@ void MediaPlayerPrivate::playCallback(void* cookie, void* buffer,
 int32 MediaPlayerPrivate::videoPlayThread(void* cookie)
 {
     MediaPlayerPrivate* player = (MediaPlayerPrivate*)cookie;
+    bigtime_t startTime = system_time() - (bigtime_t)(player->m_currentTime * 1000000.0);
 
     while (!player->m_paused) {
+        bigtime_t now = system_time();
+        // Handle seeking or drift: if the expected time vs actual time is too far off, reset base
+        bigtime_t currentFrameTime = (bigtime_t)(player->m_currentTime * 1000000.0);
+        if (std::abs((now - startTime) - currentFrameTime) > 200000) { // 0.2s tolerance
+            startTime = now - currentFrameTime;
+        }
+
         {
             BAutolock lock(player->m_mediaLock);
             if (lock.IsLocked() && player->m_videoTrack) {
@@ -246,8 +255,14 @@ int32 MediaPlayerPrivate::videoPlayThread(void* cookie)
                 }
             }
         }
-        // Simple 30fps throttle for now
-        snooze(33000);
+
+        // Wait for next frame time
+        bigtime_t targetTime = startTime + (bigtime_t)(player->m_currentTime * 1000000.0);
+        bigtime_t wait = targetTime - system_time();
+        if (wait > 0)
+            snooze(wait);
+        else
+            snooze(1000); // Yield briefly if we are late
     }
     return 0;
 }
