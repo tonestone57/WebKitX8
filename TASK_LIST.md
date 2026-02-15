@@ -22,10 +22,14 @@ These features are currently disabled in the build configuration or have only st
 
 These features exist and function to some degree but lack feature parity or robustness.
 
-*   **Networking (Haiku Native)**:
-    *   Implemented using `BHttpRequest` (Haiku Service Kit).
-    *   **Missing**: HTTP/2 support, advanced authentication schemes (currently basic/digest are handled manually), robust cookie management integration.
-    *   **Issues**: Certificate verification failures log an error but lack a user interface for creating exceptions (exceptions are stored if manually added).
+*   **Networking**:
+    *   **Certificate Exceptions**:
+        *   **Completed**: Robust certificate exception handling with SHA-256 fingerprint storage is implemented.
+        *   **UI**: `CertificateExceptionDialog` prompts users on errors.
+    *   **Cookie Management**:
+        *   Needs review to ensure persistent cookies work correctly with the new `curl` backend.
+    *   **WebSockets**:
+        *   Needs full implementation using `curl` or `BSocket`.
 *   **Clipboard & Drag-and-Drop**:
     *   **Clipboard**: Copy/Paste works for Text and Images using `BClipboard`. HTML copy is supported.
     *   **Drag-and-Drop**: Uses a custom "WebKitDrag" clipboard for internal drag operations. Full system integration for dragging content *out* of the WebView to other applications needs verification/completion.

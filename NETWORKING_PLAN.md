@@ -13,7 +13,7 @@ Enable HTTP/2 support to improve page load performance and compatibility with mo
     -   `NetworkDataTaskCurl` is now used for networking.
     -   *Note:* This deprecates `NetworkDataTaskHaiku`.
 
-## Phase 2: Robust Certificate Management (PARTIALLY IMPLEMENTED)
+## Phase 2: Robust Certificate Management (COMPLETED)
 
 ### Goal
 Provide a complete UI for managing SSL exceptions and inspecting certificates.
@@ -23,12 +23,11 @@ Provide a complete UI for managing SSL exceptions and inspecting certificates.
     -   `CertificateInfoDialog` created.
     -   `SHOW_CERTIFICATE_INFO` message and handler stub in `WebViewBase`.
     -   *Pending:* Plumbing the actual `BCertificate` data from `NetworkDataTaskHaiku` -> `WebPage` -> `WebViewBase` to populate the dialog with real data instead of placeholders.
-2.  **Persistent Storage (UI IMPLEMENTED):**
+2.  **Persistent Storage (COMPLETED):**
     -   `CertificateExceptionDialog` implemented and integrated.
-    -   Exceptions are stored as a flat list of hostnames (legacy format).
-    -   *Done:* Wiring the Curl SSL context to respect these exceptions is implemented.
-    -   *Upgrade:* Store the specific certificate fingerprint (SHA-256) alongside the hostname to prevent MITM attacks where a different invalid cert is presented for an allowed host.
-    -   *Format:* JSON or BMessage flattened file: `{ "host": "example.com", "fingerprint": "..." }`.
+    -   Exceptions are stored as a SHA-256 fingerprint alongside the hostname to prevent MITM attacks.
+    -   `CertificateUtilitiesHaiku` created to manage storage and verification.
+    -   Wiring the Curl SSL context to respect these exceptions is implemented.
 
 ## Phase 3: Cookie Management
 
@@ -39,7 +38,8 @@ Ensure cookie persistence and same-site policy compliance.
 1.  **Cookie Jar Integration:**
     -   Review `CookieJarHaiku.cpp`. Currently it relies on `BPathMonitor` to watch a cookie file.
     -   *Issue:* This mechanism might be racy or incomplete for session cookies vs. persistent cookies.
-    -   *Action:* If moving to `curl`, use `curl`'s cookie engine or WebKit's `NetworkStorageSession` with a SQLite backend.
+    -   *Action:* Since we are using `curl`, we should evaluate using `NetworkStorageSession` with a SQLite backend or ensure `CookieJarHaiku` correctly interfaces with Curl's cookie handling if necessary, though `NetworkDataTaskCurl` handles cookies via `NetworkStorageSession`.
+    -   *Check:* Verify if `NetworkStorageSessionCurl` is fully utilized and if it persists cookies correctly on Haiku.
 2.  **SameSite Support:**
     -   Verify `NetworkDataTaskHaiku` correctly respects `SameSite` attributes in `Set-Cookie` headers. (Currently likely ignored if handled by `BHttpRequest` transparently).
 
