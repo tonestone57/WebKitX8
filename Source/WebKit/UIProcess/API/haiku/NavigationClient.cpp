@@ -32,10 +32,16 @@
 #include "WebView.h"
 #include "WebViewConstants.h"
 #include "CertificateExceptionDialog.h"
+#include "CertificateUtilitiesHaiku.h"
 
+#include <WebCore/AuthenticationChallenge.h>
 #include <WebCore/LayoutMilestone.h>
 #include <WebCore/ResourceError.h>
 #include <WebCore/ResourceRequest.h>
+#include <WebCore/Credential.h>
+
+#include <APIAuthenticationChallenge.h>
+#include <AuthenticationChallengeProxy.h>
 
 #include <Directory.h>
 #include <File.h>
@@ -46,6 +52,37 @@
 #include <String.h>
 
 using namespace WebKit;
+
+void NavigationClient::didReceiveAuthenticationChallenge(WebPageProxy& page, API::AuthenticationChallenge& challenge)
+{
+    auto& webCoreChallenge = challenge.webCoreChallenge();
+
+    if (webCoreChallenge.protectionSpace().authenticationScheme() == WebCore::ProtectionSpace::AuthenticationScheme::ServerTrustEvaluationRequested) {
+        // Check if the certificate is already allowed
+        if (isHTTPSCertificateAllowed(webCoreChallenge.protectionSpace().host(), webCoreChallenge.protectionSpace().certificateInfo())) {
+            challenge.listener()->useCredential(WebCore::Credential("dummy"_s, "dummy"_s, WebCore::CredentialPersistence::None));
+            return;
+        }
+
+        WTF::String errorText = webCoreChallenge.error().localizedDescription();
+        // Use static run method to avoid object lifecycle issues
+        RefPtr<WebPageProxy> pageRef = &page;
+        // Prompt user
+        callOnMainThread([pageRef, host = webCoreChallenge.protectionSpace().host().isolatedCopy(), errorText = errorText.isolatedCopy(), certInfo = webCoreChallenge.protectionSpace().certificateInfo().isolatedCopy(), challenge = Ref { challenge }] {
+            if (CertificateExceptionDialog::run(host.utf8().data(), errorText.utf8().data())) {
+                // User allowed
+                addHTTPSCertificateException(host, certInfo);
+                challenge->listener()->useCredential(WebCore::Credential("dummy"_s, "dummy"_s, WebCore::CredentialPersistence::None));
+            } else {
+                // User denied
+                challenge->listener()->rejectProtectionSpaceAndContinue();
+            }
+        });
+        return;
+    }
+
+    challenge.listener()->rejectProtectionSpaceAndContinue();
+}
 
 void NavigationClient::didStartProvisionalNavigation(WebPageProxy& page, const WebCore::ResourceRequest& request, API::Navigation* navigation, API::Object* userData)
 {
@@ -85,79 +122,9 @@ void NavigationClient::didFailProvisionalNavigationWithError(WebPageProxy& page,
     // For now, we assume if it's an SSL error from our network backend, we might want to prompt.
     // But since NetworkDataTaskHaiku fails securely, we get a generic failure here.
 
-    // If the error message mentions "Certificate", we try to show the dialog.
-    // This is heuristic but practical given the current Haiku backend implementation.
-    String errorText = error.localizedDescription();
-    if (errorText.containsIgnoringASCIICase("Certificate")) {
-        // We must run the alert on the main thread
-        RefPtr<WebPageProxy> pageRef = &page;
-        callOnMainThread([url, errorText, pageRef] {
-            if (!pageRef) return;
-            // Use static run method to avoid object lifecycle issues
-            if (CertificateExceptionDialog::run(url.host().utf8().data(), errorText.utf8().data())) {
-                 // User clicked allow. Add to exceptions file.
-                 BPath path;
-                 if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK) {
-                     path.Append("WebKit");
-                     create_directory(path.Path(), 0755);
-
-                     path.Append("certificate_exceptions");
-
-                     // Check if host is already in the exceptions list
-                     BFile readFile(path.Path(), B_READ_ONLY);
-                     bool alreadyExists = false;
-                     if (readFile.InitCheck() == B_OK) {
-                         off_t size;
-                         readFile.GetSize(&size);
-                         if (size > 0) {
-                             BString content;
-                             // Just read the whole file for simplicity; it's small config
-                             char* buffer = content.LockBuffer(size);
-                             readFile.Read(buffer, size);
-                             content.UnlockBuffer(size);
-
-                             // Check line by line to match exact hostnames
-                             BString host = url.host().utf8().data();
-                             int32 start = 0;
-                             int32 end = 0;
-                             while ((end = content.FindFirst('\n', start)) != B_ERROR) {
-                                 BString line;
-                                 content.CopyInto(line, start, end - start);
-                                 if (line == host) {
-                                     alreadyExists = true;
-                                     break;
-                                 }
-                                 start = end + 1;
-                             }
-                             // Check last line if no newline at end
-                             if (!alreadyExists && start < content.Length()) {
-                                 BString line;
-                                 content.CopyInto(line, start, content.Length() - start);
-                                 if (line == host) {
-                                     alreadyExists = true;
-                                 }
-                             }
-                         }
-                     }
-
-                     if (!alreadyExists) {
-                         BFile file(path.Path(), B_WRITE_ONLY | B_CREATE_FILE | B_OPEN_AT_END);
-                         if (file.InitCheck() == B_OK) {
-                             BString entry;
-                             entry << url.host().utf8().data() << "\n";
-                             file.Write(entry.String(), entry.Length());
-                         }
-                     }
-
-                     // Reload the page
-                     pageRef->reload({});
-                     return;
-                 }
-            }
-        });
-        // If we handled it (or user denied), we still notify the app of failure,
-        // unless we reloaded immediately.
-    }
+    // Previously, we handled certificate errors here by checking the error description string.
+    // Now, we handle them via didReceiveAuthenticationChallenge, which is more robust and
+    // allows access to the certificate chain for fingerprint verification.
 
     BMessage message(DID_FAIL_PROVISIONAL_NAVIGATION);
     message.AddString("url", url.string().utf8().data());

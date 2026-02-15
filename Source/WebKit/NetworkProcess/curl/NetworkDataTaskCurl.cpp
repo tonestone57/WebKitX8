@@ -51,49 +51,12 @@
 #include <wtf/FileSystem.h>
 
 #if PLATFORM(HAIKU)
-#include <File.h>
-#include <Path.h>
-#include <FindDirectory.h>
-#include <wtf/Vector.h>
+#include "CertificateUtilitiesHaiku.h"
 #endif
 
 namespace WebKit {
 
 using namespace WebCore;
-
-#if PLATFORM(HAIKU)
-static bool isHTTPSCertificateHostAllowed(const WTF::String& host)
-{
-    BPath path;
-    if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) != B_OK)
-        return false;
-
-    path.Append("WebKit/certificate_exceptions");
-
-    BFile file(path.Path(), B_READ_ONLY);
-    if (file.InitCheck() != B_OK)
-        return false;
-
-    off_t size;
-    file.GetSize(&size);
-    if (size <= 0)
-        return false;
-
-    WTF::Vector<char> buffer(size + 1);
-    if (file.Read(buffer.data(), size) < size)
-        return false;
-    buffer[size] = '\0';
-
-    WTF::String content = WTF::String::fromUTF8(buffer.data());
-    WTF::Vector<WTF::String> lines = content.split('\n');
-    for (const auto& line : lines) {
-        if (line.stripWhiteSpace() == host)
-            return true;
-    }
-
-    return false;
-}
-#endif
 
 NetworkDataTaskCurl::NetworkDataTaskCurl(NetworkSession& session, NetworkDataTaskClient& client, const NetworkLoadParameters& parameters)
     : NetworkDataTask(session, client, parameters.request, parameters.storedCredentialsPolicy, parameters.shouldClearReferrerOnHTTPSToHTTPRedirect, parameters.isMainFrameNavigation, parameters.isInitiatedByDedicatedWorker)
@@ -282,9 +245,9 @@ void NetworkDataTaskCurl::curlDidFailWithError(CurlRequest& request, ResourceErr
 
     if (resourceError.isCertificationVerificationError()) {
 #if PLATFORM(HAIKU)
-        if (isHTTPSCertificateHostAllowed(request.resourceRequest().url().host().toString())) {
+        if (isHTTPSCertificateAllowed(request.resourceRequest().url().host().toString(), certificateInfo)) {
             AuthenticationChallenge challenge(request.resourceRequest().url(), certificateInfo, resourceError);
-            restartWithCredential(challenge.protectionSpace(), Credential());
+            restartWithCredential(challenge.protectionSpace(), Credential("dummy"_s, "dummy"_s, CredentialPersistence::None));
             return;
         }
 #endif
