@@ -26,7 +26,7 @@ Provide a complete UI for managing SSL exceptions and inspecting certificates.
 2.  **Persistent Storage (UI IMPLEMENTED):**
     -   `CertificateExceptionDialog` implemented and integrated.
     -   Exceptions are stored as a flat list of hostnames (legacy format).
-    -   *Current Limitation:* With `USE_CURL=ON`, the cross-platform Curl backend does not yet read this file. Wiring the Curl SSL context to respect these exceptions is the immediate next priority.
+    -   *Done:* Wiring the Curl SSL context to respect these exceptions is implemented.
     -   *Upgrade:* Store the specific certificate fingerprint (SHA-256) alongside the hostname to prevent MITM attacks where a different invalid cert is presented for an allowed host.
     -   *Format:* JSON or BMessage flattened file: `{ "host": "example.com", "fingerprint": "..." }`.
 

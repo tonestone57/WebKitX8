@@ -38,7 +38,7 @@ class CurlSSLVerifier {
     WTF_MAKE_TZONE_ALLOCATED(CurlSSLVerifier);
     WTF_MAKE_NONCOPYABLE(CurlSSLVerifier);
 public:
-    CurlSSLVerifier(void* sslCtx);
+    CurlSSLVerifier(void* sslCtx, String&& host);
 
     std::unique_ptr<WebCore::CertificateInfo> createCertificateInfo(std::optional<long>&&);
 
@@ -47,6 +47,7 @@ private:
     void collectInfo(X509_STORE_CTX*);
 
     CertificateInfo::CertificateChain m_certificateChain;
+    String m_host;
 };
 
 } // namespace WebCore

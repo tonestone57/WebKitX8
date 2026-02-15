@@ -13,7 +13,7 @@ However, the port lacks support for several modern web standards (WebAudio, WebG
 *   **Implementation:** `libcurl` is now used (`USE_CURL=ON`) via `NetworkDataTaskCurl`.
 *   **Strengths:** Industry-standard stack, supports HTTP/2, robust cookie management, and advanced authentication.
 *   **Deficiencies:**
-    *   **SSL Exceptions:** The `CertificateExceptionDialog` prompts the user and writes to a legacy text file, but the Curl backend does not yet read this file. Integration is pending.
+    *   **SSL Exceptions:** The `CertificateExceptionDialog` prompts the user and writes to a legacy text file. The Curl backend reads this file to allow exceptions for specific hosts.
 
 ### 2. Graphics & Rendering
 *   **Status:** **Functional**
@@ -52,9 +52,9 @@ However, the port lacks support for several modern web standards (WebAudio, WebG
 
 The following areas require significant work to achieve feature parity with other ports:
 
-1.  **Certificate Exception UI (IMPLEMENTED):**
+1.  **Certificate Exception UI & Wiring (IMPLEMENTED):**
     *   *Status:* A `CertificateExceptionDialog` prompts the user on SSL errors. Exceptions are persisted to `~/config/settings/WebKit/certificate_exceptions`.
-    *   *Limitation:* With `USE_CURL=ON`, the cross-platform Curl backend does not yet read this file. Wiring the Curl SSL context to respect these exceptions is the immediate next priority.
+    *   *Wiring:* The Curl backend now reads this file to allow exceptions for specific hosts.
 
 2.  **HTTP/2 Support (COMPLETED):**
     *   *Status:* Enabled by switching to `libcurl`.

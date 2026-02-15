@@ -2,11 +2,8 @@
 
 Following the networking modernization (switching to `libcurl`) and the implementation of the Certificate Exception UI, the following tasks are required to achieve full functionality and security parity.
 
-## 1. Wire SSL Exceptions to Curl (Critical)
-*   **Context:** The `CertificateExceptionDialog` currently persists user exceptions to `~/config/settings/WebKit/certificate_exceptions`. However, the newly enabled `libcurl` backend (`NetworkDataTaskCurl`) does not yet read or respect this file.
-*   **Action:** Modify the `libcurl` session initialization (likely in `NetworkProcess/curl/NetworkDataTaskCurl.cpp` or `NetworkSessionCurl.cpp`) to:
-    1.  Read the `certificate_exceptions` file.
-    2.  Configure the SSL context (via `CURLOPT_SSL_CTX_FUNCTION`) to bypass verification *only* for the listed hosts.
+## 1. Wire SSL Exceptions to Curl (COMPLETED)
+*   **Status:** Implemented in `CurlSSLVerifier` to read `~/config/settings/WebKit/certificate_exceptions` on Haiku.
 
 ## 2. Upgrade Exception Storage Security
 *   **Context:** The current exception file stores simple hostnames (e.g., `example.com`), which is vulnerable to Man-in-the-Middle (MITM) attacks if an attacker presents a different invalid certificate for an allowed host.
