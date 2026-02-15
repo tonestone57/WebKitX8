@@ -102,16 +102,41 @@ void NavigationClient::didFailProvisionalNavigationWithError(WebPageProxy& page,
                      create_directory(path.Path(), 0755);
 
                      path.Append("certificate_exceptions");
-                     BFile file(path.Path(), B_WRITE_ONLY | B_CREATE_FILE | B_OPEN_AT_END);
-                     if (file.InitCheck() == B_OK) {
-                         BString entry;
-                         entry << url.host().utf8().data() << "\n";
-                         file.Write(entry.String(), entry.Length());
 
-                         // Reload the page
-                         pageRef->reload({});
-                         return;
+                     // Check if host is already in the exceptions list
+                     BFile readFile(path.Path(), B_READ_ONLY);
+                     bool alreadyExists = false;
+                     if (readFile.InitCheck() == B_OK) {
+                         off_t size;
+                         readFile.GetSize(&size);
+                         if (size > 0) {
+                             BString content;
+                             // Just read the whole file for simplicity; it's small config
+                             char* buffer = content.LockBuffer(size);
+                             readFile.Read(buffer, size);
+                             content.UnlockBuffer(size);
+
+                             // Simple substring check. Ideally we'd split lines.
+                             // Add newline to ensure we match whole lines if possible,
+                             // though finding just the host is likely sufficient to avoid dupes here.
+                             if (content.FindFirst(url.host().utf8().data()) >= 0) {
+                                 alreadyExists = true;
+                             }
+                         }
                      }
+
+                     if (!alreadyExists) {
+                         BFile file(path.Path(), B_WRITE_ONLY | B_CREATE_FILE | B_OPEN_AT_END);
+                         if (file.InitCheck() == B_OK) {
+                             BString entry;
+                             entry << url.host().utf8().data() << "\n";
+                             file.Write(entry.String(), entry.Length());
+                         }
+                     }
+
+                     // Reload the page
+                     pageRef->reload({});
+                     return;
                  }
             }
         });
