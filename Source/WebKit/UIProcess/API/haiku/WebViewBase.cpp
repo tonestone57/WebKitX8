@@ -105,9 +105,10 @@ void WebViewBase::MessageReceived(BMessage* message)
                 fPage->handleWheelEvent(NativeWebWheelEvent(&message));
             });
             break;
-        case B_MOUSE_UP:
-            MakeFocus(true);
         case B_MOUSE_DOWN:
+            MakeFocus(true);
+            // fallthrough
+        case B_MOUSE_UP:
         case B_MOUSE_MOVED:
             callOnMainRunLoop([this, message = *message](){
                 fPage->handleMouseEvent(NativeWebMouseEvent(&message));
@@ -170,15 +171,8 @@ void WebViewBase::setCursor(const WebCore::Cursor& cursor)
     if (LockLooper()) {
         if (cursor.platformCursor())
             SetViewCursor(cursor.platformCursor());
-        else if (cursor.type() == WebCore::Cursor::Type::None) {
-            // Hide cursor
-            // Haiku doesn't have a direct "hide cursor for view" easily without creating a transparent one
-            // or using be_app->HideCursor() which is global.
-            // For now, let's just use the system default if None is requested, or ignore.
+        else
             SetViewCursor(B_CURSOR_SYSTEM_DEFAULT);
-        } else {
-            SetViewCursor(B_CURSOR_SYSTEM_DEFAULT);
-        }
         UnlockLooper();
     }
 }

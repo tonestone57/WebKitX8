@@ -218,34 +218,21 @@ WebWheelEvent WebEventFactory::createWebWheelEvent(const BMessage* message)
     message->FindFloat("be:wheel_delta_x", &wheelDeltaX);
     message->FindFloat("be:wheel_delta_y", &wheelDeltaY);
 
-    // Invert to match standard web behavior (up/left is negative)?
-    // Wait, usually WheelEvent deltaY positive means scrolling DOWN.
-    // Haiku deltaY positive means scrolling DOWN (content moves up).
-    // So Haiku matches.
-    // But `PlatformWheelEventHaiku` inverted it.
-    // WebWheelEvent should probably pass raw deltas or let PlatformWheelEvent handle it.
-    // Actually WebWheelEvent takes deltaX/Y.
-    // Let's invert here too to match PlatformWheelEventHaiku logic if we want consistent behavior
-    // or keep it raw if WebProcess handles it.
-    // Let's invert because standard is: scroll DOWN -> deltaY positive?
-    // Wait, DOM WheelEvent deltaY > 0 is scrolling DOWN.
-    // Haiku scrollbar value increases when scrolling DOWN.
-    // Haiku wheel delta > 0 is scrolling DOWN.
-    // So Haiku matches DOM.
-    // Why did I invert in PlatformWheelEventHaiku?
-    // Maybe PlatformWheelEvent expects different sign?
-    // "On Windows, a positive delta corresponds to scrolling up." (MSDN)
-    // "On Mac, a positive delta corresponds to scrolling up." (Cocoa event)
-    // So yes, usually platform events are inverted relative to DOM.
-    // So I should invert here too.
-
-    wheelDeltaX = -wheelDeltaX;
-    wheelDeltaY = -wheelDeltaY;
+    float wheelTicksX = -wheelDeltaX;
+    float wheelTicksY = -wheelDeltaY;
 
     // Scale
     const float kStep = 40.0f;
-    wheelDeltaX *= kStep;
-    wheelDeltaY *= kStep;
+    wheelDeltaX = wheelTicksX * kStep;
+    wheelDeltaY = wheelTicksY * kStep;
+
+    BPoint position;
+    if (message->FindPoint("be:view_where", &position) != B_OK)
+        position = BPoint(0, 0);
+
+    BPoint globalPosition;
+    if (message->FindPoint("screen_where", &globalPosition) != B_OK)
+        globalPosition = BPoint(0, 0);
 
     int64 when;
     MonotonicTime timestamp = MonotonicTime::now();
@@ -254,10 +241,10 @@ WebWheelEvent WebEventFactory::createWebWheelEvent(const BMessage* message)
 
     return WebWheelEvent(
         WebEvent{ WebEventType::Wheel, modifiers, timestamp},
-        IntPoint(0, 0), // position
-        IntPoint(0, 0), // globalPosition
+        IntPoint(position), // position
+        IntPoint(globalPosition), // globalPosition
         FloatSize(wheelDeltaX, wheelDeltaY), //delta
-        FloatSize(0,0),// wheelticks
+        FloatSize(wheelTicksX, wheelTicksY),// wheelticks
         WebWheelEvent::Granularity::ScrollByPixelWheelEvent// granularity
         );
 }
