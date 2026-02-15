@@ -33,6 +33,7 @@ list(APPEND WebKit_SOURCES
 
     UIProcess/DefaultUndoController.cpp
     UIProcess/LegacySessionStateCodingNone.cpp
+    UIProcess/API/haiku/CertificateExceptionDialog.cpp
     UIProcess/API/haiku/NavigationClient.cpp
     UIProcess/API/haiku/PageClientImplHaiku.cpp
     UIProcess/API/haiku/WebView.cpp

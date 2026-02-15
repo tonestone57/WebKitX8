@@ -541,7 +541,7 @@ void NetworkDataTaskHaiku::AuthenticationNeeded(BHttpRequest* request, const Res
                              }
                              ptr++;
                          }
-                         if (realm == "realm"_s && !extractedRealm.isEmpty())
+                         if (!extractedRealm.isEmpty())
                               realm = extractedRealm.toString();
                          break;
                      } else {
