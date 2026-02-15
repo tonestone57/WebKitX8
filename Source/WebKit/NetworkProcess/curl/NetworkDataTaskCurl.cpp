@@ -247,6 +247,8 @@ void NetworkDataTaskCurl::curlDidFailWithError(CurlRequest& request, ResourceErr
 #if PLATFORM(HAIKU)
         if (isHTTPSCertificateAllowed(request.resourceRequest().url().host().toString(), certificateInfo)) {
             AuthenticationChallenge challenge(request.resourceRequest().url(), certificateInfo, resourceError);
+            // restartWithCredential will disable server trust evaluation when it sees the ServerTrustEvaluationRequested scheme,
+            // preventing an infinite loop of verification failures.
             restartWithCredential(challenge.protectionSpace(), Credential("dummy"_s, "dummy"_s, CredentialPersistence::None));
             return;
         }

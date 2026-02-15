@@ -29,8 +29,6 @@
 #include <WebCore/CertificateInfo.h>
 #include <openssl/sha.h>
 #include <wtf/HexNumber.h>
-#include <wtf/Vector.h>
-#include <wtf/text/MakeString.h>
 #include <wtf/text/WTFString.h>
 
 #include <File.h>
@@ -83,29 +81,62 @@ bool isHTTPSCertificateAllowed(const WTF::String& host, const WebCore::Certifica
     if (size <= 0)
         return false;
 
-    WTF::Vector<char> buffer(size + 1);
-    if (file.Read(buffer.data(), size) < size)
-        return false;
-    buffer[size] = '\0';
+    BString content;
+    char* buffer = content.LockBuffer(size);
+    ssize_t bytesRead = file.Read(buffer, size);
+    content.UnlockBuffer(bytesRead > 0 ? bytesRead : 0);
 
-    WTF::String content = WTF::String::fromUTF8(buffer.data());
-    WTF::Vector<WTF::String> lines = content.split('\n');
+    if (bytesRead < 0)
+        return false;
 
     WTF::String fingerprint = computeSHA256Fingerprint(info);
+    BString bHost(host.utf8().data());
+    BString bFingerprint(fingerprint.utf8().data());
 
-    for (const auto& line : lines) {
-        WTF::Vector<WTF::String> parts = line.split(' ');
-        if (parts.isEmpty())
-            continue;
+    int32 start = 0;
+    int32 end;
+    while ((end = content.FindFirst('\n', start)) != B_ERROR) {
+        BString line;
+        content.CopyInto(line, start, end - start);
+        start = end + 1;
 
-        if (parts[0] == host) {
-            // Legacy format: host only
-            if (parts.size() == 1)
-                return false; // Force upgrade to fingerprint
+        if (line.IsEmpty()) continue;
 
-            // New format: host fingerprint
-            if (parts.size() >= 2 && parts[1] == fingerprint)
-                return true;
+        int32 spacePos = line.FindFirst(' ');
+        if (spacePos != B_ERROR) {
+            BString lineHost;
+            line.CopyInto(lineHost, 0, spacePos);
+            if (lineHost == bHost) {
+                BString lineFingerprint;
+                line.CopyInto(lineFingerprint, spacePos + 1, line.Length() - spacePos - 1);
+                if (lineFingerprint == bFingerprint)
+                    return true;
+            }
+        } else {
+            // Legacy format (host only) - treat as not matching to force upgrade
+            if (line == bHost)
+                return false;
+        }
+    }
+
+    // Handle last line if no newline
+    if (start < content.Length()) {
+        BString line;
+        content.CopyInto(line, start, content.Length() - start);
+        if (!line.IsEmpty()) {
+            int32 spacePos = line.FindFirst(' ');
+            if (spacePos != B_ERROR) {
+                BString lineHost;
+                line.CopyInto(lineHost, 0, spacePos);
+                if (lineHost == bHost) {
+                    BString lineFingerprint;
+                    line.CopyInto(lineFingerprint, spacePos + 1, line.Length() - spacePos - 1);
+                    if (lineFingerprint == bFingerprint)
+                        return true;
+                }
+            } else if (line == bHost) {
+                return false;
+            }
         }
     }
 
@@ -118,38 +149,76 @@ void addHTTPSCertificateException(const WTF::String& host, const WebCore::Certif
     if (path.InitCheck() != B_OK)
         return;
 
-    // Read existing content to filter out old entry for this host
-    BFile readFile(path.Path(), B_READ_ONLY);
-    WTF::String newContent = emptyString();
+    BString bHost(host.utf8().data());
+    BString newContent;
 
+    // Read existing content
+    BFile readFile(path.Path(), B_READ_ONLY);
     if (readFile.InitCheck() == B_OK) {
         off_t size;
         readFile.GetSize(&size);
         if (size > 0) {
-            WTF::Vector<char> buffer(size + 1);
-            if (readFile.Read(buffer.data(), size) == size) {
-                buffer[size] = '\0';
-                WTF::String content = WTF::String::fromUTF8(buffer.data());
-                WTF::Vector<WTF::String> lines = content.split('\n');
+            BString content;
+            char* buffer = content.LockBuffer(size);
+            ssize_t bytesRead = readFile.Read(buffer, size);
+            content.UnlockBuffer(bytesRead > 0 ? bytesRead : 0);
 
-                for (const auto& line : lines) {
-                    if (line.isEmpty()) continue;
-                    WTF::Vector<WTF::String> parts = line.split(' ');
-                    if (!parts.isEmpty() && parts[0] == host)
-                        continue; // Skip existing entry for this host
+            if (bytesRead > 0) {
+                int32 start = 0;
+                int32 end;
+                while ((end = content.FindFirst('\n', start)) != B_ERROR) {
+                    BString line;
+                    content.CopyInto(line, start, end - start);
+                    start = end + 1;
 
-                    newContent = makeString(newContent, line, "\n"_s);
+                    if (line.IsEmpty()) continue;
+
+                    // Check if this line is for the same host
+                    bool isSameHost = false;
+                    int32 spacePos = line.FindFirst(' ');
+                    if (spacePos != B_ERROR) {
+                        BString lineHost;
+                        line.CopyInto(lineHost, 0, spacePos);
+                        if (lineHost == bHost) isSameHost = true;
+                    } else {
+                        if (line == bHost) isSameHost = true;
+                    }
+
+                    if (!isSameHost) {
+                        newContent << line << "\n";
+                    }
+                }
+
+                // Handle last line
+                if (start < content.Length()) {
+                    BString line;
+                    content.CopyInto(line, start, content.Length() - start);
+                    if (!line.IsEmpty()) {
+                        bool isSameHost = false;
+                        int32 spacePos = line.FindFirst(' ');
+                        if (spacePos != B_ERROR) {
+                            BString lineHost;
+                            line.CopyInto(lineHost, 0, spacePos);
+                            if (lineHost == bHost) isSameHost = true;
+                        } else {
+                            if (line == bHost) isSameHost = true;
+                        }
+
+                        if (!isSameHost) {
+                            newContent << line << "\n";
+                        }
+                    }
                 }
             }
         }
     }
 
     WTF::String fingerprint = computeSHA256Fingerprint(info);
-    newContent = makeString(newContent, host, " "_s, fingerprint, "\n"_s);
+    newContent << bHost << " " << fingerprint.utf8().data() << "\n";
 
     BFile writeFile(path.Path(), B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
     if (writeFile.InitCheck() == B_OK) {
-        writeFile.Write(newContent.utf8().data(), newContent.utf8().length());
+        writeFile.Write(newContent.String(), newContent.Length());
     }
 }
 
