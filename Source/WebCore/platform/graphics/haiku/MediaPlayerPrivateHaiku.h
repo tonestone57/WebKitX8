@@ -30,8 +30,6 @@
 #include <ObjectList.h>
 #include <private/netservices/UrlProtocolAsynchronousListener.h>
 
-#include <atomic>
-
 class BBitmap;
 class BDataIO;
 class BMediaFile;
@@ -135,8 +133,7 @@ private:
         BSoundPlayer* m_soundPlayer;
         BBitmap* m_videoBuffer;
         BBitmap* m_drawBuffer;
-        BLocker m_audioLock;
-        BLocker m_videoLock;
+        BLocker m_mediaLock;
         BLocker m_drawLock;
         Vector<thread_id> m_identifyThreads;
         thread_id m_videoPlayThread;
@@ -145,6 +142,7 @@ private:
 #if ENABLE(MEDIA_SOURCE)
         Vector<RefPtr<StreamingDataController>> m_pendingControllers;
         Vector<RefPtr<StreamingDataController>> m_activeControllers;
+        BLocker m_controllersLock;
 #endif
 
         MediaPlayer& m_player;
@@ -153,7 +151,7 @@ private:
 
         float m_volume;
         double m_rate { 1.0 };
-        std::atomic<float> m_currentTime;
+        float m_currentTime;
         bool m_paused;
         bool m_muted { false };
         MediaPlayer::Preload m_preload;

@@ -84,11 +84,12 @@ MediaPlayerPrivate::MediaPlayerPrivate(MediaPlayer& player)
     , m_videoBuffer(nullptr)
     , m_drawBuffer(nullptr)
     , m_videoPlayThread(-1)
+#if ENABLE(MEDIA_SOURCE)
+    , m_controllersLock("MSE Controllers Lock")
+#endif
     , m_player(player)
     , m_networkState(MediaPlayer::NetworkState::Empty)
     , m_readyState(MediaPlayer::ReadyState::HaveNothing)
-    , m_audioLock("Audio Lock")
-    , m_videoLock("Video Lock")
     , m_volume(1.0)
     , m_currentTime(0.f)
     , m_paused(true)
@@ -103,10 +104,7 @@ MediaPlayerPrivate::~MediaPlayerPrivate()
     delete m_soundPlayer;
 
 #if ENABLE(MEDIA_SOURCE)
-    // We rely on the fact that identifying threads are joined below
-    // before we clear these lists, or that we are in destructor.
-    // Ideally these should be protected by a lock if accessed from multiple threads.
-    // For now assuming main thread access for load/cancel.
+    m_controllersLock.Lock();
     for (auto& controller : m_pendingControllers) {
         if (controller)
             controller->setEOS();
@@ -117,6 +115,7 @@ MediaPlayerPrivate::~MediaPlayerPrivate()
             controller->setEOS();
     }
     m_activeControllers.clear();
+    m_controllersLock.Unlock();
 #endif
 
     for (thread_id tid : m_identifyThreads)
@@ -124,6 +123,8 @@ MediaPlayerPrivate::~MediaPlayerPrivate()
 
     if (m_videoPlayThread >= 0)
         wait_for_thread(m_videoPlayThread, NULL);
+
+    BAutolock lock(m_mediaLock);
 
     cancelLoad();
     delete m_videoBuffer;
@@ -134,6 +135,7 @@ MediaPlayerPrivate::~MediaPlayerPrivate()
 void MediaPlayerPrivate::load(const URL&, const LoadOptions&, MediaSourcePrivateClient&)
 {
     // Signal EOS to unblock any pending reads
+    m_controllersLock.Lock();
     for (auto& controller : m_pendingControllers) {
         if (controller)
             controller->setEOS();
@@ -144,6 +146,7 @@ void MediaPlayerPrivate::load(const URL&, const LoadOptions&, MediaSourcePrivate
             controller->setEOS();
     }
     m_activeControllers.clear();
+    m_controllersLock.Unlock();
 
     // Wait for threads to finish
     for (thread_id tid : m_identifyThreads)
@@ -160,7 +163,9 @@ void MediaPlayerPrivate::load(const URL&, const LoadOptions&, MediaSourcePrivate
     delete m_soundPlayer;
     m_soundPlayer = nullptr;
 
+    m_mediaLock.Lock();
     cancelLoad();
+    m_mediaLock.Unlock();
 
     // In MSE mode, we wait for addStreamingSource calls.
     m_readyState = MediaPlayer::ReadyState::HaveNothing;
@@ -174,7 +179,10 @@ void MediaPlayerPrivate::addStreamingSource(RefPtr<StreamingDataController> cont
     if (!controller)
         return;
 
-    m_pendingControllers.append(controller);
+    {
+        BAutolock lock(m_controllersLock);
+        m_pendingControllers.append(controller);
+    }
 
     struct IdentifyParams {
         MediaPlayerPrivate* self;
@@ -202,6 +210,7 @@ void MediaPlayerPrivate::addStreamingSource(RefPtr<StreamingDataController> cont
 void MediaPlayerPrivate::load(const String& url)
 {
 #if ENABLE(MEDIA_SOURCE)
+    m_controllersLock.Lock();
     for (auto& controller : m_pendingControllers) {
         if (controller)
             controller->setEOS();
@@ -212,6 +221,7 @@ void MediaPlayerPrivate::load(const String& url)
             controller->setEOS();
     }
     m_activeControllers.clear();
+    m_controllersLock.Unlock();
 #endif
 
     for (thread_id tid : m_identifyThreads)
@@ -228,7 +238,9 @@ void MediaPlayerPrivate::load(const String& url)
     delete m_soundPlayer;
     m_soundPlayer = nullptr;
 
+    m_mediaLock.Lock();
     cancelLoad();
+    m_mediaLock.Unlock();
 
     struct IdentifyParams {
         MediaPlayerPrivate* self;
@@ -259,6 +271,7 @@ void MediaPlayerPrivate::load(const String& url)
 
 void MediaPlayerPrivate::cancelLoad()
 {
+    // m_mediaLock is expected to be held by caller
     for (auto* file : m_mediaFiles)
         delete file;
     m_mediaFiles.clear();
@@ -304,17 +317,16 @@ void MediaPlayerPrivate::playCallback(void* cookie, void* buffer,
 {
     MediaPlayerPrivate* player = (MediaPlayerPrivate*)cookie;
 
-    BAutolock lock(player->m_audioLock);
-    if (!lock.IsLocked())
+    if (!player->m_mediaLock.Lock())
         return;
 
     // Deleting the BMediaFile release the tracks
     if (player->m_audioTrack) {
-        int64 size64;
-        if (player->m_audioTrack->ReadFrames(buffer, &size64) != B_OK) {
-            // Clear the buffer to avoid static noise
-            memset(buffer, 0, size);
+        player->m_currentTime = player->m_audioTrack->CurrentTime() / 1000000.f;
 
+        int64 size64;
+        if (player->m_audioTrack->ReadFrames(buffer, &size64) != B_OK)
+        {
             // Notify that we're done playing...
             player->m_currentTime = player->m_audioTrack->Duration() / 1000000.f;
             player->m_soundPlayer->Stop(false);
@@ -327,83 +339,81 @@ void MediaPlayerPrivate::playCallback(void* cookie, void* buffer,
             });
 
             player->m_audioTrack = nullptr;
-        } else {
-            player->m_currentTime = player->m_audioTrack->CurrentTime() / 1000000.f;
         }
     }
+
+    if (player->m_videoTrack && player->m_audioTrack) {
+        if (player->m_videoTrack->CurrentTime()
+            < player->m_audioTrack->CurrentTime())
+        {
+            // Decode a video frame and show it on screen
+            int64 count;
+            if (player->m_videoTrack->ReadFrames(player->m_videoBuffer->Bits(),
+                &count) != B_OK) {
+                player->m_videoTrack = nullptr;
+            } else {
+                 BAutolock lock(player->m_drawLock);
+                 std::swap(player->m_videoBuffer, player->m_drawBuffer);
+            }
+
+            WeakPtr<MediaPlayerPrivate> p = WeakPtr(player);
+            callOnMainThread([p] {
+                if (!p)
+                    return;
+                p->m_player.repaint();
+            });
+        }
+    }
+    player->m_mediaLock.Unlock();
 }
 
 int32 MediaPlayerPrivate::videoPlayThread(void* cookie)
 {
     MediaPlayerPrivate* player = (MediaPlayerPrivate*)cookie;
-    bigtime_t startTime = system_time() - (bigtime_t)(player->m_currentTime.load() * 1000000.0);
+    bigtime_t startTime = system_time() - (bigtime_t)(player->m_currentTime * 1000000.0);
 
     while (!player->m_paused) {
-        bool hasAudio = player->m_audioTrack != nullptr;
-
-        if (!hasAudio) {
-            bigtime_t now = system_time();
-            // Handle seeking or drift: if the expected time vs actual time is too far off, reset base
-            bigtime_t currentFrameTime = (bigtime_t)(player->m_currentTime.load() * 1000000.0);
-            if (std::abs((now - startTime) - currentFrameTime) > 200000) { // 0.2s tolerance
-                startTime = now - currentFrameTime;
-            }
+        bigtime_t now = system_time();
+        // Handle seeking or drift: if the expected time vs actual time is too far off, reset base
+        bigtime_t currentFrameTime = (bigtime_t)(player->m_currentTime * 1000000.0);
+        if (std::abs((now - startTime) - currentFrameTime) > 200000) { // 0.2s tolerance
+            startTime = now - currentFrameTime;
         }
 
-        status_t err = B_ERROR;
-        media_header header;
         {
-            BAutolock lock(player->m_videoLock);
+            BAutolock lock(player->m_mediaLock);
             if (lock.IsLocked() && player->m_videoTrack) {
                 int64 frames = 0;
-                err = player->m_videoTrack->ReadFrames(player->m_videoBuffer->Bits(), &frames, &header);
+                media_header header;
+                if (player->m_videoTrack->ReadFrames(player->m_videoBuffer->Bits(), &frames, &header) == B_OK) {
+                    player->m_currentTime = header.start_time / 1000000.f;
+
+                    {
+                        BAutolock lock(player->m_drawLock);
+                        std::swap(player->m_videoBuffer, player->m_drawBuffer);
+                    }
+
+                    WeakPtr<MediaPlayerPrivate> p = WeakPtr(player);
+                    callOnMainThread([p] {
+                        if (p) {
+                            p->m_player.timeChanged();
+                            p->m_player.repaint();
+                        }
+                    });
+                } else {
+                    // End of stream or error
+                    player->m_paused = true;
+                }
             }
         }
-
-        if (err != B_OK) {
-             // End of stream or error
-             player->m_paused = true;
-             break;
-        }
-
-        bigtime_t targetTime = header.start_time;
 
         // Wait for next frame time
-        while (!player->m_paused) {
-            bigtime_t currentPlayTime;
-            if (hasAudio)
-                currentPlayTime = (bigtime_t)(player->m_currentTime.load() * 1000000.0);
-            else
-                currentPlayTime = system_time() - startTime;
-
-            if (currentPlayTime >= targetTime)
-                break;
-
-            bigtime_t wait = targetTime - currentPlayTime;
-            if (wait > 10000)
-                snooze(wait - 5000);
-            else
-                snooze(1000);
-        }
-
-        if (player->m_paused)
-            break;
-
-        if (!hasAudio)
-            player->m_currentTime = targetTime / 1000000.f;
-
-        {
-            BAutolock lock(player->m_drawLock);
-            std::swap(player->m_videoBuffer, player->m_drawBuffer);
-        }
-
-        WeakPtr<MediaPlayerPrivate> p = WeakPtr(player);
-        callOnMainThread([p] {
-            if (p) {
-                p->m_player.timeChanged();
-                p->m_player.repaint();
-            }
-        });
+        bigtime_t targetTime = startTime + (bigtime_t)(player->m_currentTime * 1000000.0);
+        bigtime_t wait = targetTime - system_time();
+        if (wait > 0)
+            snooze(wait);
+        else
+            snooze(1000); // Yield briefly if we are late
     }
     return 0;
 }
@@ -412,10 +422,9 @@ void MediaPlayerPrivate::play()
 {
     m_paused = false;
 
-    if (m_soundPlayer)
+    if (m_soundPlayer) {
         m_soundPlayer->Start();
-
-    if (m_videoTrack && m_videoPlayThread < 0) {
+    } else if (m_videoTrack && m_videoPlayThread < 0) {
         m_videoPlayThread = spawn_thread(videoPlayThread, "Video Playback", B_NORMAL_PRIORITY, this);
         resume_thread(m_videoPlayThread);
     }
@@ -479,6 +488,7 @@ WTF::MediaTime MediaPlayerPrivate::currentTime() const
 
 void MediaPlayerPrivate::seekToTarget(const SeekTarget& time)
 {
+    BAutolock lock(m_mediaLock);
     // Seeking logic:
     // BMediaTrack::SeekToTime handles the underlying seek.
     // If the media is streaming, BMediaFile/BMediaTrack handles the buffering or blocking.
@@ -488,16 +498,10 @@ void MediaPlayerPrivate::seekToTarget(const SeekTarget& time)
     // Usually, seeking the video is rounded to the nearest keyframe. This
     // modifies newTime, and we pass the adjusted value to the audio track, to
     // keep them in sync
-    {
-        BAutolock lock(m_videoLock);
-        if (m_videoTrack)
-            m_videoTrack->SeekToTime(&newTime);
-    }
-    {
-        BAutolock lock(m_audioLock);
-        if (m_audioTrack)
-            m_audioTrack->SeekToTime(&newTime);
-    }
+    if (m_videoTrack)
+        m_videoTrack->SeekToTime(&newTime);
+    if (m_audioTrack)
+        m_audioTrack->SeekToTime(&newTime);
 
     m_currentTime = newTime / 1000000.f;
 }
@@ -613,11 +617,10 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
     } else {
 #if ENABLE(MEDIA_SOURCE)
         if (controller) {
-            // Note: IdentifyTracks runs in a separate thread, but we assume
-            // logic protection or adequate external synchronization for the lists.
-            // Using a fine grained lock for these lists might be better in the future.
+            m_controllersLock.Lock();
             m_pendingControllers.removeFirst(controller);
             m_activeControllers.append(controller);
+            m_controllersLock.Unlock();
 
             mediaFile = new BMediaFile(new StreamingDataIO(controller.copyRef()));
         }
@@ -626,10 +629,12 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
 
     status_t err = mediaFile ? mediaFile->InitCheck() : B_ERROR;
 
+    m_mediaLock.Lock();
     if (mediaFile && err == B_OK)
         m_mediaFiles.append(mediaFile);
     else if (mediaFile)
         delete mediaFile;
+    m_mediaLock.Unlock();
 
     if (err == B_OK) {
         for (int i = mediaFile->CountTracks() - 1; i >= 0; i--)
@@ -649,8 +654,8 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
                  continue;
             }
 
+            m_mediaLock.Lock();
             if (format.IsVideo()) {
-                BAutolock lock(m_videoLock);
                 if (!m_videoTrack) {
                     // Request B_RGB32 for video to avoid software conversion during blit
                     format.u.raw_video.display.format = B_RGB32;
@@ -661,6 +666,7 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
                          if (track->DecodedFormat(&format) != B_OK) {
                              LOG(Media, "MediaPlayerPrivateHaiku: Failed to get any decoded format for video track %d", i);
                              mediaFile->ReleaseTrack(track);
+                             m_mediaLock.Unlock();
                              continue;
                          }
                     }
@@ -681,7 +687,6 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
                     mediaFile->ReleaseTrack(track);
                 }
             } else if (format.IsAudio()) {
-                BAutolock lock(m_audioLock);
                 if (!m_audioTrack) {
                     m_audioTrack = track;
                     m_soundPlayer = new BSoundPlayer(&format.u.raw_audio,
@@ -704,6 +709,7 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
             } else {
                 mediaFile->ReleaseTrack(track);
             }
+            m_mediaLock.Unlock();
         }
     } else {
         LOG(Media, "MediaPlayerPrivateHaiku: Failed to init BMediaFile: %s", strerror(err));

@@ -9,9 +9,17 @@ The WebKit2 port for Haiku is in an **advanced functional state**. It successful
 ## 2. Outstanding High Priority Tasks
 
 ### Multimedia & Video Playback
+*   **Haiku Media Pipeline Integration (Partial)**:
+    *   **Goal**: Replace FFmpeg backend with native Haiku BMediaKit pipeline (`BMediaFile`, `BMediaTrack`).
+    *   **Status**: Partial implementation. Stubs for `MediaPlayerPrivate` and related classes are present but not fully completed or robust.
+    *   **Mandatory Targets**: Seamless video playback and A/V synchronization using native codecs.
+*   **Media Source Extensions (MSE)**:
+    *   **Goal**: Enable and configure MSE on top of the Haiku Media Pipeline.
+    *   **Status**: In Progress / Partial. Depends on the completion of the Haiku Media Pipeline.
 
 ### Optimization & Stability
 *   **Memory Management**: Refine `MemoryPressureHandlerHaiku` thresholds based on real-world usage to prevent OOM kills on low-memory systems.
+*   **Graphics Optimization**: Further optimize `CoordinatedGraphics` and `BackingStoreHaiku` for high-DPI screens and complex animations.
 *   **Networking Performance**: Tune Curl buffer sizes and investigate specific edge cases in complex proxy environments.
 
 ## 3. Deferred / Future Considerations
@@ -39,19 +47,12 @@ These components are considered functional and stable for general browsing.
 *   **Proxy**: System proxy settings are propagated to the Network Process.
 
 ### Multimedia
-*   **Haiku Media Pipeline Integration**:
-    *   **Native Backend**: `MediaPlayerPrivateHaiku` implements full playback using `BMediaFile` and `BMediaTrack` with a dedicated video decoding thread.
-    *   **A/V Synchronization**: Robust synchronization achieved using `std::atomic` and precise time tracking against the audio clock (or system time).
-*   **Media Source Extensions (MSE)**:
-    *   **Status**: Enabled (`ENABLE_MEDIA_SOURCE=ON`).
-    *   **Implementation**: Utilizes `StreamingDataController` to feed `BMediaFile` via a custom `BPositionIO` bridge.
 *   **Web Audio**: Enabled using native Haiku `BSoundPlayer` and `BMediaFile` backend. `AudioFileReader` implemented for decoding.
 *   **Speech Synthesis**: Stub implementation (`PlatformSpeechSynthesizerHaiku`) added and enabled.
 
 ### Graphics & Rendering
 *   **WebGL**: Enabled via `ENABLE_WEBGL` and `GraphicsContextGLTextureMapperANGLE` with `PlatformDisplayHaiku` utilizing EGL.
 *   **2D Canvas**: Supported via software rendering using `ImageBufferHaikuSurfaceBackend` and `GraphicsContextHaiku`.
-*   **Optimization**: `GraphicsContextHaiku` optimized to use `B_OP_COPY` for opaque fills and skip bilinear filtering for simple transforms.
 *   **Printing**: Full-page pagination support implemented via `AsyncPrinter`.
 *   **Compositing**: `CoordinatedGraphics` is fully integrated via `LayerTreeHostHaiku`.
 
