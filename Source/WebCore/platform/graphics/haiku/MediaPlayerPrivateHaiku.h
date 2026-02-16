@@ -135,7 +135,6 @@ private:
         BSoundPlayer* m_soundPlayer;
         BBitmap* m_videoBuffer;
         BBitmap* m_drawBuffer;
-        BLocker m_mediaLock;
         BLocker m_audioLock;
         BLocker m_videoLock;
         BLocker m_drawLock;

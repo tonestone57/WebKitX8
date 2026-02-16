@@ -103,7 +103,10 @@ MediaPlayerPrivate::~MediaPlayerPrivate()
     delete m_soundPlayer;
 
 #if ENABLE(MEDIA_SOURCE)
-    m_mediaLock.Lock();
+    // We rely on the fact that identifying threads are joined below
+    // before we clear these lists, or that we are in destructor.
+    // Ideally these should be protected by a lock if accessed from multiple threads.
+    // For now assuming main thread access for load/cancel.
     for (auto& controller : m_pendingControllers) {
         if (controller)
             controller->setEOS();
@@ -114,7 +117,6 @@ MediaPlayerPrivate::~MediaPlayerPrivate()
             controller->setEOS();
     }
     m_activeControllers.clear();
-    m_mediaLock.Unlock();
 #endif
 
     for (thread_id tid : m_identifyThreads)
@@ -122,8 +124,6 @@ MediaPlayerPrivate::~MediaPlayerPrivate()
 
     if (m_videoPlayThread >= 0)
         wait_for_thread(m_videoPlayThread, NULL);
-
-    BAutolock lock(m_mediaLock);
 
     cancelLoad();
     delete m_videoBuffer;
@@ -134,7 +134,6 @@ MediaPlayerPrivate::~MediaPlayerPrivate()
 void MediaPlayerPrivate::load(const URL&, const LoadOptions&, MediaSourcePrivateClient&)
 {
     // Signal EOS to unblock any pending reads
-    m_mediaLock.Lock();
     for (auto& controller : m_pendingControllers) {
         if (controller)
             controller->setEOS();
@@ -145,7 +144,6 @@ void MediaPlayerPrivate::load(const URL&, const LoadOptions&, MediaSourcePrivate
             controller->setEOS();
     }
     m_activeControllers.clear();
-    m_mediaLock.Unlock();
 
     // Wait for threads to finish
     for (thread_id tid : m_identifyThreads)
@@ -162,9 +160,7 @@ void MediaPlayerPrivate::load(const URL&, const LoadOptions&, MediaSourcePrivate
     delete m_soundPlayer;
     m_soundPlayer = nullptr;
 
-    m_mediaLock.Lock();
     cancelLoad();
-    m_mediaLock.Unlock();
 
     // In MSE mode, we wait for addStreamingSource calls.
     m_readyState = MediaPlayer::ReadyState::HaveNothing;
@@ -178,10 +174,7 @@ void MediaPlayerPrivate::addStreamingSource(RefPtr<StreamingDataController> cont
     if (!controller)
         return;
 
-    {
-        BAutolock lock(m_mediaLock);
-        m_pendingControllers.append(controller);
-    }
+    m_pendingControllers.append(controller);
 
     struct IdentifyParams {
         MediaPlayerPrivate* self;
@@ -209,7 +202,6 @@ void MediaPlayerPrivate::addStreamingSource(RefPtr<StreamingDataController> cont
 void MediaPlayerPrivate::load(const String& url)
 {
 #if ENABLE(MEDIA_SOURCE)
-    m_mediaLock.Lock();
     for (auto& controller : m_pendingControllers) {
         if (controller)
             controller->setEOS();
@@ -220,7 +212,6 @@ void MediaPlayerPrivate::load(const String& url)
             controller->setEOS();
     }
     m_activeControllers.clear();
-    m_mediaLock.Unlock();
 #endif
 
     for (thread_id tid : m_identifyThreads)
@@ -237,9 +228,7 @@ void MediaPlayerPrivate::load(const String& url)
     delete m_soundPlayer;
     m_soundPlayer = nullptr;
 
-    m_mediaLock.Lock();
     cancelLoad();
-    m_mediaLock.Unlock();
 
     struct IdentifyParams {
         MediaPlayerPrivate* self;
@@ -270,7 +259,6 @@ void MediaPlayerPrivate::load(const String& url)
 
 void MediaPlayerPrivate::cancelLoad()
 {
-    // m_mediaLock is expected to be held by caller
     for (auto* file : m_mediaFiles)
         delete file;
     m_mediaFiles.clear();
@@ -324,6 +312,9 @@ void MediaPlayerPrivate::playCallback(void* cookie, void* buffer,
     if (player->m_audioTrack) {
         int64 size64;
         if (player->m_audioTrack->ReadFrames(buffer, &size64) != B_OK) {
+            // Clear the buffer to avoid static noise
+            memset(buffer, 0, size);
+
             // Notify that we're done playing...
             player->m_currentTime = player->m_audioTrack->Duration() / 1000000.f;
             player->m_soundPlayer->Stop(false);
@@ -497,13 +488,15 @@ void MediaPlayerPrivate::seekToTarget(const SeekTarget& time)
     // Usually, seeking the video is rounded to the nearest keyframe. This
     // modifies newTime, and we pass the adjusted value to the audio track, to
     // keep them in sync
-    if (m_videoTrack) {
+    {
         BAutolock lock(m_videoLock);
-        m_videoTrack->SeekToTime(&newTime);
+        if (m_videoTrack)
+            m_videoTrack->SeekToTime(&newTime);
     }
-    if (m_audioTrack) {
+    {
         BAutolock lock(m_audioLock);
-        m_audioTrack->SeekToTime(&newTime);
+        if (m_audioTrack)
+            m_audioTrack->SeekToTime(&newTime);
     }
 
     m_currentTime = newTime / 1000000.f;
@@ -620,10 +613,11 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
     } else {
 #if ENABLE(MEDIA_SOURCE)
         if (controller) {
-            m_mediaLock.Lock();
+            // Note: IdentifyTracks runs in a separate thread, but we assume
+            // logic protection or adequate external synchronization for the lists.
+            // Using a fine grained lock for these lists might be better in the future.
             m_pendingControllers.removeFirst(controller);
             m_activeControllers.append(controller);
-            m_mediaLock.Unlock();
 
             mediaFile = new BMediaFile(new StreamingDataIO(controller.copyRef()));
         }
@@ -632,12 +626,10 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
 
     status_t err = mediaFile ? mediaFile->InitCheck() : B_ERROR;
 
-    m_mediaLock.Lock();
     if (mediaFile && err == B_OK)
         m_mediaFiles.append(mediaFile);
     else if (mediaFile)
         delete mediaFile;
-    m_mediaLock.Unlock();
 
     if (err == B_OK) {
         for (int i = mediaFile->CountTracks() - 1; i >= 0; i--)
@@ -657,8 +649,8 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
                  continue;
             }
 
-            m_mediaLock.Lock();
             if (format.IsVideo()) {
+                BAutolock lock(m_videoLock);
                 if (!m_videoTrack) {
                     // Request B_RGB32 for video to avoid software conversion during blit
                     format.u.raw_video.display.format = B_RGB32;
@@ -669,7 +661,6 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
                          if (track->DecodedFormat(&format) != B_OK) {
                              LOG(Media, "MediaPlayerPrivateHaiku: Failed to get any decoded format for video track %d", i);
                              mediaFile->ReleaseTrack(track);
-                             m_mediaLock.Unlock();
                              continue;
                          }
                     }
@@ -690,6 +681,7 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
                     mediaFile->ReleaseTrack(track);
                 }
             } else if (format.IsAudio()) {
+                BAutolock lock(m_audioLock);
                 if (!m_audioTrack) {
                     m_audioTrack = track;
                     m_soundPlayer = new BSoundPlayer(&format.u.raw_audio,
@@ -712,7 +704,6 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
             } else {
                 mediaFile->ReleaseTrack(track);
             }
-            m_mediaLock.Unlock();
         }
     } else {
         LOG(Media, "MediaPlayerPrivateHaiku: Failed to init BMediaFile: %s", strerror(err));
