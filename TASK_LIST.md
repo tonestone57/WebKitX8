@@ -9,9 +9,6 @@ The WebKit2 port for Haiku is in an **advanced functional state**. It successful
 ## 2. Outstanding High Priority Tasks
 
 ### Multimedia & Video Playback
-*   **Media Source Extensions (MSE)**:
-    *   **Goal**: Enable and configure MSE on top of the Haiku Media Pipeline.
-    *   **Status**: In Progress / Partial. Depends on the completion of the Haiku Media Pipeline.
 
 ### Optimization & Stability
 *   **Memory Management**: Refine `MemoryPressureHandlerHaiku` thresholds based on real-world usage to prevent OOM kills on low-memory systems.
@@ -46,6 +43,9 @@ These components are considered functional and stable for general browsing.
 *   **Haiku Media Pipeline Integration**:
     *   **Native Backend**: `MediaPlayerPrivateHaiku` implements full playback using `BMediaFile` and `BMediaTrack` with a dedicated video decoding thread.
     *   **A/V Synchronization**: Robust synchronization achieved using `std::atomic` and precise time tracking against the audio clock (or system time).
+*   **Media Source Extensions (MSE)**:
+    *   **Status**: Enabled (`ENABLE_MEDIA_SOURCE=ON`).
+    *   **Implementation**: Utilizes `StreamingDataController` to feed `BMediaFile` via a custom `BPositionIO` bridge.
 *   **Web Audio**: Enabled using native Haiku `BSoundPlayer` and `BMediaFile` backend. `AudioFileReader` implemented for decoding.
 *   **Speech Synthesis**: Stub implementation (`PlatformSpeechSynthesizerHaiku`) added and enabled.
 
