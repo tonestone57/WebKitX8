@@ -342,10 +342,11 @@ void GraphicsContextHaiku::fillRect(const FloatRect& rect, const Color& color)
     }
 
     if (compositeOperation() == CompositeOperator::Copy) {
+        m_view->PushState();
         m_view->SetHighColor(r, g, b, a);
         m_view->SetDrawingMode(B_OP_COPY);
         m_view->FillRect(rect);
-        m_view->SetDrawingMode(B_OP_ALPHA);
+        m_view->PopState();
         return;
     }
 
@@ -435,10 +436,11 @@ void GraphicsContextHaiku::fillRoundedRectImpl(const FloatRoundedRect& roundRect
         }
         if (compositeOperation() == CompositeOperator::Copy) {
             const auto [r, g, b, a] = color.toColorTypeLossy<SRGBA<uint8_t>>().resolved();
+            m_view->PushState();
             m_view->SetHighColor(r, g, b, a);
             m_view->SetDrawingMode(B_OP_COPY);
             m_view->FillRoundRect(rect, topLeft.width(), topLeft.height());
-            m_view->SetDrawingMode(B_OP_ALPHA);
+            m_view->PopState();
             return;
         }
     }
