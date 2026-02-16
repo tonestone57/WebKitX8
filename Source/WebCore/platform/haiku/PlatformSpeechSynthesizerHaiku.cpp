@@ -29,7 +29,6 @@
 #if ENABLE(SPEECH_SYNTHESIS)
 
 #include "PlatformSpeechSynthesisUtterance.h"
-#include <wtf/TZoneMallocInlines.h>
 
 namespace WebCore {
 
