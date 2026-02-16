@@ -21,8 +21,10 @@ The WebKit2 port for Haiku is in an **advanced functional stage**. Most core com
 - **Environment**: System environment variables are correctly passed to child processes.
 
 ### 4. Networking (MOSTLY COMPLETE)
-- **Current State**: Native Haiku network implementation (`NetworkDataTaskHaiku`) is functional and handles certificate verification failures securely.
-- **Features**: `BUrlRequest` and `BHttpRequest` are used. Authentication challenges and redirection are supported.
+- **Current State**: Networking backend migrated to `libcurl` (`NetworkDataTaskCurl`) to support HTTP/2 and modern standards.
+- **Features**: Certificate verification, Cookies (SQLite), and WebSockets are supported.
+
+### 5. Graphics & Rendering (COMPLETE)
 
 ### 5. Graphics & Rendering (COMPLETE)
 - **Architecture**: `CoordinatedGraphics` is fully integrated via `LayerTreeHostHaiku.cpp`.
@@ -42,10 +44,11 @@ The WebKit2 port for Haiku is in an **advanced functional stage**. Most core com
 - **Cursors**: `CursorHaiku.cpp` implemented using standard `BCursor` types.
 - **Resources**: `LocalizedStringsHaiku.cpp` provides default English strings. `MIMETypeRegistryHaiku.cpp` uses `BMimeType`.
 - **Fonts**: `FontHaiku.cpp` implements glyph drawing and half-width font fallbacks.
-- **Media**: `AudioFileReaderHaiku` implements audio decoding. `MediaPlayerPrivateHaiku` implements playback and buffering.
+- **Media**: `AudioFileReaderHaiku` implements audio decoding (WebAudio enabled). `MediaPlayerPrivateHaiku` implements playback and buffering.
+- **Features**: Geolocation and Speech Synthesis stubs are implemented.
 
 ### 8. Remaining Tasks & Improvements
-- **Printing**: Viewport printing is implemented. Full-page printing requires WebProcess coordination.
+- **Graphics**: Implement WebGL (`GraphicsContextGLHaiku`).
 - **Advanced UI**: Color Picker and DateTime Picker are implemented.
 - **Optimization**: Continued refinement of memory pressure handling and drawing performance.
 

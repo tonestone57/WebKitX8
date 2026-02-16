@@ -45,6 +45,7 @@ list(APPEND WebKit_SOURCES
     UIProcess/Inspector/socket/RemoteInspectorClient.cpp
     UIProcess/Inspector/socket/RemoteInspectorProtocolHandler.cpp
     UIProcess/haiku/BackingStoreHaiku.cpp
+    UIProcess/haiku/GeolocationProviderHaiku.cpp
     UIProcess/haiku/TextCheckerHaiku.cpp
     UIProcess/haiku/WebPageProxyHaiku.cpp
     UIProcess/haiku/WebProcessPoolHaiku.cpp

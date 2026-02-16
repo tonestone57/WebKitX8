@@ -473,7 +473,7 @@ private:
         printInfo.availablePaperHeight = printableRect.Height();
         printInfo.rect = IntRect(0, 0, (int)printableRect.Width(), (int)printableRect.Height());
 
-        m_page.drawRectToImage(m_frame.frameID(), printInfo, rect, snapshotSize, [this, protectedThis = Ref { *this }](std::optional<ShareableBitmap::Handle>&& imageHandle) {
+        m_page.drawRectToImage(m_frame, printInfo, rect, snapshotSize, [this, protectedThis = Ref { *this }](std::optional<ShareableBitmap::Handle>&& imageHandle) {
             if (imageHandle) {
                 m_snapshots.append(ShareableBitmap::create(WTFMove(*imageHandle)));
             } else {
@@ -541,7 +541,7 @@ private:
 
     WeakPtr<WebViewBase> m_view;
     WebPageProxy& m_page;
-    WebFrameProxy& m_frame;
+    Ref<WebFrameProxy> m_frame;
     std::shared_ptr<BPrintJob> m_printJob;
     Vector<IntRect> m_pageRects;
     double m_scaleFactor { 1.0 };

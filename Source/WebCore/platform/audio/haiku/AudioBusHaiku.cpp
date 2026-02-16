@@ -28,7 +28,10 @@
 
 namespace WebCore {
 
-PassRefPtr<AudioBus> AudioBus::loadPlatformResource(const char* name, float sampleRate)
+// Declared in AudioFileReaderHaiku.cpp but not in AudioFileReader.h
+RefPtr<AudioBus> createBusFromAudioFile(const char* filePath, bool mixToMono, float sampleRate);
+
+RefPtr<AudioBus> AudioBus::loadPlatformResource(const char* name, float sampleRate)
 {
     String absoluteFilename(makeString(DATA_DIR, "/webaudio/resources/", name, ".wav"));
     if (!fileExists(absoluteFilename))
