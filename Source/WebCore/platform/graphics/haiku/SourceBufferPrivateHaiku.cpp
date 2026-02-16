@@ -53,8 +53,10 @@ SourceBufferPrivateHaiku::~SourceBufferPrivateHaiku()
 Ref<MediaPromise> SourceBufferPrivateHaiku::appendInternal(Ref<SharedBuffer>&& buffer)
 {
     if (m_streamingData) {
-        for (const auto& segment : *buffer)
-            m_streamingData->append(segment.data(), segment.size());
+        for (const auto& segment : *buffer) {
+            if (!m_streamingData->append(segment.data(), segment.size()))
+                return MediaPromise::createAndReject(PlatformMediaError::IOError);
+        }
     }
     return MediaPromise::createAndResolve();
 }
@@ -70,6 +72,13 @@ void SourceBufferPrivateHaiku::removedFromMediaSource()
 
 void SourceBufferPrivateHaiku::notifyClientWhenReadyForMoreSamples(TrackID)
 {
+}
+
+void SourceBufferPrivateHaiku::setMediaSourceEnded(bool ended)
+{
+    SourceBufferPrivate::setMediaSourceEnded(ended);
+    if (ended && m_streamingData)
+        m_streamingData->setEOS();
 }
 
 #if !RELEASE_LOG_DISABLED

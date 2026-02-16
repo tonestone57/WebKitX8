@@ -47,6 +47,7 @@ public:
     void notifyClientWhenReadyForMoreSamples(TrackID) override;
     bool canSetMinimumUpcomingPresentationTime(TrackID) const override { return false; }
     void setMinimumUpcomingPresentationTime(TrackID, const MediaTime&) override { }
+    void setMediaSourceEnded(bool) override;
 
     RefPtr<StreamingDataController> streamingData() const { return m_streamingData; }
 

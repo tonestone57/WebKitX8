@@ -37,7 +37,7 @@ public:
     StreamingDataController();
     ~StreamingDataController();
 
-    void append(const void* data, size_t size);
+    bool append(const void* data, size_t size);
     ssize_t read(off_t position, void* buffer, size_t size);
     off_t getSize() const;
 
@@ -47,7 +47,8 @@ public:
 private:
     mutable Lock m_lock;
     Condition m_condition;
-    Vector<uint8_t> m_buffer;
+    int m_fd;
+    off_t m_writePosition;
     bool m_eos;
 };
 

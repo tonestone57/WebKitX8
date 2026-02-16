@@ -83,7 +83,6 @@ MediaPlayerPrivate::MediaPlayerPrivate(MediaPlayer& player)
     , m_soundPlayer(nullptr)
     , m_videoBuffer(nullptr)
     , m_drawBuffer(nullptr)
-    , m_identifyThread(-1)
     , m_videoPlayThread(-1)
     , m_player(player)
     , m_networkState(MediaPlayer::NetworkState::Empty)
@@ -101,8 +100,23 @@ MediaPlayerPrivate::~MediaPlayerPrivate()
 {
     delete m_soundPlayer;
 
-    if (m_identifyThread >= 0)
-        wait_for_thread(m_identifyThread, NULL);
+#if ENABLE(MEDIA_SOURCE)
+    m_mediaLock.Lock();
+    for (auto& controller : m_pendingControllers) {
+        if (controller)
+            controller->setEOS();
+    }
+    m_pendingControllers.clear();
+    for (auto& controller : m_activeControllers) {
+        if (controller)
+            controller->setEOS();
+    }
+    m_activeControllers.clear();
+    m_mediaLock.Unlock();
+#endif
+
+    for (thread_id tid : m_identifyThreads)
+        wait_for_thread(tid, NULL);
 
     if (m_videoPlayThread >= 0)
         wait_for_thread(m_videoPlayThread, NULL);
@@ -115,11 +129,44 @@ MediaPlayerPrivate::~MediaPlayerPrivate()
 }
 
 #if ENABLE(MEDIA_SOURCE)
-void MediaPlayerPrivate::load(const String& /*url*/, WebCore::MediaSourcePrivateClient*)
+void MediaPlayerPrivate::load(const URL&, const LoadOptions&, MediaSourcePrivateClient&)
 {
+    // Signal EOS to unblock any pending reads
+    m_mediaLock.Lock();
+    for (auto& controller : m_pendingControllers) {
+        if (controller)
+            controller->setEOS();
+    }
+    m_pendingControllers.clear();
+    for (auto& controller : m_activeControllers) {
+        if (controller)
+            controller->setEOS();
+    }
+    m_activeControllers.clear();
+    m_mediaLock.Unlock();
+
+    // Wait for threads to finish
+    for (thread_id tid : m_identifyThreads)
+        wait_for_thread(tid, NULL);
+    m_identifyThreads.clear();
+
+    if (m_videoPlayThread >= 0)
+        wait_for_thread(m_videoPlayThread, NULL);
+    m_videoPlayThread = -1;
+
+    // Cleanup resources
+    if (m_soundPlayer)
+        m_soundPlayer->Stop(false);
+    delete m_soundPlayer;
+    m_soundPlayer = nullptr;
+
+    m_mediaLock.Lock();
+    cancelLoad();
+    m_mediaLock.Unlock();
+
     // In MSE mode, we wait for addStreamingSource calls.
-    m_readyState = MediaPlayer::ReadyState::HaveMetadata;
-    m_networkState = MediaPlayer::NetworkState::Loaded;
+    m_readyState = MediaPlayer::ReadyState::HaveNothing;
+    m_networkState = MediaPlayer::NetworkState::Loading;
     m_player.networkStateChanged();
     m_player.readyStateChanged();
 }
@@ -129,10 +176,10 @@ void MediaPlayerPrivate::addStreamingSource(RefPtr<StreamingDataController> cont
     if (!controller)
         return;
 
-    // We can't use spawn_thread directly if we need multiple sources.
-    // For simplicity, we spawn a thread for each source added.
-    // Or reuse the identify mechanism.
-    // Since BMediaFile reads header on creation, we need to do it in a thread.
+    {
+        BAutolock lock(m_mediaLock);
+        m_pendingControllers.append(controller);
+    }
 
     struct IdentifyParams {
         MediaPlayerPrivate* self;
@@ -143,30 +190,50 @@ void MediaPlayerPrivate::addStreamingSource(RefPtr<StreamingDataController> cont
 
     thread_id tid = spawn_thread([](void* data) -> int32 {
         IdentifyParams* params = (IdentifyParams*)data;
+#if ENABLE(MEDIA_SOURCE)
+        params->self->IdentifyTracks(params->url, params->controller);
+#else
         params->self->IdentifyTracks(params->url);
-        // IdentifyTracks handles controller if url is empty
+#endif
         delete params;
         return 0;
     }, "Media Source Identify", B_NORMAL_PRIORITY, params);
 
+    m_identifyThreads.append(tid);
     resume_thread(tid);
 }
 #endif
 
 void MediaPlayerPrivate::load(const String& url)
 {
+#if ENABLE(MEDIA_SOURCE)
+    m_mediaLock.Lock();
+    for (auto& controller : m_pendingControllers) {
+        if (controller)
+            controller->setEOS();
+    }
+    m_pendingControllers.clear();
+    for (auto& controller : m_activeControllers) {
+        if (controller)
+            controller->setEOS();
+    }
+    m_activeControllers.clear();
+    m_mediaLock.Unlock();
+#endif
+
+    for (thread_id tid : m_identifyThreads)
+        wait_for_thread(tid, NULL);
+    m_identifyThreads.clear();
+
+    if (m_videoPlayThread >= 0)
+        wait_for_thread(m_videoPlayThread, NULL);
+    m_videoPlayThread = -1;
+
     // Cleanup from previous request (can this even happen?)
     if (m_soundPlayer)
         m_soundPlayer->Stop(false);
     delete m_soundPlayer;
     m_soundPlayer = nullptr;
-
-    if (m_identifyThread >= 0)
-        wait_for_thread(m_identifyThread, NULL);
-
-    if (m_videoPlayThread >= 0)
-        wait_for_thread(m_videoPlayThread, NULL);
-    m_videoPlayThread = -1;
 
     m_mediaLock.Lock();
     cancelLoad();
@@ -181,7 +248,7 @@ void MediaPlayerPrivate::load(const String& url)
     };
     IdentifyParams* params = new IdentifyParams { this, url };
 
-    m_identifyThread = spawn_thread([](void* data) -> int32 {
+    thread_id tid = spawn_thread([](void* data) -> int32 {
         IdentifyParams* params = (IdentifyParams*)data;
 #if ENABLE(MEDIA_SOURCE)
         params->self->IdentifyTracks(params->url, params->controller);
@@ -192,7 +259,8 @@ void MediaPlayerPrivate::load(const String& url)
         return 0;
     }, "Media Identify", B_NORMAL_PRIORITY, params);
 
-    resume_thread(m_identifyThread);
+    m_identifyThreads.append(tid);
+    resume_thread(tid);
 
     m_networkState = MediaPlayer::NetworkState::Loading;
     m_player.networkStateChanged();
@@ -204,6 +272,27 @@ void MediaPlayerPrivate::cancelLoad()
     for (auto* file : m_mediaFiles)
         delete file;
     m_mediaFiles.clear();
+
+#if ENABLE(MEDIA_SOURCE)
+    // We already signaled EOS in load()/dtor, now we can clear the list
+    // m_activeControllers.clear(); // done in load()/dtor?
+    // Wait, cancelLoad is called by load().
+    // load() calls cancelLoad() under lock.
+    // load() clears the lists under lock.
+    // So active controllers are cleared before cancelLoad is called?
+    // In load():
+    // 1. Lock.
+    // 2. Clear pending/active.
+    // 3. Unlock.
+    // 4. Wait threads.
+    // 5. ...
+    // 6. Lock.
+    // 7. cancelLoad().
+    // So active controllers are already cleared.
+    // But if cancelLoad is called from other places?
+    // It's only called from load() and ~dtor.
+    // So we are safe.
+#endif
 
     m_audioTrack = nullptr;
     m_videoTrack = nullptr;
@@ -524,8 +613,14 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
 #endif
     } else {
 #if ENABLE(MEDIA_SOURCE)
-        if (controller)
-            mediaFile = new BMediaFile(new StreamingDataIO(controller.releaseNonNull()));
+        if (controller) {
+            m_mediaLock.Lock();
+            m_pendingControllers.removeFirst(controller);
+            m_activeControllers.append(controller);
+            m_mediaLock.Unlock();
+
+            mediaFile = new BMediaFile(new StreamingDataIO(controller.copyRef()));
+        }
 #endif
     }
 
@@ -635,7 +730,6 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
         p->m_player.readyStateChanged();
     });
 
-    m_identifyThread = -1;
 }
 
 // #pragma mark - static methods

@@ -54,7 +54,8 @@ MediaSourcePrivate::AddStatus MediaSourcePrivateHaiku::addSourceBuffer(const Con
     buffer = sb.copyRef();
 
     if (m_player) {
-        if (auto* player = dynamic_cast<MediaPlayerPrivate*>(m_player.get())) {
+        if (m_player->mediaPlayerType() == MediaPlayerType::Haiku) {
+            auto* player = static_cast<MediaPlayerPrivate*>(m_player.get());
             player->addStreamingSource(sb->streamingData());
         }
     }

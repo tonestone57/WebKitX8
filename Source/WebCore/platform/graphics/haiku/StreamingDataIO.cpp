@@ -23,6 +23,10 @@
 #if ENABLE(MEDIA_SOURCE)
 
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <unistd.h>
 
 namespace WebCore {
 
@@ -34,44 +38,58 @@ Ref<StreamingDataController> StreamingDataController::create()
 }
 
 StreamingDataController::StreamingDataController()
-    : m_eos(false)
+    : m_fd(-1)
+    , m_writePosition(0)
+    , m_eos(false)
 {
+    char path[] = "/tmp/WebKit-StreamingData-XXXXXX";
+    m_fd = mkstemp(path);
+    if (m_fd >= 0)
+        unlink(path);
 }
 
 StreamingDataController::~StreamingDataController()
 {
+    if (m_fd >= 0)
+        close(m_fd);
 }
 
-void StreamingDataController::append(const void* data, size_t size)
+bool StreamingDataController::append(const void* data, size_t size)
 {
     Locker locker { m_lock };
-    size_t oldSize = m_buffer.size();
-    m_buffer.append(static_cast<const uint8_t*>(data), size);
-    if (m_buffer.size() > oldSize)
-        m_condition.notifyAll();
+    if (m_fd < 0)
+        return false;
+
+    ssize_t written = pwrite(m_fd, data, size, m_writePosition);
+    if (written < 0 || (size_t)written != size)
+        return false;
+
+    m_writePosition += size;
+    m_condition.notifyAll();
+    return true;
 }
 
 ssize_t StreamingDataController::read(off_t position, void* buffer, size_t size)
 {
     Locker locker { m_lock };
 
-    while (static_cast<size_t>(position) >= m_buffer.size() && !m_eos) {
+    while (position >= m_writePosition && !m_eos) {
         m_condition.wait(m_lock);
     }
 
-    if (static_cast<size_t>(position) >= m_buffer.size())
+    if (position >= m_writePosition)
         return 0; // EOF
 
-    size_t available = m_buffer.size() - position;
-    size_t toRead = std::min(size, available);
-    memcpy(buffer, m_buffer.data() + position, toRead);
-    return toRead;
+    if (m_fd < 0)
+        return B_ERROR;
+
+    return pread(m_fd, buffer, size, position);
 }
 
 off_t StreamingDataController::getSize() const
 {
     Locker locker { m_lock };
-    return m_buffer.size();
+    return m_writePosition;
 }
 
 void StreamingDataController::setEOS()

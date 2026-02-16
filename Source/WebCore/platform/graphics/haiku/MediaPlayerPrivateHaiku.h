@@ -63,7 +63,7 @@ public:
 
         void load(const String& url) override;
 #if ENABLE(MEDIA_SOURCE)
-        void load(const String& url, MediaSourcePrivateClient*) override;
+        void load(const URL&, const LoadOptions&, MediaSourcePrivateClient&) override;
         void addStreamingSource(RefPtr<StreamingDataController>);
 #endif
         void cancelLoad() override;
@@ -135,9 +135,14 @@ private:
         BBitmap* m_drawBuffer;
         BLocker m_mediaLock;
         BLocker m_drawLock;
-        thread_id m_identifyThread;
+        Vector<thread_id> m_identifyThreads;
         thread_id m_videoPlayThread;
         mutable PlatformTimeRanges m_buffered;
+
+#if ENABLE(MEDIA_SOURCE)
+        Vector<RefPtr<StreamingDataController>> m_pendingControllers;
+        Vector<RefPtr<StreamingDataController>> m_activeControllers;
+#endif
 
         MediaPlayer& m_player;
         MediaPlayer::NetworkState m_networkState;
