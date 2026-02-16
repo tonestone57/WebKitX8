@@ -87,6 +87,8 @@ MediaPlayerPrivate::MediaPlayerPrivate(MediaPlayer& player)
     , m_player(player)
     , m_networkState(MediaPlayer::NetworkState::Empty)
     , m_readyState(MediaPlayer::ReadyState::HaveNothing)
+    , m_audioLock("Audio Lock")
+    , m_videoLock("Video Lock")
     , m_volume(1.0)
     , m_currentTime(0.f)
     , m_paused(true)
@@ -314,16 +316,14 @@ void MediaPlayerPrivate::playCallback(void* cookie, void* buffer,
 {
     MediaPlayerPrivate* player = (MediaPlayerPrivate*)cookie;
 
-    if (!player->m_mediaLock.Lock())
+    BAutolock lock(player->m_audioLock);
+    if (!lock.IsLocked())
         return;
 
     // Deleting the BMediaFile release the tracks
     if (player->m_audioTrack) {
-        player->m_currentTime = player->m_audioTrack->CurrentTime() / 1000000.f;
-
         int64 size64;
-        if (player->m_audioTrack->ReadFrames(buffer, &size64) != B_OK)
-        {
+        if (player->m_audioTrack->ReadFrames(buffer, &size64) != B_OK) {
             // Notify that we're done playing...
             player->m_currentTime = player->m_audioTrack->Duration() / 1000000.f;
             player->m_soundPlayer->Stop(false);
@@ -336,81 +336,83 @@ void MediaPlayerPrivate::playCallback(void* cookie, void* buffer,
             });
 
             player->m_audioTrack = nullptr;
+        } else {
+            player->m_currentTime = player->m_audioTrack->CurrentTime() / 1000000.f;
         }
     }
-
-    if (player->m_videoTrack && player->m_audioTrack) {
-        if (player->m_videoTrack->CurrentTime()
-            < player->m_audioTrack->CurrentTime())
-        {
-            // Decode a video frame and show it on screen
-            int64 count;
-            if (player->m_videoTrack->ReadFrames(player->m_videoBuffer->Bits(),
-                &count) != B_OK) {
-                player->m_videoTrack = nullptr;
-            } else {
-                 BAutolock lock(player->m_drawLock);
-                 std::swap(player->m_videoBuffer, player->m_drawBuffer);
-            }
-
-            WeakPtr<MediaPlayerPrivate> p = WeakPtr(player);
-            callOnMainThread([p] {
-                if (!p)
-                    return;
-                p->m_player.repaint();
-            });
-        }
-    }
-    player->m_mediaLock.Unlock();
 }
 
 int32 MediaPlayerPrivate::videoPlayThread(void* cookie)
 {
     MediaPlayerPrivate* player = (MediaPlayerPrivate*)cookie;
-    bigtime_t startTime = system_time() - (bigtime_t)(player->m_currentTime * 1000000.0);
+    bigtime_t startTime = system_time() - (bigtime_t)(player->m_currentTime.load() * 1000000.0);
 
     while (!player->m_paused) {
-        bigtime_t now = system_time();
-        // Handle seeking or drift: if the expected time vs actual time is too far off, reset base
-        bigtime_t currentFrameTime = (bigtime_t)(player->m_currentTime * 1000000.0);
-        if (std::abs((now - startTime) - currentFrameTime) > 200000) { // 0.2s tolerance
-            startTime = now - currentFrameTime;
-        }
+        bool hasAudio = player->m_audioTrack != nullptr;
 
-        {
-            BAutolock lock(player->m_mediaLock);
-            if (lock.IsLocked() && player->m_videoTrack) {
-                int64 frames = 0;
-                media_header header;
-                if (player->m_videoTrack->ReadFrames(player->m_videoBuffer->Bits(), &frames, &header) == B_OK) {
-                    player->m_currentTime = header.start_time / 1000000.f;
-
-                    {
-                        BAutolock lock(player->m_drawLock);
-                        std::swap(player->m_videoBuffer, player->m_drawBuffer);
-                    }
-
-                    WeakPtr<MediaPlayerPrivate> p = WeakPtr(player);
-                    callOnMainThread([p] {
-                        if (p) {
-                            p->m_player.timeChanged();
-                            p->m_player.repaint();
-                        }
-                    });
-                } else {
-                    // End of stream or error
-                    player->m_paused = true;
-                }
+        if (!hasAudio) {
+            bigtime_t now = system_time();
+            // Handle seeking or drift: if the expected time vs actual time is too far off, reset base
+            bigtime_t currentFrameTime = (bigtime_t)(player->m_currentTime.load() * 1000000.0);
+            if (std::abs((now - startTime) - currentFrameTime) > 200000) { // 0.2s tolerance
+                startTime = now - currentFrameTime;
             }
         }
 
+        status_t err = B_ERROR;
+        media_header header;
+        {
+            BAutolock lock(player->m_videoLock);
+            if (lock.IsLocked() && player->m_videoTrack) {
+                int64 frames = 0;
+                err = player->m_videoTrack->ReadFrames(player->m_videoBuffer->Bits(), &frames, &header);
+            }
+        }
+
+        if (err != B_OK) {
+             // End of stream or error
+             player->m_paused = true;
+             break;
+        }
+
+        bigtime_t targetTime = header.start_time;
+
         // Wait for next frame time
-        bigtime_t targetTime = startTime + (bigtime_t)(player->m_currentTime * 1000000.0);
-        bigtime_t wait = targetTime - system_time();
-        if (wait > 0)
-            snooze(wait);
-        else
-            snooze(1000); // Yield briefly if we are late
+        while (!player->m_paused) {
+            bigtime_t currentPlayTime;
+            if (hasAudio)
+                currentPlayTime = (bigtime_t)(player->m_currentTime.load() * 1000000.0);
+            else
+                currentPlayTime = system_time() - startTime;
+
+            if (currentPlayTime >= targetTime)
+                break;
+
+            bigtime_t wait = targetTime - currentPlayTime;
+            if (wait > 10000)
+                snooze(wait - 5000);
+            else
+                snooze(1000);
+        }
+
+        if (player->m_paused)
+            break;
+
+        if (!hasAudio)
+            player->m_currentTime = targetTime / 1000000.f;
+
+        {
+            BAutolock lock(player->m_drawLock);
+            std::swap(player->m_videoBuffer, player->m_drawBuffer);
+        }
+
+        WeakPtr<MediaPlayerPrivate> p = WeakPtr(player);
+        callOnMainThread([p] {
+            if (p) {
+                p->m_player.timeChanged();
+                p->m_player.repaint();
+            }
+        });
     }
     return 0;
 }
@@ -419,9 +421,10 @@ void MediaPlayerPrivate::play()
 {
     m_paused = false;
 
-    if (m_soundPlayer) {
+    if (m_soundPlayer)
         m_soundPlayer->Start();
-    } else if (m_videoTrack && m_videoPlayThread < 0) {
+
+    if (m_videoTrack && m_videoPlayThread < 0) {
         m_videoPlayThread = spawn_thread(videoPlayThread, "Video Playback", B_NORMAL_PRIORITY, this);
         resume_thread(m_videoPlayThread);
     }
@@ -485,7 +488,6 @@ WTF::MediaTime MediaPlayerPrivate::currentTime() const
 
 void MediaPlayerPrivate::seekToTarget(const SeekTarget& time)
 {
-    BAutolock lock(m_mediaLock);
     // Seeking logic:
     // BMediaTrack::SeekToTime handles the underlying seek.
     // If the media is streaming, BMediaFile/BMediaTrack handles the buffering or blocking.
@@ -495,10 +497,14 @@ void MediaPlayerPrivate::seekToTarget(const SeekTarget& time)
     // Usually, seeking the video is rounded to the nearest keyframe. This
     // modifies newTime, and we pass the adjusted value to the audio track, to
     // keep them in sync
-    if (m_videoTrack)
+    if (m_videoTrack) {
+        BAutolock lock(m_videoLock);
         m_videoTrack->SeekToTime(&newTime);
-    if (m_audioTrack)
+    }
+    if (m_audioTrack) {
+        BAutolock lock(m_audioLock);
         m_audioTrack->SeekToTime(&newTime);
+    }
 
     m_currentTime = newTime / 1000000.f;
 }
