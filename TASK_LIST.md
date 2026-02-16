@@ -8,15 +8,6 @@ The WebKit2 port for Haiku is in an **advanced functional state**. It successful
 
 ## 2. Outstanding High Priority Tasks
 
-### Multimedia & Video Playback
-*   **Haiku Media Pipeline Integration (Complete)**:
-    *   **Goal**: Replace FFmpeg backend with native Haiku BMediaKit pipeline (`BMediaFile`, `BMediaTrack`).
-    *   **Status**: Complete. Native `BMediaFile`-based playback is fully implemented with A/V sync and double-buffering.
-    *   **Mandatory Targets**: Seamless video playback and A/V synchronization using native codecs.
-*   **Media Source Extensions (MSE)**:
-    *   **Goal**: Enable and configure MSE on top of the Haiku Media Pipeline.
-    *   **Status**: Complete. Implemented via `StreamingDataIO` and fully integrated with `MediaPlayerPrivateHaiku`.
-
 ### Optimization & Stability
 *   **Memory Management**: Refine `MemoryPressureHandlerHaiku` thresholds based on real-world usage to prevent OOM kills on low-memory systems.
 
@@ -47,6 +38,8 @@ These components are considered functional and stable for general browsing.
 ### Multimedia
 *   **Web Audio**: Enabled using native Haiku `BSoundPlayer` and `BMediaFile` backend. `AudioFileReader` implemented for decoding.
 *   **Speech Synthesis**: Stub implementation (`PlatformSpeechSynthesizerHaiku`) added and enabled.
+*   **Haiku Media Pipeline**: Replaced FFmpeg backend with native `BMediaFile`/`BMediaTrack`. Full A/V sync and double-buffering implemented.
+*   **Media Source Extensions (MSE)**: Enabled and fully implemented using `StreamingDataIO` and `MediaSourcePrivateHaiku`.
 
 ### Graphics & Rendering
 *   **WebGL**: Enabled via `ENABLE_WEBGL` and `GraphicsContextGLTextureMapperANGLE` with `PlatformDisplayHaiku` utilizing EGL.
