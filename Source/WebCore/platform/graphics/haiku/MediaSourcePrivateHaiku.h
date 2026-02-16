@@ -40,6 +40,7 @@ public:
 
     AddStatus addSourceBuffer(const ContentType&, const MediaSourceConfiguration&, RefPtr<SourceBufferPrivate>&) override;
     void notifyActiveSourceBuffersChanged() override;
+    void markEndOfStream(EndOfStreamStatus) override;
 
 private:
     WeakPtr<MediaPlayerPrivateInterface> m_player;
