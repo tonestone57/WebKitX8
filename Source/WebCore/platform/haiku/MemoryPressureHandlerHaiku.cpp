@@ -30,7 +30,7 @@
 #include <wtf/MainThread.h>
 #include <wtf/RunLoop.h>
 
-namespace WebCore {
+namespace WTF {
 
 void MemoryPressureHandler::platformReleaseMemory(Critical)
 {
@@ -41,6 +41,8 @@ std::optional<MemoryPressureHandler::ReliefLogger::MemoryUsage> MemoryPressureHa
     return std::nullopt;
 }
 
+static std::unique_ptr<RunLoop::Timer> s_memoryPressureTimer;
+
 void MemoryPressureHandler::install()
 {
     if (m_installed)
@@ -48,7 +50,7 @@ void MemoryPressureHandler::install()
 
     m_installed = true;
 
-    RunLoop::main().dispatchRepeating([] {
+    s_memoryPressureTimer = makeUnique<RunLoop::Timer>(Ref { RunLoop::mainSingleton() }, "HaikuMemoryPressure"_s, [] {
         system_info info;
         if (get_system_info(&info) == B_OK) {
             // Include cached pages as available memory since Haiku caches aggressively.
@@ -63,7 +65,9 @@ void MemoryPressureHandler::install()
                 MemoryPressureHandler::singleton().triggerMemoryPressureEvent(true);
             }
         }
-    }, 10_s);
+    });
+
+    s_memoryPressureTimer->startRepeating(10_s);
 }
 
-} // namespace WebCore
+} // namespace WTF
