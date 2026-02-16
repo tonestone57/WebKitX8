@@ -190,6 +190,8 @@ endif ()
 
 if (ENABLE_WEBGL)
     list(APPEND WebCore_SOURCES
+        platform/graphics/angle/GraphicsContextGLANGLE.cpp
+        platform/graphics/texmap/GraphicsContextGLTextureMapperANGLE.cpp
         platform/graphics/haiku/GraphicsContextGLHaiku.cpp
     )
 endif ()
