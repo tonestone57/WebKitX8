@@ -9,12 +9,13 @@ The WebKit2 port for Haiku is in an **advanced functional state**. It successful
 ## 2. Outstanding High Priority Tasks
 
 ### Multimedia & Video Playback
+*   **Haiku Media Pipeline Integration (Partial)**:
+    *   **Goal**: Replace FFmpeg backend with native Haiku BMediaKit pipeline (`BMediaFile`, `BMediaTrack`).
+    *   **Status**: Partial implementation. Stubs for `MediaPlayerPrivate` and related classes are present but not fully completed or robust.
+    *   **Mandatory Targets**: Seamless video playback and A/V synchronization using native codecs.
 *   **Media Source Extensions (MSE)**:
-    *   **Goal**: Enable and configure MSE.
-    *   **Reason**: Support adaptive streaming protocols like DASH (YouTube) and HLS (news sites).
-*   **Codec Backend (FFmpeg)**:
-    *   **Goal**: Ensure the FFmpeg backend is properly integrated to handle software decoding for standard web media formats.
-    *   **Mandatory Targets**: H.264, VP9, AV1 (Video) and AAC, Opus (Audio).
+    *   **Goal**: Enable and configure MSE on top of the Haiku Media Pipeline.
+    *   **Status**: In Progress / Partial. Depends on the completion of the Haiku Media Pipeline.
 
 ### Optimization & Stability
 *   **Memory Management**: Refine `MemoryPressureHandlerHaiku` thresholds based on real-world usage to prevent OOM kills on low-memory systems.
@@ -47,7 +48,6 @@ These components are considered functional and stable for general browsing.
 
 ### Multimedia
 *   **Web Audio**: Enabled using native Haiku `BSoundPlayer` and `BMediaFile` backend. `AudioFileReader` implemented for decoding.
-*   **Haiku Media Pipeline (`MediaPlayerPrivate`)**: Implemented. Routes decoded video frames to `BBitmap`/`app_server` and audio to `BSoundPlayer` or `BMediaRoster`.
 *   **Speech Synthesis**: Stub implementation (`PlatformSpeechSynthesizerHaiku`) added and enabled.
 
 ### Graphics & Rendering
