@@ -60,7 +60,15 @@ Ref<MediaPromise> SourceBufferPrivateHaiku::appendInternal(Ref<SharedBuffer>&& d
     ALWAYS_LOG(LOGIDENTIFIER, "data size: ", data->size());
 
     // Accumulate data using SharedBufferBuilder
-    m_builder.append(data.get());
+    // FIXME: In the future, parse this data instead of just accumulating it.
+    // For now, if we don't consume it, it's a memory leak if we keep appending.
+    // Since this backend is currently experimental/stubbed, we accumulate for
+    // demonstration of the architecture, but we should be careful.
+
+    // m_builder.append(data.get());
+
+    // FIXME: Re-enable buffering when we actually consume the data.
+    // For now, dropping data to prevent leaks in the stub.
 
     return MediaPromise::createAndResolve();
 }
