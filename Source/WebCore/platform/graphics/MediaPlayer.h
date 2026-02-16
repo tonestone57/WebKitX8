@@ -150,7 +150,8 @@ enum class MediaPlatformType {
     Mock,
     AVFObjC,
     GStreamer,
-    Remote
+    Remote,
+    Haiku
 };
 
 enum class MediaPlayerType {

@@ -22,6 +22,10 @@
 
 #if ENABLE(VIDEO)
 
+#if ENABLE(MEDIA_SOURCE)
+#include "MediaSourcePrivateHaiku.h"
+#endif
+
 #include "GraphicsContext.h"
 #include "Logging.h"
 #include <cmath>
@@ -110,9 +114,33 @@ MediaPlayerPrivate::~MediaPlayerPrivate()
 }
 
 #if ENABLE(MEDIA_SOURCE)
-void MediaPlayerPrivate::load(const String& url, WebCore::MediaSourcePrivateClient*)
+void MediaPlayerPrivate::load(const String& url, WebCore::MediaSourcePrivateClient* client)
 {
-    load(url);
+    // Cleanup previous state
+    if (m_soundPlayer)
+        m_soundPlayer->Stop(false);
+    delete m_soundPlayer;
+    m_soundPlayer = nullptr;
+
+    if (m_identifyThread >= 0)
+        wait_for_thread(m_identifyThread, NULL);
+
+    if (m_videoPlayThread >= 0)
+        wait_for_thread(m_videoPlayThread, NULL);
+    m_videoPlayThread = -1;
+
+    m_mediaLock.Lock();
+    cancelLoad();
+    m_mediaLock.Unlock();
+
+    // Initialize MediaSource
+    if (client) {
+        m_mediaSourcePrivate = adoptRef(*new MediaSourcePrivateHaiku(*this, *client));
+        m_networkState = MediaPlayer::NetworkState::Loading;
+        m_readyState = MediaPlayer::ReadyState::HaveNothing;
+        m_player.networkStateChanged();
+        m_player.readyStateChanged();
+    }
 }
 #endif
 
@@ -161,6 +189,9 @@ void MediaPlayerPrivate::cancelLoad()
     m_mediaFile = nullptr;
     m_audioTrack = nullptr;
     m_videoTrack = nullptr;
+#if ENABLE(MEDIA_SOURCE)
+    m_mediaSourcePrivate = nullptr;
+#endif
 }
 
 void MediaPlayerPrivate::prepareToPlay()

@@ -2,16 +2,7 @@
 
 This document provides a detailed breakdown of the current status of the WebKit2 port for Haiku, organized by priority.
 
-## 1. Graphics & Rendering (Priority: High)
-
-*   **WebGL**:
-    *   **Goal**: Enable `ENABLE_WEBGL` and implement `GraphicsContextGL`.
-    *   **Implementation**: Use an EGL/GL context compatible with `BGLView`.
-*   **Hardware Acceleration**:
-    *   **Goal**: Investigate hardware acceleration for 2D canvas and compositing.
-    *   **Strategy**: Prioritize standard software fallback to `app_server` to ensure stability before enabling acceleration.
-
-## 2. Multimedia & Video Playback (Priority: Medium)
+## 1. Multimedia & Video Playback (Priority: High)
 
 *   **Media Source Extensions (MSE)**:
     *   **Goal**: Enable and configure MSE.
@@ -23,7 +14,7 @@ This document provides a detailed breakdown of the current status of the WebKit2
     *   **Goal**: Implement the Haiku-specific media player backend.
     *   **Role**: Glue code that routes decoded video frames to `BBitmap`/`app_server` and audio to `BSoundPlayer` or `BMediaRoster`, while maintaining strict A/V synchronization.
 
-## 3. Other Missing Features (Priority: Low)
+## 2. Other Missing Features (Priority: Low)
 
 *   **Printing**:
     *   **Goal**: Implement full-page pagination support (currently only viewport printing works).
@@ -32,8 +23,11 @@ This document provides a detailed breakdown of the current status of the WebKit2
 *   **Speech Synthesis**:
     *   **Goal**: Enable by porting a third-party library (e.g., eSpeak) as a dependency.
 
-## 4. Deferred / Future Considerations
+## 3. Deferred / Future Considerations
 
+*   **Hardware Acceleration**:
+    *   **Status**: Deferred.
+    *   **Strategy**: Prioritize standard software fallback to `app_server` to ensure stability before enabling acceleration.
 *   **Web Audio API**: Deferred. Focus will remain on standard HTML5 `<audio>`/`<video>` and MSE for standard media playback rather than complex audio synthesis.
 *   **Peripheral & Hardware APIs**: Gamepad API, Battery Status API, and Touch Events are deferred.
 *   **Media Stream & WebRTC**: Deferred due to the massive size of the Google WebRTC library dependency and complex OS-level audio/video capture integrations.
@@ -41,10 +35,13 @@ This document provides a detailed breakdown of the current status of the WebKit2
 *   **Encrypted Media Extensions (EME)**: Indefinitely deferred (requires proprietary binaries like Widevine).
 *   **Wide Gamut & HDR**: Deferred until Haiku's `app_server` gains system-level color-management infrastructure.
 
-## 5. Completed Features
+## 4. Completed Features
 
 These components are considered functional and stable for general browsing.
 
+*   **Graphics & Rendering**:
+    *   **WebGL**: Enabled via `ENABLE_WEBGL` and `GraphicsContextGLTextureMapperANGLE` with `PlatformDisplayHaiku` utilizing EGL.
+    *   **2D Canvas**: Supported via software rendering using `ImageBufferHaikuSurfaceBackend` and `GraphicsContextHaiku`.
 *   **Networking**:
     *   **Backend**: Fully migrated to `libcurl` (HTTP/2 support).
     *   **Certificates**: Robust exception handling with SHA-256 fingerprint storage.

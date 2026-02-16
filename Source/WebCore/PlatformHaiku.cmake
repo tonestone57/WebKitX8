@@ -209,6 +209,13 @@ if (ENABLE_MEDIA_STREAM)
     )
 endif ()
 
+if (ENABLE_MEDIA_SOURCE)
+    list(APPEND WebCore_SOURCES
+        platform/graphics/haiku/MediaSourcePrivateHaiku.cpp
+        platform/graphics/haiku/SourceBufferPrivateHaiku.cpp
+    )
+endif ()
+
 list(APPEND WebCore_USER_AGENT_STYLE_SHEETS
     ${WebCore_DERIVED_SOURCES_DIR}/ModernMediaControls.css
 )

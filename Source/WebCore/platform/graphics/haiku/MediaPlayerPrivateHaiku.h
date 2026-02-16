@@ -39,6 +39,9 @@ struct media_raw_audio_format;
 namespace WebCore {
 
 class MediaPlayerFactoryHaiku;
+#if ENABLE(MEDIA_SOURCE)
+class MediaSourcePrivateHaiku;
+#endif
 
 class MediaPlayerPrivate
     : public MediaPlayerPrivateInterface
@@ -52,6 +55,9 @@ public:
 
 
         friend class MediaPlayerFactoryHaiku;
+#if ENABLE(MEDIA_SOURCE)
+        friend class MediaSourcePrivateHaiku;
+#endif
 
         static void registerMediaEngine(MediaEngineRegistrar);
 
@@ -94,6 +100,11 @@ public:
 
         WTF::MediaTime maxTimeSeekable() const override { return duration(); }
 
+#if !RELEASE_LOG_DISABLED
+        const Logger& mediaPlayerLogger() { return m_player.mediaPlayerLogger(); }
+        const void* mediaPlayerLogIdentifier() { return m_player.mediaPlayerLogIdentifier(); }
+#endif
+
         PlatformTimeRanges& buffered() const override;
         bool didLoadingProgress() const override;
 
@@ -130,6 +141,10 @@ private:
         thread_id m_identifyThread;
         thread_id m_videoPlayThread;
         mutable PlatformTimeRanges m_buffered;
+
+#if ENABLE(MEDIA_SOURCE)
+        RefPtr<MediaSourcePrivateHaiku> m_mediaSourcePrivate;
+#endif
 
         MediaPlayer& m_player;
         MediaPlayer::NetworkState m_networkState;
