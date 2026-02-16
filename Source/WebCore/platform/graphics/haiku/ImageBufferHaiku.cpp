@@ -86,8 +86,12 @@ ImageBufferData::ImageBufferData(const IntSize& size)
 
 ImageBufferData::~ImageBufferData()
 {
-    m_view = nullptr;
-        // m_bitmap owns m_view and deletes it when going out of this destructor.
+    if (m_view) {
+        if (m_image)
+            m_image->RemoveChild(m_view);
+        delete m_view;
+        m_view = nullptr;
+    }
     m_image = nullptr;
     delete m_context;
 }
