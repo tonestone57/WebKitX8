@@ -72,7 +72,7 @@ RefPtr<AudioBus> AudioFileReader::createBus(float sampleRate, bool mixToMono)
         media_format format;
         if (track->EncodedFormat(&format) != B_OK) {
             m_file->ReleaseTrack(track);
-            return AudioBus::create(0, 0, true);
+            return nullptr;
         }
 
         // Setup format conversion
@@ -85,17 +85,17 @@ RefPtr<AudioBus> AudioFileReader::createBus(float sampleRate, bool mixToMono)
 
         if (track->SetDecodedFormat(&format) != B_OK) {
             m_file->ReleaseTrack(track);
-            return AudioBus::create(0, 0, true);
+            return nullptr;
         }
 
         int64 frames = track->CountFrames();
         if (frames <= 0) {
             m_file->ReleaseTrack(track);
-            return AudioBus::create(0, 0, true);
+            return nullptr;
         }
 
         unsigned channels = format.u.raw_audio.channel_count;
-        Ref<AudioBus> audioBus = AudioBus::create(channels, frames, true);
+        auto audioBus = AudioBus::create(channels, frames, true);
         audioBus->setSampleRate(sampleRate);
 
         // Get pointers to the audio bus channels
@@ -132,8 +132,7 @@ RefPtr<AudioBus> AudioFileReader::createBus(float sampleRate, bool mixToMono)
     } else {
         // Reading the file failed, return an empty bus
         if (track) m_file->ReleaseTrack(track);
-        Ref<AudioBus> audioBus = AudioBus::create(0, 0, true);
-        return audioBus;
+        return nullptr;
     }
 }
 
