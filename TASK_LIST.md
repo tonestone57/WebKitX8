@@ -9,13 +9,13 @@ The WebKit2 port for Haiku is in an **advanced functional state**. It successful
 ## 2. Outstanding High Priority Tasks
 
 ### Multimedia & Video Playback
-*   **Haiku Media Pipeline Integration (Partial)**:
+*   **Haiku Media Pipeline Integration (Complete)**:
     *   **Goal**: Replace FFmpeg backend with native Haiku BMediaKit pipeline (`BMediaFile`, `BMediaTrack`).
-    *   **Status**: Partial implementation. Stubs for `MediaPlayerPrivate` and related classes are present but not fully completed or robust.
+    *   **Status**: Complete. Native `BMediaFile`-based playback is fully implemented with A/V sync and double-buffering.
     *   **Mandatory Targets**: Seamless video playback and A/V synchronization using native codecs.
 *   **Media Source Extensions (MSE)**:
     *   **Goal**: Enable and configure MSE on top of the Haiku Media Pipeline.
-    *   **Status**: In Progress / Partial. Depends on the completion of the Haiku Media Pipeline.
+    *   **Status**: Complete. Implemented via `StreamingDataIO` and fully integrated with `MediaPlayerPrivateHaiku`.
 
 ### Optimization & Stability
 *   **Memory Management**: Refine `MemoryPressureHandlerHaiku` thresholds based on real-world usage to prevent OOM kills on low-memory systems.
