@@ -39,6 +39,8 @@ namespace WebCore {
 
 class SourceBufferAdapterIO : public BDataIO {
 public:
+    static const size_t kMaxBufferSize = 100 * 1024 * 1024; // 100MB Cap for scaffolding
+
     SourceBufferAdapterIO()
         : m_lock("SourceBufferAdapterIO Lock")
         , m_notifyRead(create_sem(0, "SourceBufferAdapterIO Read"))
@@ -111,10 +113,17 @@ public:
             return;
         }
 
-        // FIXME: Unbounded memory growth.
-        // We accumulate all data in memory because BMediaFile seeks around.
-        // To fix this, we need to implement a smarter buffering strategy that
-        // caches enough for BMediaFile or implements a file-backed buffer.
+        // Cap buffer size to prevent OOM
+        if (m_data.size() + size > kMaxBufferSize) {
+            // Drop data or fail?
+            // For now, we drop data to preserve system stability.
+            // In a real implementation, we should evict old data or file-back it.
+            // BMediaFile might fail if we drop data it expects, but OOM is worse.
+            LOG(Media, "SourceBufferAdapterIO: Buffer full (>%zu bytes), dropping data", kMaxBufferSize);
+            m_lock.Unlock();
+            return;
+        }
+
         size_t currentSize = m_data.size();
         m_data.resize(currentSize + size);
         memcpy(m_data.data() + currentSize, data, size);
@@ -208,7 +217,6 @@ Ref<MediaPromise> SourceBufferPrivateHaiku::appendInternal(Ref<SharedBuffer>&& d
 
     // Note: Data accumulation is enabled for testing the BMediaFile integration path.
     // In production, buffer size limits should be enforced.
-    // FIXME: This will leak memory for long streams. See SourceBufferAdapterIO.
     for (const auto& segment : *data) {
         m_stream->AppendData(segment.data(), segment.size());
     }
