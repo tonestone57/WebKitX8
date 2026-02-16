@@ -25,6 +25,7 @@
 #include "AudioBus.h"
 #include "NotImplemented.h"
 
+#include <span>
 #include <File.h>
 #include <MediaFile.h>
 #include <MediaTrack.h>
@@ -60,7 +61,7 @@ AudioFileReader::AudioFileReader(std::span<const uint8_t> data)
 AudioFileReader::~AudioFileReader()
 {
     delete m_file;
-    delete m_data;
+    // m_file (BMediaFile) takes ownership of m_data (BDataIO) and deletes it.
 }
 
 RefPtr<AudioBus> AudioFileReader::createBus(float sampleRate, bool mixToMono)

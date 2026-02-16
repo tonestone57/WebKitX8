@@ -248,7 +248,7 @@ if (ENABLE_WEB_AUDIO)
     #)
 
     list(APPEND WebCore_LIBRARIES
-        media avcodec
+        media
     )
 endif ()
 
