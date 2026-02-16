@@ -30,9 +30,9 @@
 
 namespace WebCore {
 
-long CurlSSLHandle::platformSSLOptions()
+void CurlSSLHandle::platformInitialize()
 {
-    return 0;
+    setCACertPath("/system/data/ssl/CARootCertificates.pem"_s);
 }
 
 } // namespace WebCore

@@ -306,6 +306,11 @@ CurlHandle::CurlHandle()
     setDnsCacheTimeout(CurlContext::singleton().dnsCacheTimeout());
     setConnectTimeout(CurlContext::singleton().connectTimeout());
 
+    // Tune buffer sizes for better performance
+    curl_easy_setopt(m_handle, CURLOPT_BUFFERSIZE, 128 * 1024L);
+    curl_easy_setopt(m_handle, CURLOPT_UPLOAD_BUFFERSIZE, 64 * 1024L);
+
+    configureCAInfo();
     enableProxyIfExists();
 
 #ifndef NDEBUG
@@ -343,6 +348,12 @@ void CurlHandle::enableSSL()
 
     setSslCtxCallbackFunction(willSetupSslCtxCallback, this);
 
+    configureCAInfo();
+}
+
+void CurlHandle::configureCAInfo()
+{
+    auto& sslHandle = CurlContext::singleton().sslHandle();
 #if OS(WINDOWS)
     curl_easy_setopt(m_handle, CURLOPT_SSL_OPTIONS, CURLSSLOPT_NATIVE_CA);
 #else

@@ -329,6 +329,7 @@ private:
     };
 
     void enableRequestHeaders();
+    void configureCAInfo();
 
     static CURLcode willSetupSslCtxCallback(CURL*, void* sslCtx, void* userData);
     CURLcode willSetupSslCtx(void* sslCtx);
