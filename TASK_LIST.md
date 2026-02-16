@@ -1,51 +1,70 @@
 # WebKit2 Haiku Port: Outstanding Task List and Audit
 
-This document provides a detailed breakdown of the current status of the WebKit2 port for Haiku, organized by priority.
+This document provides a detailed breakdown of the current status of the WebKit2 port for Haiku, acting as the authoritative source for feature status, roadmap, and outstanding tasks.
 
-## 1. Multimedia & Video Playback (Priority: High)
+## 1. Project Status Summary
 
+The WebKit2 port for Haiku is in an **advanced functional state**. It successfully implements the multi-process architecture (UIProcess, WebProcess, NetworkProcess) and provides a stable browsing experience for general web content. The networking stack has been fully modernized to use `libcurl`, enabling HTTP/2 and robust security features.
+
+## 2. Outstanding High Priority Tasks
+
+### Multimedia & Video Playback
 *   **Media Source Extensions (MSE)**:
     *   **Goal**: Enable and configure MSE.
     *   **Reason**: Support adaptive streaming protocols like DASH (YouTube) and HLS (news sites).
 *   **Codec Backend (FFmpeg)**:
     *   **Goal**: Ensure the FFmpeg backend is properly integrated to handle software decoding for standard web media formats.
     *   **Mandatory Targets**: H.264, VP9, AV1 (Video) and AAC, Opus (Audio).
-## 2. Deferred / Future Considerations
+
+### Optimization & Stability
+*   **Memory Management**: Refine `MemoryPressureHandlerHaiku` thresholds based on real-world usage to prevent OOM kills on low-memory systems.
+*   **Graphics Optimization**: Further optimize `CoordinatedGraphics` and `BackingStoreHaiku` for high-DPI screens and complex animations.
+*   **Networking Performance**: Tune Curl buffer sizes and investigate specific edge cases in complex proxy environments.
+
+## 3. Deferred / Future Considerations
 
 *   **Hardware Acceleration**:
     *   **Status**: Deferred.
     *   **Strategy**: Prioritize standard software fallback to `app_server` to ensure stability before enabling acceleration.
 *   **Peripheral & Hardware APIs**: Gamepad API, Battery Status API, and Touch Events are deferred.
-*   **Media Stream & WebRTC**: Partially enabled (`ENABLE_MEDIA_STREAM` is ON). Full WebRTC support requires porting `libwebrtc`.
+*   **Media Stream & WebRTC**: Partially enabled (`ENABLE_MEDIA_STREAM` is ON). Basic infrastructure exists, but full WebRTC support requires porting `libwebrtc` and implementing robust camera/microphone access.
 *   **Accessibility**: True screen reader support is deferred until a mature, system-wide accessibility API exists in Haiku.
-
 *   **Encrypted Media Extensions (EME)**: Indefinitely deferred (requires proprietary binaries like Widevine).
 *   **Wide Gamut & HDR**: Deferred until Haiku's `app_server` gains system-level color-management infrastructure.
 
-## 3. Completed Features
+## 4. Completed Features
 
 These components are considered functional and stable for general browsing.
 
-*   **Multimedia**:
-    *   **Web Audio**: Enabled using native Haiku `BSoundPlayer` and `BMediaFile` backend. `AudioFileReader` implemented for decoding.
-    *   **Haiku Media Pipeline (`MediaPlayerPrivate`)**: Implemented. Routes decoded video frames to `BBitmap`/`app_server` and audio to `BSoundPlayer` or `BMediaRoster`.
-    *   **Speech Synthesis**: Stub implementation (`PlatformSpeechSynthesizerHaiku`) added and enabled.
-*   **Graphics & Rendering**:
-    *   **WebGL**: Enabled via `ENABLE_WEBGL` and `GraphicsContextGLTextureMapperANGLE` with `PlatformDisplayHaiku` utilizing EGL.
-    *   **2D Canvas**: Supported via software rendering using `ImageBufferHaikuSurfaceBackend` and `GraphicsContextHaiku`.
-    *   **Printing**: Full-page pagination support implemented via `AsyncPrinter`.
-*   **Networking**:
-    *   **Backend**: Fully migrated to `libcurl` (HTTP/2 support).
-    *   **Certificates**: Robust exception handling with SHA-256 fingerprint storage.
-    *   **Cookies**: Persistent storage via SQLite (`CookieJarDB`).
-    *   **WebSockets**: Supported via `WebSocketTaskCurl` and `curl`.
-    *   **Proxy**: System proxy settings are propagated to the Network Process.
+### Networking (Modernized)
+*   **Backend**: Fully migrated to `libcurl` (`USE_CURL=ON`) supporting HTTP/2.
+*   **Security**:
+    *   Robust certificate verification with SHA-256 fingerprint storage.
+    *   `CertificateExceptionDialog` implemented for user override of SSL errors.
+*   **Cookies**: Persistent storage via SQLite (`CookieJarDB`).
+*   **WebSockets**: Supported via `WebSocketTaskCurl` and `curl`.
+*   **Proxy**: System proxy settings are propagated to the Network Process.
+
+### Multimedia
+*   **Web Audio**: Enabled using native Haiku `BSoundPlayer` and `BMediaFile` backend. `AudioFileReader` implemented for decoding.
+*   **Haiku Media Pipeline (`MediaPlayerPrivate`)**: Implemented. Routes decoded video frames to `BBitmap`/`app_server` and audio to `BSoundPlayer` or `BMediaRoster`.
+*   **Speech Synthesis**: Stub implementation (`PlatformSpeechSynthesizerHaiku`) added and enabled.
+
+### Graphics & Rendering
+*   **WebGL**: Enabled via `ENABLE_WEBGL` and `GraphicsContextGLTextureMapperANGLE` with `PlatformDisplayHaiku` utilizing EGL.
+*   **2D Canvas**: Supported via software rendering using `ImageBufferHaikuSurfaceBackend` and `GraphicsContextHaiku`.
+*   **Printing**: Full-page pagination support implemented via `AsyncPrinter`.
+*   **Compositing**: `CoordinatedGraphics` is fully integrated via `LayerTreeHostHaiku`.
+
+### UI Process & Integration
 *   **Core WebView API**: `BWebView` and `WebViewBase` provide a functional view for embedding, URL loading, and navigation.
-*   **Process Model**: Successful separation of UIProcess, WebProcess, and NetworkProcess. Launching via `posix_spawn` works correctly.
-*   **Input Handling**: Full support for Mouse (Down, Up, Moved, Wheel) and Keyboard events, mapped from native `BMessage`s.
-*   **Preferences & Storage**: Implementation for `B_USER_SETTINGS_DIRECTORY` usage for saving recent searches and certificate exceptions.
-*   **Web Inspector**: Local Web Inspector is fully functional using a socket-based connection (`RemoteInspectorProtocolHandler`).
-*   **Cursor Support**: Mapping of standard web cursors to native `BCursor`s.
-*   **User Interface**: Native implementation of Context Menus (`WebContextMenuProxyHaiku`) and Popup Menus (`WebPopupMenuProxyHaiku`).
+*   **Process Model**: Successful separation of UIProcess, WebProcess, and NetworkProcess using `posix_spawn`.
+*   **Input Handling**: Full support for Mouse (Down, Up, Moved, Wheel) and Keyboard events.
+*   **Preferences & Storage**: `B_USER_SETTINGS_DIRECTORY` usage for saving recent searches and certificate exceptions.
+*   **Web Inspector**: Local Web Inspector is fully functional using a socket-based connection.
+*   **Native UI**: Context Menus, Popup Menus, Color Picker, and DateTime Picker are implemented using native controls.
+*   **Drag and Drop**: Support for dragging Text, Colors, and URLs.
 *   **Geolocation**: Stub implementation (`GeolocationProviderHaiku`) added and enabled.
-*   **Build System**: CMake configuration (`PlatformHaiku.cmake`, `OptionsHaiku.cmake`) is established and maintained.
+
+### Build System
+*   **CMake**: Configuration (`PlatformHaiku.cmake`, `OptionsHaiku.cmake`) is established and maintained.

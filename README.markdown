@@ -251,7 +251,7 @@ The port is currently in an **advanced functional state**, supporting:
 - WebAudio and Media Playback
 - Full multi-process isolation
 
-For a detailed analysis of the feature status, known issues, and roadmap, please verify `HAIKU_PORT_ANALYSIS.md`, `WebKit2HaikuStatus.md` and `TASK_LIST.md` in this repository.
+For a detailed analysis of the feature status, known issues, and roadmap, please refer to `TASK_LIST.md` in this repository, which serves as the authoritative status document.
 
 ### Logging ###
 
