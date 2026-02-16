@@ -197,7 +197,9 @@ endif ()
 
 if (ENABLE_WEB_AUDIO)
     list(APPEND WebCore_SOURCES
+        platform/audio/haiku/AudioBusHaiku.cpp
         platform/audio/haiku/AudioDestinationHaiku.cpp
+        platform/audio/haiku/AudioFileReaderHaiku.cpp
     )
 endif ()
 
