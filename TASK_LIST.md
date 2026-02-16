@@ -12,7 +12,6 @@ The WebKit2 port for Haiku is in an **advanced functional state**. It successful
 
 ### Optimization & Stability
 *   **Memory Management**: Refine `MemoryPressureHandlerHaiku` thresholds based on real-world usage to prevent OOM kills on low-memory systems.
-*   **Graphics Optimization**: Further optimize `CoordinatedGraphics` and `BackingStoreHaiku` for high-DPI screens and complex animations.
 *   **Networking Performance**: Tune Curl buffer sizes and investigate specific edge cases in complex proxy environments.
 
 ## 3. Deferred / Future Considerations
@@ -52,6 +51,7 @@ These components are considered functional and stable for general browsing.
 ### Graphics & Rendering
 *   **WebGL**: Enabled via `ENABLE_WEBGL` and `GraphicsContextGLTextureMapperANGLE` with `PlatformDisplayHaiku` utilizing EGL.
 *   **2D Canvas**: Supported via software rendering using `ImageBufferHaikuSurfaceBackend` and `GraphicsContextHaiku`.
+*   **Optimization**: `GraphicsContextHaiku` optimized to use `B_OP_COPY` for opaque fills and skip bilinear filtering for simple transforms.
 *   **Printing**: Full-page pagination support implemented via `AsyncPrinter`.
 *   **Compositing**: `CoordinatedGraphics` is fully integrated via `LayerTreeHostHaiku`.
 

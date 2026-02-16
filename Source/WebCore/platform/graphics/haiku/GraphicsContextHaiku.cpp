@@ -174,8 +174,12 @@ void GraphicsContextHaiku::drawBitmap(BBitmap* image, const FloatRect& destRect,
     if (quality == InterpolationQuality::Default)
         quality = m_imageInterpolationQuality;
 
-    if (quality > InterpolationQuality::Low)
-        flags |= B_FILTER_BITMAP_BILINEAR;
+    if (quality > InterpolationQuality::Low) {
+        // Skip bilinear filtering if the transform is simple (identity or translation only)
+        // to avoid unnecessary overhead on pixel-aligned draws.
+        if (!getCTM().isIdentityOrTranslationOrFlipped())
+             flags |= B_FILTER_BITMAP_BILINEAR;
+    }
 
     // We rely on end-of-frame synchronization or the fact that BBitmap drawing is usually synchronous.
     m_view->DrawBitmap(image, BRect(srcRect), BRect(destRect), flags);
@@ -337,7 +341,14 @@ void GraphicsContextHaiku::fillRect(const FloatRect& rect, const Color& color)
 
     if (compositeOperation() == CompositeOperator::SourceOver) {
         m_view->SetHighColor(r, g, b, a);
-        m_view->FillRect(rect);
+        // Optimize for opaque colors: B_OP_COPY is faster than B_OP_ALPHA
+        if (a == 255) {
+            m_view->SetDrawingMode(B_OP_COPY);
+            m_view->FillRect(rect);
+            m_view->SetDrawingMode(B_OP_ALPHA);
+        } else {
+            m_view->FillRect(rect);
+        }
         return;
     }
 
@@ -375,10 +386,20 @@ void GraphicsContextHaiku::fillRect(const FloatRect& rect, RequiresClipToRect re
 
     const auto [r, g, b, a] = state().fillBrush().color().toColorTypeLossy<SRGBA<uint8_t>>().resolved();
 
-    if (a == 255 && m_view->DrawingMode() == B_OP_COPY) {
-        m_view->SetHighColor(r, g, b, 255);
-        m_view->FillRect(rect);
-        return;
+    if (a == 255) {
+        // Optimize for opaque colors in common modes
+        if (m_view->DrawingMode() == B_OP_COPY) {
+            m_view->SetHighColor(r, g, b, 255);
+            m_view->FillRect(rect);
+            return;
+        }
+        if (compositeOperation() == CompositeOperator::SourceOver) {
+            m_view->SetHighColor(r, g, b, 255);
+            m_view->SetDrawingMode(B_OP_COPY);
+            m_view->FillRect(rect);
+            m_view->SetDrawingMode(B_OP_ALPHA);
+            return;
+        }
     }
 
     // FillRect doesn't respect blending modes, DrawBitmap does
