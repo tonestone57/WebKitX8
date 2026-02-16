@@ -74,6 +74,13 @@ void MediaSourcePrivateHaiku::markEndOfStream(EndOfStreamStatus status)
         buffer->setMediaSourceEnded(true);
 }
 
+void MediaSourcePrivateHaiku::unmarkEndOfStream()
+{
+    MediaSourcePrivate::unmarkEndOfStream();
+    for (auto* buffer : m_activeSourceBuffers)
+        buffer->setMediaSourceEnded(false);
+}
+
 } // namespace WebCore
 
 #endif // ENABLE(MEDIA_SOURCE)

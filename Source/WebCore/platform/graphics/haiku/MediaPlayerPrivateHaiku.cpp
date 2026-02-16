@@ -673,10 +673,13 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
                     m_videoBuffer = new BBitmap(
                         BRect(0, 0, format.Width() - 1, format.Height() - 1),
                         format.u.raw_video.display.format); // Use the negotiated format
-                    delete m_drawBuffer;
-                    m_drawBuffer = new BBitmap(
-                        BRect(0, 0, format.Width() - 1, format.Height() - 1),
-                        format.u.raw_video.display.format);
+                    {
+                        BAutolock lock(m_drawLock);
+                        delete m_drawBuffer;
+                        m_drawBuffer = new BBitmap(
+                            BRect(0, 0, format.Width() - 1, format.Height() - 1),
+                            format.u.raw_video.display.format);
+                    }
                 } else {
                     mediaFile->ReleaseTrack(track);
                 }

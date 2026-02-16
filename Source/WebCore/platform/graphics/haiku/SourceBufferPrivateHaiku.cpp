@@ -77,8 +77,12 @@ void SourceBufferPrivateHaiku::notifyClientWhenReadyForMoreSamples(TrackID)
 void SourceBufferPrivateHaiku::setMediaSourceEnded(bool ended)
 {
     SourceBufferPrivate::setMediaSourceEnded(ended);
-    if (ended && m_streamingData)
-        m_streamingData->setEOS();
+    if (m_streamingData) {
+        if (ended)
+            m_streamingData->setEOS();
+        else
+            m_streamingData->clearEOS();
+    }
 }
 
 #if !RELEASE_LOG_DISABLED

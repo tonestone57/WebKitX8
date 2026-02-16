@@ -99,6 +99,12 @@ void StreamingDataController::setEOS()
     m_condition.notifyAll();
 }
 
+void StreamingDataController::clearEOS()
+{
+    Locker locker { m_lock };
+    m_eos = false;
+}
+
 bool StreamingDataController::isEOS() const
 {
     Locker locker { m_lock };

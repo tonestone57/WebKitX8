@@ -42,6 +42,7 @@ public:
     off_t getSize() const;
 
     void setEOS();
+    void clearEOS();
     bool isEOS() const;
 
 private:
