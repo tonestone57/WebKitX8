@@ -185,25 +185,32 @@ void MediaPlayerPrivate::addStreamingSource(RefPtr<StreamingDataController> cont
     }
 
     struct IdentifyParams {
-        MediaPlayerPrivate* self;
+        WeakPtr<MediaPlayerPrivate> self;
         String url;
         RefPtr<StreamingDataController> controller;
     };
-    IdentifyParams* params = new IdentifyParams { this, String(), controller };
+    IdentifyParams* params = new IdentifyParams { WeakPtr { *this }, String(), controller };
 
     thread_id tid = spawn_thread([](void* data) -> int32 {
         IdentifyParams* params = (IdentifyParams*)data;
 #if ENABLE(MEDIA_SOURCE)
-        params->self->IdentifyTracks(params->url, params->controller);
+        if (params->self)
+            params->self->IdentifyTracks(params->self, params->url, params->controller);
 #else
-        params->self->IdentifyTracks(params->url);
+        if (params->self)
+            params->self->IdentifyTracks(params->self, params->url);
 #endif
         delete params;
         return 0;
     }, "Media Source Identify", B_NORMAL_PRIORITY, params);
 
-    m_identifyThreads.append(tid);
-    resume_thread(tid);
+    if (tid >= 0) {
+        m_identifyThreads.append(tid);
+        resume_thread(tid);
+    } else {
+        delete params;
+        LOG(Media, "MediaPlayerPrivateHaiku: Failed to spawn IdentifyTracks thread: %s", strerror(tid));
+    }
 }
 #endif
 
@@ -243,27 +250,34 @@ void MediaPlayerPrivate::load(const String& url)
     m_mediaLock.Unlock();
 
     struct IdentifyParams {
-        MediaPlayerPrivate* self;
+        WeakPtr<MediaPlayerPrivate> self;
         String url;
 #if ENABLE(MEDIA_SOURCE)
         RefPtr<StreamingDataController> controller;
 #endif
     };
-    IdentifyParams* params = new IdentifyParams { this, url };
+    IdentifyParams* params = new IdentifyParams { WeakPtr { *this }, url };
 
     thread_id tid = spawn_thread([](void* data) -> int32 {
         IdentifyParams* params = (IdentifyParams*)data;
 #if ENABLE(MEDIA_SOURCE)
-        params->self->IdentifyTracks(params->url, params->controller);
+        if (params->self)
+            params->self->IdentifyTracks(params->self, params->url, params->controller);
 #else
-        params->self->IdentifyTracks(params->url);
+        if (params->self)
+            params->self->IdentifyTracks(params->self, params->url);
 #endif
         delete params;
         return 0;
     }, "Media Identify", B_NORMAL_PRIORITY, params);
 
-    m_identifyThreads.append(tid);
-    resume_thread(tid);
+    if (tid >= 0) {
+        m_identifyThreads.append(tid);
+        resume_thread(tid);
+    } else {
+        delete params;
+        LOG(Media, "MediaPlayerPrivateHaiku: Failed to spawn IdentifyTracks thread: %s", strerror(tid));
+    }
 
     m_networkState = MediaPlayer::NetworkState::Loading;
     m_player.networkStateChanged();
@@ -601,9 +615,9 @@ void MediaPlayerPrivate::paint(GraphicsContext& context, const FloatRect& r)
 // #pragma mark - private methods
 
 #if ENABLE(MEDIA_SOURCE)
-void MediaPlayerPrivate::IdentifyTracks(const String& url, RefPtr<StreamingDataController> controller)
+void MediaPlayerPrivate::IdentifyTracks(WeakPtr<MediaPlayerPrivate> weakSelf, const String& url, RefPtr<StreamingDataController> controller)
 #else
-void MediaPlayerPrivate::IdentifyTracks(const String& url)
+void MediaPlayerPrivate::IdentifyTracks(WeakPtr<MediaPlayerPrivate> weakSelf, const String& url)
 #endif
 {
     BMediaFile* mediaFile = nullptr;
@@ -716,8 +730,7 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
     }
 
     // Notify main thread
-    WeakPtr<MediaPlayerPrivate> p = WeakPtr(this);
-    callOnMainThread([p, err] {
+    callOnMainThread([p = weakSelf, err] {
         if (!p) return;
         if (err == B_OK) {
             p->m_player.characteristicChanged();
