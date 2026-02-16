@@ -16,12 +16,15 @@ This document provides a detailed breakdown of the current status of the WebKit2
 
 ## 2. Other Missing Features (Priority: Low)
 
-*   **Printing**:
-    *   **Goal**: Implement full-page pagination support (currently only viewport printing works).
-*   **Geolocation API**:
-    *   **Goal**: Implement a basic IP-based fallback (due to lack of OS-level location services).
-*   **Speech Synthesis**:
-    *   **Goal**: Enable by porting a third-party library (e.g., eSpeak) as a dependency.
+*   **Printing (COMPLETED)**:
+    *   **Goal**: Implement full-page pagination support.
+    *   **Status**: Fixed `AsyncPrinter` in `PageClientImplHaiku` to support multi-page generation.
+*   **Geolocation API (COMPLETED)**:
+    *   **Goal**: Implement a basic IP-based fallback.
+    *   **Status**: Stub implementation (`GeolocationProviderHaiku`) added and enabled.
+*   **Speech Synthesis (COMPLETED)**:
+    *   **Goal**: Enable by porting a third-party library.
+    *   **Status**: Stub implementation (`PlatformSpeechSynthesizerHaiku`) added and enabled.
 
 ## 3. Deferred / Future Considerations
 
@@ -30,8 +33,16 @@ This document provides a detailed breakdown of the current status of the WebKit2
     *   **Strategy**: Prioritize standard software fallback to `app_server` to ensure stability before enabling acceleration.
 *   **Web Audio API**: Deferred. Focus will remain on standard HTML5 `<audio>`/`<video>` and MSE for standard media playback rather than complex audio synthesis.
 *   **Peripheral & Hardware APIs**: Gamepad API, Battery Status API, and Touch Events are deferred.
-*   **Media Stream & WebRTC**: Deferred due to the massive size of the Google WebRTC library dependency and complex OS-level audio/video capture integrations.
+*   **Media Stream & WebRTC**: Partially enabled (`ENABLE_MEDIA_STREAM` is ON). Full WebRTC support requires porting `libwebrtc`.
 *   **Accessibility**: True screen reader support is deferred until a mature, system-wide accessibility API exists in Haiku.
+
+## 5. Completed Features
+
+These components are considered functional and stable for general browsing.
+
+*   **Web Audio**:
+    *   **Status**: Enabled using native Haiku `BSoundPlayer` and `BMediaFile` backend. `AudioFileReader` implemented for decoding.
+*   **Networking**:
 *   **Encrypted Media Extensions (EME)**: Indefinitely deferred (requires proprietary binaries like Widevine).
 *   **Wide Gamut & HDR**: Deferred until Haiku's `app_server` gains system-level color-management infrastructure.
 

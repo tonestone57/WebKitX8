@@ -25,6 +25,7 @@
 #include "AudioBus.h"
 #include "NotImplemented.h"
 
+#include <span>
 #include <File.h>
 #include <MediaFile.h>
 #include <MediaTrack.h>
@@ -35,10 +36,10 @@ class AudioFileReader {
     WTF_MAKE_NONCOPYABLE(AudioFileReader);
 public:
     AudioFileReader(const char* filePath);
-    AudioFileReader(const void* data, size_t dataSize);
+    AudioFileReader(std::span<const uint8_t> data);
     ~AudioFileReader();
 
-    PassRefPtr<AudioBus> createBus(float sampleRate, bool mixToMono);
+    RefPtr<AudioBus> createBus(float sampleRate, bool mixToMono);
 
 private:
     BDataIO* m_data;
@@ -51,20 +52,19 @@ AudioFileReader::AudioFileReader(const char* filePath)
     m_file = new BMediaFile(m_data);
 }
 
-AudioFileReader::AudioFileReader(const void* data, size_t dataSize)
+AudioFileReader::AudioFileReader(std::span<const uint8_t> data)
 {
-    m_data = new BMemoryIO(data, dataSize);
-        // TODO should we take ownership of the data, or copy it?
+    m_data = new BMemoryIO(data.data(), data.size());
     m_file = new BMediaFile(m_data);
 }
 
 AudioFileReader::~AudioFileReader()
 {
     delete m_file;
-    delete m_data;
+    // m_file (BMediaFile) takes ownership of m_data (BDataIO) and deletes it.
 }
 
-PassRefPtr<AudioBus> AudioFileReader::createBus(float sampleRate, bool mixToMono)
+RefPtr<AudioBus> AudioFileReader::createBus(float sampleRate, bool mixToMono)
 {
     BMediaTrack* track = m_file->TrackAt(0);
 
@@ -72,7 +72,7 @@ PassRefPtr<AudioBus> AudioFileReader::createBus(float sampleRate, bool mixToMono
         media_format format;
         if (track->EncodedFormat(&format) != B_OK) {
             m_file->ReleaseTrack(track);
-            return AudioBus::create(0, 0, true);
+            return nullptr;
         }
 
         // Setup format conversion
@@ -85,17 +85,17 @@ PassRefPtr<AudioBus> AudioFileReader::createBus(float sampleRate, bool mixToMono
 
         if (track->SetDecodedFormat(&format) != B_OK) {
             m_file->ReleaseTrack(track);
-            return AudioBus::create(0, 0, true);
+            return nullptr;
         }
 
         int64 frames = track->CountFrames();
         if (frames <= 0) {
             m_file->ReleaseTrack(track);
-            return AudioBus::create(0, 0, true);
+            return nullptr;
         }
 
         unsigned channels = format.u.raw_audio.channel_count;
-        RefPtr<AudioBus> audioBus = AudioBus::create(channels, frames, true);
+        auto audioBus = AudioBus::create(channels, frames, true);
         audioBus->setSampleRate(sampleRate);
 
         // Get pointers to the audio bus channels
@@ -132,19 +132,18 @@ PassRefPtr<AudioBus> AudioFileReader::createBus(float sampleRate, bool mixToMono
     } else {
         // Reading the file failed, return an empty bus
         if (track) m_file->ReleaseTrack(track);
-        RefPtr<AudioBus> audioBus = AudioBus::create(0, 0, true);
-        return audioBus;
+        return nullptr;
     }
 }
 
-PassRefPtr<AudioBus> createBusFromAudioFile(const char* filePath, bool mixToMono, float sampleRate)
+RefPtr<AudioBus> createBusFromAudioFile(const char* filePath, bool mixToMono, float sampleRate)
 {
     return AudioFileReader(filePath).createBus(sampleRate, mixToMono);
 }
 
-PassRefPtr<AudioBus> createBusFromInMemoryAudioFile(const void* data, size_t dataSize, bool mixToMono, float sampleRate)
+RefPtr<AudioBus> createBusFromInMemoryAudioFile(std::span<const uint8_t> data, bool mixToMono, float sampleRate)
 {
-    return AudioFileReader(data, dataSize).createBus(sampleRate, mixToMono);
+    return AudioFileReader(data).createBus(sampleRate, mixToMono);
 }
 
 } // WebCore

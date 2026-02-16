@@ -32,6 +32,11 @@
 #include <wtf/MainThread.h>
 #include <wtf/RunLoop.h>
 
+#if ENABLE(GEOLOCATION)
+#include "GeolocationProviderHaiku.h"
+#include "WebGeolocationManagerProxy.h"
+#endif
+
 #include <OS.h>
 
 namespace WebKit {
@@ -40,6 +45,11 @@ void WebProcessPool::platformInitialize(NeedsGlobalStaticInitialization)
 {
     if (auto* manager = ensureSupplement<WebNotificationManagerProxy>())
         manager->setProvider(makeUnique<NotificationProviderHaiku>());
+
+#if ENABLE(GEOLOCATION)
+    if (auto* manager = ensureSupplement<WebGeolocationManagerProxy>())
+        manager->setProvider(makeUnique<GeolocationProviderHaiku>());
+#endif
 
     // Check memory status periodically
     static bool memoryPressureHandlerInitialized = false;

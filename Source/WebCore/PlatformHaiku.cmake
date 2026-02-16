@@ -95,6 +95,7 @@ list(APPEND WebCore_SOURCES
   platform/haiku/PlatformKeyboardEventHaiku.cpp
   platform/haiku/PlatformMouseEventHaiku.cpp
   platform/haiku/PlatformScreenHaiku.cpp
+  platform/haiku/PlatformSpeechSynthesizerHaiku.cpp
   platform/haiku/PopupMenuHaiku.cpp
   platform/haiku/ScrollbarThemeHaiku.cpp
   platform/haiku/SearchPopupMenuHaiku.cpp
@@ -198,7 +199,9 @@ endif ()
 
 if (ENABLE_WEB_AUDIO)
     list(APPEND WebCore_SOURCES
+        platform/audio/haiku/AudioBusHaiku.cpp
         platform/audio/haiku/AudioDestinationHaiku.cpp
+        platform/audio/haiku/AudioFileReaderHaiku.cpp
     )
 endif ()
 
@@ -206,6 +209,14 @@ if (ENABLE_MEDIA_STREAM)
     list(APPEND WebCore_SOURCES
         platform/mediastream/haiku/RealtimeMediaSourceCenterHaiku.cpp
         platform/mediastream/haiku/RealtimeMediaSourceHaiku.cpp
+    )
+endif ()
+
+if (ENABLE_MEDIA_SOURCE)
+    list(APPEND WebCore_SOURCES
+        platform/graphics/haiku/MediaSourcePrivateHaiku.cpp
+        platform/graphics/haiku/SourceBufferPrivateHaiku.cpp
+        platform/graphics/haiku/StreamingDataIO.cpp
     )
 endif ()
 
@@ -247,7 +258,7 @@ if (ENABLE_WEB_AUDIO)
     #)
 
     list(APPEND WebCore_LIBRARIES
-        media avcodec
+        media
     )
 endif ()
 

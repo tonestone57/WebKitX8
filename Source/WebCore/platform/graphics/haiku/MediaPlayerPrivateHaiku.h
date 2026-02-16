@@ -22,6 +22,7 @@
 #if ENABLE(VIDEO)
 
 #include "MediaPlayerPrivate.h"
+#include "StreamingDataIO.h"
 
 #include <wtf/WeakPtr.h>
 
@@ -62,7 +63,8 @@ public:
 
         void load(const String& url) override;
 #if ENABLE(MEDIA_SOURCE)
-        void load(const String& url, MediaSourcePrivateClient*) override;
+        void load(const URL&, const LoadOptions&, MediaSourcePrivateClient&) override;
+        void addStreamingSource(RefPtr<StreamingDataController>);
 #endif
         void cancelLoad() override;
 
@@ -110,7 +112,11 @@ public:
 
     constexpr MediaPlayerType mediaPlayerType() const final { return MediaPlayerType::Haiku; }
 private:
+#if ENABLE(MEDIA_SOURCE)
+        void IdentifyTracks(const String& url, RefPtr<StreamingDataController> controller = nullptr);
+#else
         void IdentifyTracks(const String& url);
+#endif
         static int32 videoPlayThread(void* cookie);
 
         static void playCallback(void*, void*, size_t,
@@ -121,15 +127,22 @@ private:
         static MediaPlayer::SupportsType supportsType(const MediaEngineSupportParameters&);
 
         mutable bool m_didReceiveData;
-        BMediaFile* m_mediaFile;
+        Vector<BMediaFile*> m_mediaFiles;
         BMediaTrack* m_audioTrack;
         BMediaTrack* m_videoTrack;
         BSoundPlayer* m_soundPlayer;
-        BBitmap* m_frameBuffer;
+        BBitmap* m_videoBuffer;
+        BBitmap* m_drawBuffer;
         BLocker m_mediaLock;
-        thread_id m_identifyThread;
+        BLocker m_drawLock;
+        Vector<thread_id> m_identifyThreads;
         thread_id m_videoPlayThread;
         mutable PlatformTimeRanges m_buffered;
+
+#if ENABLE(MEDIA_SOURCE)
+        Vector<RefPtr<StreamingDataController>> m_pendingControllers;
+        Vector<RefPtr<StreamingDataController>> m_activeControllers;
+#endif
 
         MediaPlayer& m_player;
         MediaPlayer::NetworkState m_networkState;
