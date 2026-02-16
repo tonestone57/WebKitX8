@@ -24,6 +24,10 @@
 
 #include "GraphicsContext.h"
 #include "Logging.h"
+#if ENABLE(MEDIA_SOURCE)
+#include "MediaSourcePrivateClient.h"
+#endif
+#include <algorithm>
 #include <cmath>
 #include "wtf/text/CString.h"
 #include "wtf/NeverDestroyed.h"
@@ -74,12 +78,11 @@ void MediaPlayerPrivate::registerMediaEngine(MediaEngineRegistrar registrar)
 
 MediaPlayerPrivate::MediaPlayerPrivate(MediaPlayer& player)
     : m_didReceiveData(false)
-    , m_mediaFile(nullptr)
     , m_audioTrack(nullptr)
     , m_videoTrack(nullptr)
     , m_soundPlayer(nullptr)
-    , m_frameBuffer(nullptr)
-    , m_identifyThread(-1)
+    , m_videoBuffer(nullptr)
+    , m_drawBuffer(nullptr)
     , m_videoPlayThread(-1)
     , m_player(player)
     , m_networkState(MediaPlayer::NetworkState::Empty)
@@ -97,8 +100,23 @@ MediaPlayerPrivate::~MediaPlayerPrivate()
 {
     delete m_soundPlayer;
 
-    if (m_identifyThread >= 0)
-        wait_for_thread(m_identifyThread, NULL);
+#if ENABLE(MEDIA_SOURCE)
+    m_mediaLock.Lock();
+    for (auto& controller : m_pendingControllers) {
+        if (controller)
+            controller->setEOS();
+    }
+    m_pendingControllers.clear();
+    for (auto& controller : m_activeControllers) {
+        if (controller)
+            controller->setEOS();
+    }
+    m_activeControllers.clear();
+    m_mediaLock.Unlock();
+#endif
+
+    for (thread_id tid : m_identifyThreads)
+        wait_for_thread(tid, NULL);
 
     if (m_videoPlayThread >= 0)
         wait_for_thread(m_videoPlayThread, NULL);
@@ -106,30 +124,116 @@ MediaPlayerPrivate::~MediaPlayerPrivate()
     BAutolock lock(m_mediaLock);
 
     cancelLoad();
-    delete m_frameBuffer;
+    delete m_videoBuffer;
+    delete m_drawBuffer;
 }
 
 #if ENABLE(MEDIA_SOURCE)
-void MediaPlayerPrivate::load(const String& url, WebCore::MediaSourcePrivateClient*)
+void MediaPlayerPrivate::load(const URL&, const LoadOptions&, MediaSourcePrivateClient&)
 {
-    load(url);
-}
-#endif
+    // Signal EOS to unblock any pending reads
+    m_mediaLock.Lock();
+    for (auto& controller : m_pendingControllers) {
+        if (controller)
+            controller->setEOS();
+    }
+    m_pendingControllers.clear();
+    for (auto& controller : m_activeControllers) {
+        if (controller)
+            controller->setEOS();
+    }
+    m_activeControllers.clear();
+    m_mediaLock.Unlock();
 
-void MediaPlayerPrivate::load(const String& url)
-{
-    // Cleanup from previous request (can this even happen?)
+    // Wait for threads to finish
+    for (thread_id tid : m_identifyThreads)
+        wait_for_thread(tid, NULL);
+    m_identifyThreads.clear();
+
+    if (m_videoPlayThread >= 0)
+        wait_for_thread(m_videoPlayThread, NULL);
+    m_videoPlayThread = -1;
+
+    // Cleanup resources
     if (m_soundPlayer)
         m_soundPlayer->Stop(false);
     delete m_soundPlayer;
     m_soundPlayer = nullptr;
 
-    if (m_identifyThread >= 0)
-        wait_for_thread(m_identifyThread, NULL);
+    m_mediaLock.Lock();
+    cancelLoad();
+    m_mediaLock.Unlock();
+
+    // In MSE mode, we wait for addStreamingSource calls.
+    m_readyState = MediaPlayer::ReadyState::HaveNothing;
+    m_networkState = MediaPlayer::NetworkState::Loading;
+    m_player.networkStateChanged();
+    m_player.readyStateChanged();
+}
+
+void MediaPlayerPrivate::addStreamingSource(RefPtr<StreamingDataController> controller)
+{
+    if (!controller)
+        return;
+
+    {
+        BAutolock lock(m_mediaLock);
+        m_pendingControllers.append(controller);
+    }
+
+    struct IdentifyParams {
+        MediaPlayerPrivate* self;
+        String url;
+        RefPtr<StreamingDataController> controller;
+    };
+    IdentifyParams* params = new IdentifyParams { this, String(), controller };
+
+    thread_id tid = spawn_thread([](void* data) -> int32 {
+        IdentifyParams* params = (IdentifyParams*)data;
+#if ENABLE(MEDIA_SOURCE)
+        params->self->IdentifyTracks(params->url, params->controller);
+#else
+        params->self->IdentifyTracks(params->url);
+#endif
+        delete params;
+        return 0;
+    }, "Media Source Identify", B_NORMAL_PRIORITY, params);
+
+    m_identifyThreads.append(tid);
+    resume_thread(tid);
+}
+#endif
+
+void MediaPlayerPrivate::load(const String& url)
+{
+#if ENABLE(MEDIA_SOURCE)
+    m_mediaLock.Lock();
+    for (auto& controller : m_pendingControllers) {
+        if (controller)
+            controller->setEOS();
+    }
+    m_pendingControllers.clear();
+    for (auto& controller : m_activeControllers) {
+        if (controller)
+            controller->setEOS();
+    }
+    m_activeControllers.clear();
+    m_mediaLock.Unlock();
+#endif
+
+    for (thread_id tid : m_identifyThreads)
+        wait_for_thread(tid, NULL);
+    m_identifyThreads.clear();
 
     if (m_videoPlayThread >= 0)
         wait_for_thread(m_videoPlayThread, NULL);
     m_videoPlayThread = -1;
+
+    // Cleanup from previous request (can this even happen?)
+    if (m_soundPlayer)
+        m_soundPlayer->Stop(false);
+    delete m_soundPlayer;
+    m_soundPlayer = nullptr;
 
     m_mediaLock.Lock();
     cancelLoad();
@@ -138,17 +242,25 @@ void MediaPlayerPrivate::load(const String& url)
     struct IdentifyParams {
         MediaPlayerPrivate* self;
         String url;
+#if ENABLE(MEDIA_SOURCE)
+        RefPtr<StreamingDataController> controller;
+#endif
     };
     IdentifyParams* params = new IdentifyParams { this, url };
 
-    m_identifyThread = spawn_thread([](void* data) -> int32 {
+    thread_id tid = spawn_thread([](void* data) -> int32 {
         IdentifyParams* params = (IdentifyParams*)data;
+#if ENABLE(MEDIA_SOURCE)
+        params->self->IdentifyTracks(params->url, params->controller);
+#else
         params->self->IdentifyTracks(params->url);
+#endif
         delete params;
         return 0;
     }, "Media Identify", B_NORMAL_PRIORITY, params);
 
-    resume_thread(m_identifyThread);
+    m_identifyThreads.append(tid);
+    resume_thread(tid);
 
     m_networkState = MediaPlayer::NetworkState::Loading;
     m_player.networkStateChanged();
@@ -157,10 +269,38 @@ void MediaPlayerPrivate::load(const String& url)
 void MediaPlayerPrivate::cancelLoad()
 {
     // m_mediaLock is expected to be held by caller
-    delete m_mediaFile;
-    m_mediaFile = nullptr;
+    for (auto* file : m_mediaFiles)
+        delete file;
+    m_mediaFiles.clear();
+
+#if ENABLE(MEDIA_SOURCE)
+    // We already signaled EOS in load()/dtor, now we can clear the list
+    // m_activeControllers.clear(); // done in load()/dtor?
+    // Wait, cancelLoad is called by load().
+    // load() calls cancelLoad() under lock.
+    // load() clears the lists under lock.
+    // So active controllers are cleared before cancelLoad is called?
+    // In load():
+    // 1. Lock.
+    // 2. Clear pending/active.
+    // 3. Unlock.
+    // 4. Wait threads.
+    // 5. ...
+    // 6. Lock.
+    // 7. cancelLoad().
+    // So active controllers are already cleared.
+    // But if cancelLoad is called from other places?
+    // It's only called from load() and ~dtor.
+    // So we are safe.
+#endif
+
     m_audioTrack = nullptr;
     m_videoTrack = nullptr;
+
+    delete m_videoBuffer;
+    m_videoBuffer = nullptr;
+    delete m_drawBuffer;
+    m_drawBuffer = nullptr;
 }
 
 void MediaPlayerPrivate::prepareToPlay()
@@ -205,9 +345,12 @@ void MediaPlayerPrivate::playCallback(void* cookie, void* buffer,
         {
             // Decode a video frame and show it on screen
             int64 count;
-            if (player->m_videoTrack->ReadFrames(player->m_frameBuffer->Bits(),
+            if (player->m_videoTrack->ReadFrames(player->m_videoBuffer->Bits(),
                 &count) != B_OK) {
                 player->m_videoTrack = nullptr;
+            } else {
+                 BAutolock lock(player->m_drawLock);
+                 std::swap(player->m_videoBuffer, player->m_drawBuffer);
             }
 
             WeakPtr<MediaPlayerPrivate> p = WeakPtr(player);
@@ -239,8 +382,13 @@ int32 MediaPlayerPrivate::videoPlayThread(void* cookie)
             if (lock.IsLocked() && player->m_videoTrack) {
                 int64 frames = 0;
                 media_header header;
-                if (player->m_videoTrack->ReadFrames(player->m_frameBuffer->Bits(), &frames, &header) == B_OK) {
+                if (player->m_videoTrack->ReadFrames(player->m_videoBuffer->Bits(), &frames, &header) == B_OK) {
                     player->m_currentTime = header.start_time / 1000000.f;
+
+                    {
+                        BAutolock lock(player->m_drawLock);
+                        std::swap(player->m_videoBuffer, player->m_drawBuffer);
+                    }
 
                     WeakPtr<MediaPlayerPrivate> p = WeakPtr(player);
                     callOnMainThread([p] {
@@ -293,10 +441,10 @@ void MediaPlayerPrivate::pause()
 
 FloatSize MediaPlayerPrivate::naturalSize() const
 {
-    if (!m_frameBuffer)
+    if (!m_videoBuffer)
         return FloatSize(0,0);
 
-    BRect r(m_frameBuffer->Bounds());
+    BRect r(m_videoBuffer->Bounds());
     return FloatSize(r.Width() + 1, r.Height() + 1);
 }
 
@@ -439,33 +587,56 @@ void MediaPlayerPrivate::paint(GraphicsContext& context, const FloatRect& r)
     if (context.paintingDisabled())
         return;
 
-    if (m_frameBuffer) {
+    BAutolock lock(m_drawLock);
+    if (m_drawBuffer) {
         BView* target = context.platformContext();
         target->SetDrawingMode(B_OP_COPY);
-        target->DrawBitmap(m_frameBuffer, r);
+        target->DrawBitmap(m_drawBuffer, r);
     }
 }
 
 // #pragma mark - private methods
 
-void MediaPlayerPrivate::IdentifyTracks(const String& url)
-{
-#if B_HAIKU_VERSION <= B_HAIKU_VERSION_1_BETA_5
-    BMediaFile* mediaFile = new BMediaFile(BUrl(url.utf8().data()));
+#if ENABLE(MEDIA_SOURCE)
+void MediaPlayerPrivate::IdentifyTracks(const String& url, RefPtr<StreamingDataController> controller)
 #else
-    BMediaFile* mediaFile = new BMediaFile(BUrl(url.utf8().data(), false));
+void MediaPlayerPrivate::IdentifyTracks(const String& url)
 #endif
+{
+    BMediaFile* mediaFile = nullptr;
 
-    status_t err = mediaFile->InitCheck();
+    if (!url.isEmpty()) {
+#if B_HAIKU_VERSION <= B_HAIKU_VERSION_1_BETA_5
+        mediaFile = new BMediaFile(BUrl(url.utf8().data()));
+#else
+        mediaFile = new BMediaFile(BUrl(url.utf8().data(), false));
+#endif
+    } else {
+#if ENABLE(MEDIA_SOURCE)
+        if (controller) {
+            m_mediaLock.Lock();
+            m_pendingControllers.removeFirst(controller);
+            m_activeControllers.append(controller);
+            m_mediaLock.Unlock();
+
+            mediaFile = new BMediaFile(new StreamingDataIO(controller.copyRef()));
+        }
+#endif
+    }
+
+    status_t err = mediaFile ? mediaFile->InitCheck() : B_ERROR;
 
     m_mediaLock.Lock();
-    m_mediaFile = mediaFile;
+    if (mediaFile && err == B_OK)
+        m_mediaFiles.append(mediaFile);
+    else if (mediaFile)
+        delete mediaFile;
     m_mediaLock.Unlock();
 
     if (err == B_OK) {
-        for (int i = m_mediaFile->CountTracks() - 1; i >= 0; i--)
+        for (int i = mediaFile->CountTracks() - 1; i >= 0; i--)
         {
-            BMediaTrack* track = m_mediaFile->TrackAt(i);
+            BMediaTrack* track = mediaFile->TrackAt(i);
             if (!track) {
                 LOG(Media, "MediaPlayerPrivateHaiku: Failed to get track %d", i);
                 continue;
@@ -476,7 +647,7 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
 
             if (track->DecodedFormat(&format) != B_OK) {
                  LOG(Media, "MediaPlayerPrivateHaiku: Failed to get decoded format for track %d", i);
-                 m_mediaFile->ReleaseTrack(track);
+                 mediaFile->ReleaseTrack(track);
                  continue;
             }
 
@@ -491,18 +662,26 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
                          format.u.raw_video.display.format = 0; // Wildcard
                          if (track->DecodedFormat(&format) != B_OK) {
                              LOG(Media, "MediaPlayerPrivateHaiku: Failed to get any decoded format for video track %d", i);
-                             m_mediaFile->ReleaseTrack(track);
+                             mediaFile->ReleaseTrack(track);
                              m_mediaLock.Unlock();
                              continue;
                          }
                     }
 
                     m_videoTrack = track;
-                    m_frameBuffer = new BBitmap(
+                    delete m_videoBuffer;
+                    m_videoBuffer = new BBitmap(
                         BRect(0, 0, format.Width() - 1, format.Height() - 1),
                         format.u.raw_video.display.format); // Use the negotiated format
+                    {
+                        BAutolock lock(m_drawLock);
+                        delete m_drawBuffer;
+                        m_drawBuffer = new BBitmap(
+                            BRect(0, 0, format.Width() - 1, format.Height() - 1),
+                            format.u.raw_video.display.format);
+                    }
                 } else {
-                    m_mediaFile->ReleaseTrack(track);
+                    mediaFile->ReleaseTrack(track);
                 }
             } else if (format.IsAudio()) {
                 if (!m_audioTrack) {
@@ -515,17 +694,17 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
                         delete m_soundPlayer;
                         m_soundPlayer = nullptr;
                         m_audioTrack = nullptr;
-                        m_mediaFile->ReleaseTrack(track);
+                        mediaFile->ReleaseTrack(track);
                     } else {
                         m_soundPlayer->SetVolume(m_volume);
                         if (!m_paused)
                             m_soundPlayer->Start();
                     }
                 } else {
-                     m_mediaFile->ReleaseTrack(track);
+                     mediaFile->ReleaseTrack(track);
                 }
             } else {
-                m_mediaFile->ReleaseTrack(track);
+                mediaFile->ReleaseTrack(track);
             }
             m_mediaLock.Unlock();
         }
@@ -554,7 +733,6 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
         p->m_player.readyStateChanged();
     });
 
-    m_identifyThread = -1;
 }
 
 // #pragma mark - static methods
