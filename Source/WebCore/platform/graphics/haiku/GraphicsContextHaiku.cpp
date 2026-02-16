@@ -336,8 +336,10 @@ void GraphicsContextHaiku::fillRect(const FloatRect& rect, const Color& color)
     const auto [r, g, b, a] = color.toColorTypeLossy<SRGBA<uint8_t>>().resolved();
 
     if (compositeOperation() == CompositeOperator::SourceOver) {
+        m_view->PushState();
         m_view->SetHighColor(r, g, b, a);
         m_view->FillRect(rect);
+        m_view->PopState();
         return;
     }
 
@@ -377,8 +379,10 @@ void GraphicsContextHaiku::fillRect(const FloatRect& rect, RequiresClipToRect re
     const auto [r, g, b, a] = state().fillBrush().color().toColorTypeLossy<SRGBA<uint8_t>>().resolved();
 
     if (a == 255 && m_view->DrawingMode() == B_OP_COPY) {
+        m_view->PushState();
         m_view->SetHighColor(r, g, b, 255);
         m_view->FillRect(rect);
+        m_view->PopState();
         return;
     }
 
@@ -430,8 +434,10 @@ void GraphicsContextHaiku::fillRoundedRectImpl(const FloatRoundedRect& roundRect
     if (roundRect.radii().isUniformCornerRadius()) {
         if (compositeOperation() == CompositeOperator::SourceOver) {
             const auto [r, g, b, a] = color.toColorTypeLossy<SRGBA<uint8_t>>().resolved();
+            m_view->PushState();
             m_view->SetHighColor(r, g, b, a);
             m_view->FillRoundRect(rect, topLeft.width(), topLeft.height());
+            m_view->PopState();
             return;
         }
         if (compositeOperation() == CompositeOperator::Copy) {
@@ -483,9 +489,11 @@ void GraphicsContextHaiku::fillRoundedRectImpl(const FloatRoundedRect& roundRect
     shape.BezierTo(points);
     shape.Close(); // Automatically completes the shape with the top border
 
+    m_view->PushState();
     m_view->MovePenTo(B_ORIGIN);
     m_view->SetHighColor(color);
     m_view->FillShape(&shape);
+    m_view->PopState();
 }
 
 void GraphicsContextHaiku::fillRectWithRoundedHole(const FloatRect& rect, const FloatRoundedRect& roundedHoleRect, const Color& color)

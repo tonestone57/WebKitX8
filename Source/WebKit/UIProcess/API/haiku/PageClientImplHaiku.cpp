@@ -144,10 +144,12 @@ WebCore::FloatPoint PageClientImpl::viewScrollPosition()
 
 WebCore::IntSize PageClientImpl::viewSize()
 {
-    fWebView.Window()->Lock();
-    BRect rect = fWebView.Frame();
-    fWebView.Window()->Unlock();
-    return IntSize(rect.right - rect.left, rect.bottom - rect.top);
+    if (fWebView.LockLooper()) {
+        BRect bounds = fWebView.Bounds();
+        fWebView.UnlockLooper();
+        return IntSize(bounds.IntegerWidth() + 1, bounds.IntegerHeight() + 1);
+    }
+    return IntSize();
 }
 
 bool PageClientImpl::isViewWindowActive()
@@ -664,8 +666,8 @@ void PageClientImpl::startDrag(const WebCore::DragItem& dragItem, WebCore::Share
 
     fWebView.DragMessage(&dragMessage, dragBitmap, B_OP_ALPHA, offset);
 
-    if (dragBitmap)
-        delete dragBitmap;
+    // The bitmap is owned by the drag message once DragMessage is called.
+    // It will be deleted by the system when the drag is finished.
 
     fWebView.UnlockLooper();
 }
