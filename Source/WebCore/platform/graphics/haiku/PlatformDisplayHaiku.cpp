@@ -27,13 +27,22 @@
 #include "PlatformDisplayHaiku.h"
 
 #include "GLContext.h"
+#include "GLDisplay.h"
+#include <EGL/egl.h>
 
 namespace WebCore {
 
 std::unique_ptr<PlatformDisplayHaiku> PlatformDisplayHaiku::create()
 {
-    RefPtr<GLDisplay> glDisplay;
-    return std::unique_ptr<PlatformDisplayHaiku>(new PlatformDisplayHaiku(glDisplay.releaseNonNull()));
+    EGLDisplay eglDisplay = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    if (eglDisplay == EGL_NO_DISPLAY)
+        return nullptr;
+
+    auto display = GLDisplay::create(eglDisplay);
+    if (!display)
+        return nullptr;
+
+    return std::unique_ptr<PlatformDisplayHaiku>(new PlatformDisplayHaiku(display.releaseNonNull()));
 }
 
 PlatformDisplayHaiku::PlatformDisplayHaiku(Ref<GLDisplay>&& glDisplay)
