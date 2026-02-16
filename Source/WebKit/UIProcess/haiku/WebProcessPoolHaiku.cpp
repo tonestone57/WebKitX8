@@ -61,6 +61,7 @@ void WebProcessPool::platformInitialize(NeedsGlobalStaticInitialization)
             if (get_system_info(&info) == B_OK) {
                 // If free memory is less than 5% or 64MB (assuming pages are 4KB), trigger low memory warning.
                 // Haiku pages are usually 4096 bytes.
+                // Note: free_memory is in bytes, cached_pages is in pages.
                 uint64_t freeMemory = (uint64_t)info.free_memory + ((uint64_t)info.cached_pages * B_PAGE_SIZE);
                 uint64_t totalMemory = (uint64_t)info.max_pages * B_PAGE_SIZE;
 
