@@ -78,8 +78,7 @@ WebViewBase::WebViewBase(const char* name, BRect rect, BWindow* parentWindow,
     fPage->initializeWebPage(Site(aboutBlankURL()), {}, {});
 
     if (fPage->drawingArea()) {
-        fPage->drawingArea()->setSize(IntSize(rect.right - rect.left,
-            rect.top - rect.bottom));
+        fPage->drawingArea()->setSize(IntSize(rect.IntegerWidth() + 1, rect.IntegerHeight() + 1));
     }
 }
 
@@ -94,7 +93,7 @@ void WebViewBase::FrameResized(float newWidth, float newHeight)
     auto drawingArea = static_cast<DrawingAreaProxyCoordinatedGraphics*>(page()->drawingArea());
     if (!drawingArea)
         return;
-    drawingArea->setSize(IntSize(newWidth, newHeight));
+    drawingArea->setSize(IntSize(newWidth + 1, newHeight + 1));
 #endif
 }
 
