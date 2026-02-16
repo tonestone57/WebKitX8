@@ -1,20 +1,26 @@
 /*
  * Copyright (C) 2014 Haiku, Inc.
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Library General Public
- * License as published by the Free Software Foundation; either
- * version 2 of the License, or (at your option) any later version.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
  *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Library General Public License for more details.
- *
- * You should have received a copy of the GNU Library General Public License
- * aint with this library; see the file COPYING.LIB.  If not, write to
- * the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
- * Boston, MA 02110-1301, USA.
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS''
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+ * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #ifndef MediaPlayerPrivateHaiku_h
@@ -24,6 +30,8 @@
 #include "MediaPlayerPrivate.h"
 
 #include <wtf/WeakPtr.h>
+#include <wtf/Vector.h>
+#include <wtf/HashMap.h>
 
 #include <Locker.h>
 #include <ObjectList.h>
@@ -41,6 +49,7 @@ namespace WebCore {
 class MediaPlayerFactoryHaiku;
 #if ENABLE(MEDIA_SOURCE)
 class MediaSourcePrivateHaiku;
+class SourceBufferPrivateHaiku;
 #endif
 
 class MediaPlayerPrivate
@@ -69,6 +78,8 @@ public:
         void load(const String& url) override;
 #if ENABLE(MEDIA_SOURCE)
         void load(const String& url, MediaSourcePrivateClient*) override;
+        void addSourceBuffer(SourceBufferPrivateHaiku*);
+        void removeSourceBuffer(SourceBufferPrivateHaiku*);
 #endif
         void cancelLoad() override;
 
@@ -122,6 +133,9 @@ public:
     constexpr MediaPlayerType mediaPlayerType() const final { return MediaPlayerType::Haiku; }
 private:
         void IdentifyTracks(const String& url);
+#if ENABLE(MEDIA_SOURCE)
+        void IdentifyTracks(SourceBufferPrivateHaiku* buffer);
+#endif
         static int32 videoPlayThread(void* cookie);
 
         static void playCallback(void*, void*, size_t,
@@ -138,12 +152,14 @@ private:
         BSoundPlayer* m_soundPlayer;
         BBitmap* m_frameBuffer;
         BLocker m_mediaLock;
-        thread_id m_identifyThread;
+        Vector<thread_id> m_identifyThreads;
         thread_id m_videoPlayThread;
         mutable PlatformTimeRanges m_buffered;
 
 #if ENABLE(MEDIA_SOURCE)
         RefPtr<MediaSourcePrivateHaiku> m_mediaSourcePrivate;
+        // Map source buffer to its associated BMediaFile to manage lifecycle
+        HashMap<SourceBufferPrivateHaiku*, BMediaFile*> m_mseMediaFiles;
 #endif
 
         MediaPlayer& m_player;

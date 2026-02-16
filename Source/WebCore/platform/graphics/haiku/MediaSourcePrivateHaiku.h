@@ -30,10 +30,13 @@
 
 #include "MediaSourcePrivate.h"
 #include <wtf/LoggerHelper.h>
+#include <wtf/WeakPtr.h>
+#include <wtf/HashSet.h>
 
 namespace WebCore {
 
 class MediaPlayerPrivate;
+class SourceBufferPrivateHaiku;
 
 class MediaSourcePrivateHaiku final
     : public MediaSourcePrivate
@@ -46,6 +49,7 @@ public:
     virtual ~MediaSourcePrivateHaiku();
 
     AddStatus addSourceBuffer(const ContentType&, RefPtr<SourceBufferPrivate>&) override;
+    void removeSourceBuffer(SourceBufferPrivate&) override;
     void durationChanged(const MediaTime&) override;
     void markEndOfStream(EndOfStreamStatus) override;
     void unmarkEndOfStream() override;
@@ -56,6 +60,11 @@ public:
 
     void waitForSeekCompleted(float, const MediaTime&, Promise&&) override;
     void seekToTime(const MediaTime&) override;
+
+    // Called by SourceBufferPrivateHaiku destructor
+    void sourceBufferPrivateDidClose(SourceBufferPrivateHaiku*);
+
+    void abortAllSourceBuffers();
 
 #if !RELEASE_LOG_DISABLED
     const Logger& logger() const override { return m_logger; }
@@ -69,6 +78,9 @@ private:
     Ref<MediaSourcePrivateClient> m_client;
     MediaPlayer::ReadyState m_readyState { MediaPlayer::ReadyState::HaveNothing };
     bool m_isEnded { false };
+
+    // Track active source buffers to abort them
+    HashSet<SourceBufferPrivateHaiku*> m_sourceBuffers;
 
 #if !RELEASE_LOG_DISABLED
     Ref<const Logger> m_logger;

@@ -30,11 +30,15 @@
 
 #include "ContentType.h"
 #include "SourceBufferPrivate.h"
+#include <wtf/Vector.h>
 #include <wtf/SharedBuffer.h>
+
+class BDataIO;
 
 namespace WebCore {
 
 class MediaSourcePrivateHaiku;
+class SourceBufferAdapterIO;
 
 class SourceBufferPrivateHaiku final : public SourceBufferPrivate {
 public:
@@ -44,9 +48,10 @@ public:
     constexpr MediaPlatformType platformType() const override { return MediaPlatformType::Haiku; }
 
     void removedFromMediaSource() override;
+    void abort() override;
 
-    // Returns a copy of the current accumulated data as a SharedBuffer
-    Ref<SharedBuffer> copyData() const;
+    // For MediaPlayerPrivateHaiku to read
+    BDataIO* dataIO() const;
 
 #if !RELEASE_LOG_DISABLED
     const Logger& sourceBufferLogger() const override { return m_logger; }
@@ -59,8 +64,9 @@ private:
     Ref<MediaPromise> appendInternal(Ref<SharedBuffer>&&) override;
     void resetParserStateInternal() override;
 
+    MediaSourcePrivateHaiku& m_mediaSource;
     ContentType m_contentType;
-    SharedBufferBuilder m_builder;
+    SourceBufferAdapterIO* m_stream; // Owned
 
 #if !RELEASE_LOG_DISABLED
     Ref<const Logger> m_logger;

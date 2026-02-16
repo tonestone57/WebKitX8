@@ -48,23 +48,52 @@ MediaSourcePrivateHaiku::MediaSourcePrivateHaiku(MediaPlayerPrivate& player, Med
 MediaSourcePrivateHaiku::~MediaSourcePrivateHaiku()
 {
     ALWAYS_LOG(LOGIDENTIFIER);
+    abortAllSourceBuffers();
 }
 
 MediaSourcePrivate::AddStatus MediaSourcePrivateHaiku::addSourceBuffer(const ContentType& contentType, RefPtr<SourceBufferPrivate>& outPrivate)
 {
     ALWAYS_LOG(LOGIDENTIFIER, contentType);
 
-    // FIXME: Check if contentType is supported
-    // For now, always accept supported types
-    outPrivate = SourceBufferPrivateHaiku::create(*this, contentType);
+    auto sourceBuffer = SourceBufferPrivateHaiku::create(*this, contentType);
+    m_sourceBuffers.add(sourceBuffer.ptr());
+    m_player.addSourceBuffer(sourceBuffer.ptr());
+    outPrivate = sourceBuffer;
+
     return AddStatus::Ok;
+}
+
+void MediaSourcePrivateHaiku::removeSourceBuffer(SourceBufferPrivate& buffer)
+{
+    ALWAYS_LOG(LOGIDENTIFIER);
+    SourceBufferPrivateHaiku* haikuBuffer = static_cast<SourceBufferPrivateHaiku*>(&buffer);
+
+    // Notify player to clean up associated resources (BMediaFile, tracks)
+    m_player.removeSourceBuffer(haikuBuffer);
+
+    m_sourceBuffers.remove(haikuBuffer);
+    MediaSourcePrivate::removeSourceBuffer(buffer);
+}
+
+void MediaSourcePrivateHaiku::sourceBufferPrivateDidClose(SourceBufferPrivateHaiku* buffer)
+{
+    // This might be called from SourceBufferPrivateHaiku destructor.
+    // removeSourceBuffer should have been called first by WebCore.
+    // Just ensure it's removed from our list.
+    m_sourceBuffers.remove(buffer);
+}
+
+void MediaSourcePrivateHaiku::abortAllSourceBuffers()
+{
+    for (auto* buffer : m_sourceBuffers) {
+        if (buffer) buffer->abort();
+    }
 }
 
 void MediaSourcePrivateHaiku::durationChanged(const MediaTime& duration)
 {
     ALWAYS_LOG(LOGIDENTIFIER, duration);
-    // Notify player of duration change if needed
-    // m_player.durationChanged();
+    m_player.durationChanged();
 }
 
 void MediaSourcePrivateHaiku::markEndOfStream(EndOfStreamStatus status)
