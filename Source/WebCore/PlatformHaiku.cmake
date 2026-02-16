@@ -211,6 +211,7 @@ if (ENABLE_MEDIA_SOURCE)
     list(APPEND WebCore_SOURCES
         platform/graphics/haiku/MediaSourcePrivateHaiku.cpp
         platform/graphics/haiku/SourceBufferPrivateHaiku.cpp
+        platform/graphics/haiku/StreamingDataIO.cpp
     )
 endif ()
 

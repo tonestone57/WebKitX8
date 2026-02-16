@@ -22,6 +22,7 @@
 #if ENABLE(VIDEO)
 
 #include "MediaPlayerPrivate.h"
+#include "StreamingDataIO.h"
 
 #include <wtf/WeakPtr.h>
 
@@ -63,6 +64,7 @@ public:
         void load(const String& url) override;
 #if ENABLE(MEDIA_SOURCE)
         void load(const String& url, MediaSourcePrivateClient*) override;
+        void addStreamingSource(RefPtr<StreamingDataController>);
 #endif
         void cancelLoad() override;
 
@@ -110,7 +112,11 @@ public:
 
     constexpr MediaPlayerType mediaPlayerType() const final { return MediaPlayerType::Haiku; }
 private:
+#if ENABLE(MEDIA_SOURCE)
+        void IdentifyTracks(const String& url, RefPtr<StreamingDataController> controller = nullptr);
+#else
         void IdentifyTracks(const String& url);
+#endif
         static int32 videoPlayThread(void* cookie);
 
         static void playCallback(void*, void*, size_t,
@@ -121,7 +127,7 @@ private:
         static MediaPlayer::SupportsType supportsType(const MediaEngineSupportParameters&);
 
         mutable bool m_didReceiveData;
-        BMediaFile* m_mediaFile;
+        Vector<BMediaFile*> m_mediaFiles;
         BMediaTrack* m_audioTrack;
         BMediaTrack* m_videoTrack;
         BSoundPlayer* m_soundPlayer;

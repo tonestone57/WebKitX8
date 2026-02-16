@@ -36,6 +36,7 @@ Ref<SourceBufferPrivateHaiku> SourceBufferPrivateHaiku::create(MediaSourcePrivat
 
 SourceBufferPrivateHaiku::SourceBufferPrivateHaiku(MediaSourcePrivate& mediaSource)
     : SourceBufferPrivate(mediaSource)
+    , m_streamingData(StreamingDataController::create())
 #if !RELEASE_LOG_DISABLED
     , m_logger(Logger::create(this))
     , m_logIdentifier(LoggerHelper::uniqueLogIdentifier())
@@ -45,11 +46,16 @@ SourceBufferPrivateHaiku::SourceBufferPrivateHaiku(MediaSourcePrivate& mediaSour
 
 SourceBufferPrivateHaiku::~SourceBufferPrivateHaiku()
 {
+    if (m_streamingData)
+        m_streamingData->setEOS();
 }
 
-Ref<MediaPromise> SourceBufferPrivateHaiku::appendInternal(Ref<SharedBuffer>&&)
+Ref<MediaPromise> SourceBufferPrivateHaiku::appendInternal(Ref<SharedBuffer>&& buffer)
 {
-    // Stub implementation.
+    if (m_streamingData) {
+        for (const auto& segment : *buffer)
+            m_streamingData->append(segment.data(), segment.size());
+    }
     return MediaPromise::createAndResolve();
 }
 

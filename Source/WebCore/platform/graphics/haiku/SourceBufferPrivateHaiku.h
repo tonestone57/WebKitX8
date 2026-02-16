@@ -22,6 +22,7 @@
 #if ENABLE(MEDIA_SOURCE)
 
 #include "SourceBufferPrivate.h"
+#include "StreamingDataIO.h"
 #include <wtf/LoggerHelper.h>
 
 namespace WebCore {
@@ -47,6 +48,8 @@ public:
     bool canSetMinimumUpcomingPresentationTime(TrackID) const override { return false; }
     void setMinimumUpcomingPresentationTime(TrackID, const MediaTime&) override { }
 
+    RefPtr<StreamingDataController> streamingData() const { return m_streamingData; }
+
 #if !RELEASE_LOG_DISABLED
     const Logger& logger() const final { return m_logger; }
     const char* logClassName() const final { return "SourceBufferPrivateHaiku"; }
@@ -58,6 +61,8 @@ public:
 #endif
 
 private:
+    RefPtr<StreamingDataController> m_streamingData;
+
 #if !RELEASE_LOG_DISABLED
     Ref<Logger> m_logger;
     uint64_t m_logIdentifier;

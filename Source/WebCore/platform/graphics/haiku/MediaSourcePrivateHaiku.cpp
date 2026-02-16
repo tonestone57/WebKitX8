@@ -22,6 +22,7 @@
 
 #if ENABLE(MEDIA_SOURCE)
 
+#include "MediaPlayerPrivateHaiku.h"
 #include "MediaSourcePrivateClient.h"
 #include "SourceBufferPrivateHaiku.h"
 #include <wtf/Ref.h>
@@ -49,7 +50,15 @@ MediaSourcePrivateHaiku::~MediaSourcePrivateHaiku()
 
 MediaSourcePrivate::AddStatus MediaSourcePrivateHaiku::addSourceBuffer(const ContentType&, const MediaSourceConfiguration&, RefPtr<SourceBufferPrivate>& buffer)
 {
-    buffer = SourceBufferPrivateHaiku::create(*this);
+    auto sb = SourceBufferPrivateHaiku::create(*this);
+    buffer = sb.copyRef();
+
+    if (m_player) {
+        if (auto* player = dynamic_cast<MediaPlayerPrivate*>(m_player.get())) {
+            player->addStreamingSource(sb->streamingData());
+        }
+    }
+
     return MediaSourcePrivate::AddStatus::Ok;
 }
 
