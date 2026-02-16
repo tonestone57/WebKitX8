@@ -5,23 +5,16 @@ Following the networking modernization (switching to `libcurl`) and the implemen
 ## 1. Wire SSL Exceptions to Curl (COMPLETED)
 *   **Status:** Implemented in `CurlSSLVerifier` to read `~/config/settings/WebKit/certificate_exceptions` on Haiku.
 
-## 2. Upgrade Exception Storage Security
-*   **Context:** The current exception file stores simple hostnames (e.g., `example.com`), which is vulnerable to Man-in-the-Middle (MITM) attacks if an attacker presents a different invalid certificate for an allowed host.
-*   **Action:** Upgrade the storage format to include the certificate fingerprint (SHA-256).
-    *   *New Format:* JSON or structured text: `{ "host": "example.com", "fingerprint": "sha256:..." }`
-    *   *Logic:* Only allow the connection if the hostname *and* the certificate fingerprint match.
+## 2. Upgrade Exception Storage Security (COMPLETED)
+*   **Status:** SHA-256 fingerprint storage implemented.
 
-## 3. Implement WebSocket Support
-*   **Context:** `WebSocketTaskHaiku` is currently a stub, meaning WebSockets do not work.
-*   **Action:** Implement the WebSocket protocol using:
-    *   Option A: `libcurl`'s WebSocket capabilities (if available in the linked version).
-    *   Option B: Native Haiku `BSocket` implementation.
+## 3. Implement WebSocket Support (COMPLETED)
+*   **Status:** Implemented via `WebSocketTaskCurl` using `libcurl`.
 
-## 4. Modernize Cookie Storage
-*   **Context:** `CookieJarHaiku` currently monitors a text file for cookie updates, which is prone to race conditions and does not support complex policies (SameSite, etc.) robustly.
-*   **Action:** Migrate to WebKit's cross-platform `NetworkStorageSession` with the SQLite backend. This ensures standard compliance and reliable persistence.
+## 4. Modernize Cookie Storage (COMPLETED)
+*   **Status:** Migrated to `NetworkStorageSession` using the SQLite backend (`CookieJarDB`).
 
 ## 5. Enable Multimedia Features
-*   **WebAudio:** Implement `AudioDestinationHaiku` using `BSoundPlayer` to enable audio synthesis and processing.
-*   **WebGL:** Implement `GraphicsContextGL` using `BGLView` to enable 3D graphics.
-*   **Media Capture:** Implement `RealtimeMediaSource` using `BMediaRoster` to enable camera/microphone access (WebRTC).
+*   **WebAudio (COMPLETED):** Implemented `AudioDestinationHaiku` using `BSoundPlayer`.
+*   **WebGL (COMPLETED):** Implemented `GraphicsContextGL` using `GraphicsContextGLTextureMapperANGLE` and `PlatformDisplayHaiku` utilizing EGL.
+*   **Media Capture (PARTIAL):** Basic infrastructure enabled (`ENABLE_MEDIA_STREAM`). Further work needed for robust camera/microphone access.

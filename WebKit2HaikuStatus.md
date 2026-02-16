@@ -25,17 +25,17 @@ The WebKit2 port for Haiku is in an **advanced functional stage**. Most core com
 - **Features**: Certificate verification, Cookies (SQLite), and WebSockets are supported.
 
 ### 5. Graphics & Rendering (COMPLETE)
-
-### 5. Graphics & Rendering (COMPLETE)
 - **Architecture**: `CoordinatedGraphics` is fully integrated via `LayerTreeHostHaiku.cpp`.
 - **Drawing Area**: `DrawingAreaProxyCoordinatedGraphics` is used with a Haiku-specific `BackingStore` implementation that ensures thread safety (`m_backingStoreLock`) when painting to `BView`.
 - **Context**: `GraphicsContextHaiku.cpp` implements drawing operations using `BView`.
+- **WebGL**: Implemented via `GraphicsContextGLTextureMapperANGLE` and `PlatformDisplayHaiku` utilizing EGL.
 
 ### 6. UI Process & API (COMPLETE)
 - **WebView**: `BWebView` and `WebViewBase` provide the hosting view.
 - **Page Client**: `PageClientImplHaiku.cpp` implements menus, cursors, and tooltips.
 - **Input Events**: `PlatformKeyboardEvent`, `PlatformMouseEvent`, and `PlatformWheelEvent` are implemented and mapped from `BMessage`.
 - **Inspector**: Local Web Inspector is implemented via `WebInspectorUIProxyHaiku` and `InspectorWindow`.
+- **Advanced UI**: Native Color Picker and DateTime Picker are implemented.
 
 ### 7. WebCore Platform Support (COMPLETE)
 - **Clipboard**: `PasteboardHaiku.cpp` implemented using `BClipboard` (Read/Write for Text/HTML).
@@ -48,8 +48,6 @@ The WebKit2 port for Haiku is in an **advanced functional stage**. Most core com
 - **Features**: Geolocation and Speech Synthesis stubs are implemented.
 
 ### 8. Remaining Tasks & Improvements
-- **Graphics**: Implement WebGL (`GraphicsContextGLHaiku`).
-- **Advanced UI**: Color Picker and DateTime Picker are implemented.
 - **Optimization**: Continued refinement of memory pressure handling and drawing performance.
 
 ## Conclusion

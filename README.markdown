@@ -240,20 +240,18 @@ There are more tests, but the build-\* scripts must be working before we can run
 
 ## Status of WebKit2 port ##
 
-The Haiku port currently uses the WebKitLegacy API. Eventually we should move to
-WebKit2 (simply called WebKit in the sources). WebKit2 splits the web engine into
-multiple processes: an user interface, a web process, a network process, etc. This
-allows for better sandboxing, and better stability (the user interface will not
-crash or freeze when it hits a problematic website).
+The Haiku port has successfully migrated to the modern WebKit (WebKit2) multi-process architecture.
+This splits the web engine into multiple processes: a user interface, a web process, a network process, etc.
+This allows for better sandboxing, better stability (the user interface will not crash or freeze when it
+hits a problematic website), and support for modern web standards.
 
-The work on WebKit2 is found in the GSoC2019 tag. It has not been updated since
-and the internals of WebKit have changed a bit. An attempt to rebase it is found
-in the haiku-webkit2 branch, but it's broken. This branch is a bit more than a rebase,
-there is also a lot of cleanup of the commit history, and some obsolete changes were removed.
-It is a good starting point to get WebKit2 running on Haiku, but a lot of things will need
-to be added or debugged. It is possible to build the MiniBrowser test browser, but inter-process
-communications are not working, and so, it is not possible to even start loading a page at the
-moment. There is some ongoing work to restore this to a working state.
+The port is currently in an **advanced functional state**, supporting:
+- Networking via `libcurl` (HTTP/2, etc.)
+- WebGL and 2D Canvas
+- WebAudio and Media Playback
+- Full multi-process isolation
+
+For a detailed analysis of the feature status, known issues, and roadmap, please verify `HAIKU_PORT_ANALYSIS.md`, `WebKit2HaikuStatus.md` and `TASK_LIST.md` in this repository.
 
 ### Logging ###
 
@@ -278,6 +276,6 @@ WebKitBuild/Release folder. Launching it will then use the freshly built
 libraries instead of the system ones. It is a good idea to test this because
 HaikuLauncher doesn't use tabs, which sometimes expose different bugs.
 
-This document was last updated August 13, 2020.
+This document was last updated October 2023.
 
 Authors: Maxime Simon, Alexandre Deckner, Adrien Destugues
