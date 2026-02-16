@@ -117,8 +117,9 @@ void WebViewBase::MessageReceived(BMessage* message)
             break;
         }
         case B_MOUSE_WHEEL_CHANGED:
-            callOnMainRunLoop([this, message = *message](){
-                fPage->handleWheelEvent(NativeWebWheelEvent(&message));
+            callOnMainRunLoop([weakThis = WeakPtr { *this }, message = *message](){
+                if (weakThis)
+                    weakThis->fPage->handleWheelEvent(NativeWebWheelEvent(&message));
             });
             break;
         case B_MOUSE_DOWN:
@@ -126,24 +127,27 @@ void WebViewBase::MessageReceived(BMessage* message)
             // fallthrough
         case B_MOUSE_UP:
         case B_MOUSE_MOVED:
-            callOnMainRunLoop([this, message = *message](){
-                fPage->handleMouseEvent(NativeWebMouseEvent(&message));
+            callOnMainRunLoop([weakThis = WeakPtr { *this }, message = *message](){
+                if (weakThis)
+                    weakThis->fPage->handleMouseEvent(NativeWebMouseEvent(&message));
             });
             break;
         case B_KEY_DOWN:
         case B_KEY_UP:
         case B_UNMAPPED_KEY_DOWN:
         case B_UNMAPPED_KEY_UP:
-            callOnMainRunLoop([this, message = *message](){
-                fPage->handleKeyboardEvent(NativeWebKeyboardEvent(&message));
+            callOnMainRunLoop([weakThis = WeakPtr { *this }, message = *message](){
+                if (weakThis)
+                    weakThis->fPage->handleKeyboardEvent(NativeWebKeyboardEvent(&message));
             });
             break;
         case B_TOUCH_DOWN:
         case B_TOUCH_UP:
         case B_TOUCH_MOVED:
         case B_TOUCH_CANCEL:
-            callOnMainRunLoop([this, message = *message](){
-                fPage->handleTouchEvent(nullptr, NativeWebTouchEvent(&message));
+            callOnMainRunLoop([weakThis = WeakPtr { *this }, message = *message](){
+                if (weakThis)
+                    weakThis->fPage->handleTouchEvent(nullptr, NativeWebTouchEvent(&message));
             });
             break;
         default:

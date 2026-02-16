@@ -185,25 +185,30 @@ void MediaPlayerPrivate::addStreamingSource(RefPtr<StreamingDataController> cont
     }
 
     struct IdentifyParams {
-        MediaPlayerPrivate* self;
+        WeakPtr<MediaPlayerPrivate> self;
         String url;
         RefPtr<StreamingDataController> controller;
     };
-    IdentifyParams* params = new IdentifyParams { this, String(), controller };
+    IdentifyParams* params = new IdentifyParams { WeakPtr { *this }, String(), controller };
 
     thread_id tid = spawn_thread([](void* data) -> int32 {
         IdentifyParams* params = (IdentifyParams*)data;
 #if ENABLE(MEDIA_SOURCE)
-        params->self->IdentifyTracks(params->url, params->controller);
+        MediaPlayerPrivate::IdentifyTracks(params->self, params->url, params->controller);
 #else
-        params->self->IdentifyTracks(params->url);
+        MediaPlayerPrivate::IdentifyTracks(params->self, params->url);
 #endif
         delete params;
         return 0;
     }, "Media Source Identify", B_NORMAL_PRIORITY, params);
 
-    m_identifyThreads.append(tid);
-    resume_thread(tid);
+    if (tid >= 0) {
+        m_identifyThreads.append(tid);
+        resume_thread(tid);
+    } else {
+        delete params;
+        LOG(Media, "MediaPlayerPrivateHaiku: Failed to spawn IdentifyTracks thread: %s", strerror(tid));
+    }
 }
 #endif
 
@@ -243,27 +248,32 @@ void MediaPlayerPrivate::load(const String& url)
     m_mediaLock.Unlock();
 
     struct IdentifyParams {
-        MediaPlayerPrivate* self;
+        WeakPtr<MediaPlayerPrivate> self;
         String url;
 #if ENABLE(MEDIA_SOURCE)
         RefPtr<StreamingDataController> controller;
 #endif
     };
-    IdentifyParams* params = new IdentifyParams { this, url };
+    IdentifyParams* params = new IdentifyParams { WeakPtr { *this }, url };
 
     thread_id tid = spawn_thread([](void* data) -> int32 {
         IdentifyParams* params = (IdentifyParams*)data;
 #if ENABLE(MEDIA_SOURCE)
-        params->self->IdentifyTracks(params->url, params->controller);
+        MediaPlayerPrivate::IdentifyTracks(params->self, params->url, params->controller);
 #else
-        params->self->IdentifyTracks(params->url);
+        MediaPlayerPrivate::IdentifyTracks(params->self, params->url);
 #endif
         delete params;
         return 0;
     }, "Media Identify", B_NORMAL_PRIORITY, params);
 
-    m_identifyThreads.append(tid);
-    resume_thread(tid);
+    if (tid >= 0) {
+        m_identifyThreads.append(tid);
+        resume_thread(tid);
+    } else {
+        delete params;
+        LOG(Media, "MediaPlayerPrivateHaiku: Failed to spawn IdentifyTracks thread: %s", strerror(tid));
+    }
 
     m_networkState = MediaPlayer::NetworkState::Loading;
     m_player.networkStateChanged();
@@ -601,11 +611,16 @@ void MediaPlayerPrivate::paint(GraphicsContext& context, const FloatRect& r)
 // #pragma mark - private methods
 
 #if ENABLE(MEDIA_SOURCE)
-void MediaPlayerPrivate::IdentifyTracks(const String& url, RefPtr<StreamingDataController> controller)
+void MediaPlayerPrivate::IdentifyTracks(WeakPtr<MediaPlayerPrivate> weakSelf, const String& url, RefPtr<StreamingDataController> controller)
 #else
-void MediaPlayerPrivate::IdentifyTracks(const String& url)
+void MediaPlayerPrivate::IdentifyTracks(WeakPtr<MediaPlayerPrivate> weakSelf, const String& url)
 #endif
 {
+    // Using WeakPtr protected pointer to access members safely
+    MediaPlayerPrivate* self = weakSelf.get();
+    if (!self)
+        return;
+
     BMediaFile* mediaFile = nullptr;
 
     if (!url.isEmpty()) {
@@ -617,10 +632,10 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
     } else {
 #if ENABLE(MEDIA_SOURCE)
         if (controller) {
-            m_controllersLock.Lock();
-            m_pendingControllers.removeFirst(controller);
-            m_activeControllers.append(controller);
-            m_controllersLock.Unlock();
+            self->m_controllersLock.Lock();
+            self->m_pendingControllers.removeFirst(controller);
+            self->m_activeControllers.append(controller);
+            self->m_controllersLock.Unlock();
 
             mediaFile = new BMediaFile(new StreamingDataIO(controller.copyRef()));
         }
@@ -629,12 +644,12 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
 
     status_t err = mediaFile ? mediaFile->InitCheck() : B_ERROR;
 
-    m_mediaLock.Lock();
+    self->m_mediaLock.Lock();
     if (mediaFile && err == B_OK)
-        m_mediaFiles.append(mediaFile);
+        self->m_mediaFiles.append(mediaFile);
     else if (mediaFile)
         delete mediaFile;
-    m_mediaLock.Unlock();
+    self->m_mediaLock.Unlock();
 
     if (err == B_OK) {
         for (int i = mediaFile->CountTracks() - 1; i >= 0; i--)
@@ -654,9 +669,9 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
                  continue;
             }
 
-            m_mediaLock.Lock();
+            self->m_mediaLock.Lock();
             if (format.IsVideo()) {
-                if (!m_videoTrack) {
+                if (!self->m_videoTrack) {
                     // Request B_RGB32 for video to avoid software conversion during blit
                     format.u.raw_video.display.format = B_RGB32;
                     status_t err = track->DecodedFormat(&format);
@@ -666,20 +681,20 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
                          if (track->DecodedFormat(&format) != B_OK) {
                              LOG(Media, "MediaPlayerPrivateHaiku: Failed to get any decoded format for video track %d", i);
                              mediaFile->ReleaseTrack(track);
-                             m_mediaLock.Unlock();
+                             self->m_mediaLock.Unlock();
                              continue;
                          }
                     }
 
-                    m_videoTrack = track;
-                    delete m_videoBuffer;
-                    m_videoBuffer = new BBitmap(
+                    self->m_videoTrack = track;
+                    delete self->m_videoBuffer;
+                    self->m_videoBuffer = new BBitmap(
                         BRect(0, 0, format.Width() - 1, format.Height() - 1),
                         format.u.raw_video.display.format); // Use the negotiated format
                     {
-                        BAutolock lock(m_drawLock);
-                        delete m_drawBuffer;
-                        m_drawBuffer = new BBitmap(
+                        BAutolock lock(self->m_drawLock);
+                        delete self->m_drawBuffer;
+                        self->m_drawBuffer = new BBitmap(
                             BRect(0, 0, format.Width() - 1, format.Height() - 1),
                             format.u.raw_video.display.format);
                     }
@@ -687,21 +702,21 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
                     mediaFile->ReleaseTrack(track);
                 }
             } else if (format.IsAudio()) {
-                if (!m_audioTrack) {
-                    m_audioTrack = track;
-                    m_soundPlayer = new BSoundPlayer(&format.u.raw_audio,
-                        "HTML5 Audio", playCallback, NULL, this);
+                if (!self->m_audioTrack) {
+                    self->m_audioTrack = track;
+                    self->m_soundPlayer = new BSoundPlayer(&format.u.raw_audio,
+                        "HTML5 Audio", playCallback, NULL, self);
 
-                    if (m_soundPlayer->InitCheck() != B_OK) {
+                    if (self->m_soundPlayer->InitCheck() != B_OK) {
                         LOG(Media, "MediaPlayerPrivateHaiku: Failed to initialize BSoundPlayer");
-                        delete m_soundPlayer;
-                        m_soundPlayer = nullptr;
-                        m_audioTrack = nullptr;
+                        delete self->m_soundPlayer;
+                        self->m_soundPlayer = nullptr;
+                        self->m_audioTrack = nullptr;
                         mediaFile->ReleaseTrack(track);
                     } else {
-                        m_soundPlayer->SetVolume(m_volume);
-                        if (!m_paused)
-                            m_soundPlayer->Start();
+                        self->m_soundPlayer->SetVolume(self->m_volume);
+                        if (!self->m_paused)
+                            self->m_soundPlayer->Start();
                     }
                 } else {
                      mediaFile->ReleaseTrack(track);
@@ -709,15 +724,14 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
             } else {
                 mediaFile->ReleaseTrack(track);
             }
-            m_mediaLock.Unlock();
+            self->m_mediaLock.Unlock();
         }
     } else {
         LOG(Media, "MediaPlayerPrivateHaiku: Failed to init BMediaFile: %s", strerror(err));
     }
 
     // Notify main thread
-    WeakPtr<MediaPlayerPrivate> p = WeakPtr(this);
-    callOnMainThread([p, err] {
+    callOnMainThread([p = weakSelf, err] {
         if (!p) return;
         if (err == B_OK) {
             p->m_player.characteristicChanged();
