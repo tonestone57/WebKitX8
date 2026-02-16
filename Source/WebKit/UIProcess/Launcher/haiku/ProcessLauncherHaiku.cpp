@@ -82,8 +82,10 @@ void ProcessLauncher::launchProcess()
 
     posix_spawn_file_actions_destroy(&file_actions);
 
-    if (status != 0)
+    if (status != 0) {
+        m_processID = 0;
         LOG(Process, "failed to start process %s, error %s", executablePath.String(), strerror(status));
+    }
 
     executablePath.UnlockBuffer();
     processIdentifier.UnlockBuffer();
