@@ -30,8 +30,6 @@
 #include "MediaPlayerPrivate.h"
 
 #include <wtf/WeakPtr.h>
-#include <wtf/Vector.h>
-#include <wtf/HashMap.h>
 
 #include <Locker.h>
 #include <ObjectList.h>
@@ -47,10 +45,6 @@ struct media_raw_audio_format;
 namespace WebCore {
 
 class MediaPlayerFactoryHaiku;
-#if ENABLE(MEDIA_SOURCE)
-class MediaSourcePrivateHaiku;
-class SourceBufferPrivateHaiku;
-#endif
 
 class MediaPlayerPrivate
     : public MediaPlayerPrivateInterface
@@ -64,9 +58,6 @@ public:
 
 
         friend class MediaPlayerFactoryHaiku;
-#if ENABLE(MEDIA_SOURCE)
-        friend class MediaSourcePrivateHaiku;
-#endif
 
         static void registerMediaEngine(MediaEngineRegistrar);
 
@@ -78,8 +69,6 @@ public:
         void load(const String& url) override;
 #if ENABLE(MEDIA_SOURCE)
         void load(const String& url, MediaSourcePrivateClient*) override;
-        void addSourceBuffer(SourceBufferPrivateHaiku*);
-        void removeSourceBuffer(SourceBufferPrivateHaiku*);
 #endif
         void cancelLoad() override;
 
@@ -111,11 +100,6 @@ public:
 
         WTF::MediaTime maxTimeSeekable() const override { return duration(); }
 
-#if !RELEASE_LOG_DISABLED
-        const Logger& mediaPlayerLogger() { return m_player.mediaPlayerLogger(); }
-        const void* mediaPlayerLogIdentifier() { return m_player.mediaPlayerLogIdentifier(); }
-#endif
-
         PlatformTimeRanges& buffered() const override;
         bool didLoadingProgress() const override;
 
@@ -133,9 +117,6 @@ public:
     constexpr MediaPlayerType mediaPlayerType() const final { return MediaPlayerType::Haiku; }
 private:
         void IdentifyTracks(const String& url);
-#if ENABLE(MEDIA_SOURCE)
-        void IdentifyTracks(SourceBufferPrivateHaiku* buffer);
-#endif
         static int32 videoPlayThread(void* cookie);
 
         static void playCallback(void*, void*, size_t,
@@ -152,15 +133,9 @@ private:
         BSoundPlayer* m_soundPlayer;
         BBitmap* m_frameBuffer;
         BLocker m_mediaLock;
-        Vector<thread_id> m_identifyThreads;
+        thread_id m_identifyThread;
         thread_id m_videoPlayThread;
         mutable PlatformTimeRanges m_buffered;
-
-#if ENABLE(MEDIA_SOURCE)
-        RefPtr<MediaSourcePrivateHaiku> m_mediaSourcePrivate;
-        // Map source buffer to its associated BMediaFile to manage lifecycle
-        HashMap<SourceBufferPrivateHaiku*, BMediaFile*> m_mseMediaFiles;
-#endif
 
         MediaPlayer& m_player;
         MediaPlayer::NetworkState m_networkState;

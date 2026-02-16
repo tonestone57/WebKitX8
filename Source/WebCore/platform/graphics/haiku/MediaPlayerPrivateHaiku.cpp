@@ -22,11 +22,6 @@
 
 #if ENABLE(VIDEO)
 
-#if ENABLE(MEDIA_SOURCE)
-#include "MediaSourcePrivateHaiku.h"
-#include "SourceBufferPrivateHaiku.h"
-#endif
-
 #include "GraphicsContext.h"
 #include "Logging.h"
 #include <cmath>
@@ -84,6 +79,7 @@ MediaPlayerPrivate::MediaPlayerPrivate(MediaPlayer& player)
     , m_videoTrack(nullptr)
     , m_soundPlayer(nullptr)
     , m_frameBuffer(nullptr)
+    , m_identifyThread(-1)
     , m_videoPlayThread(-1)
     , m_player(player)
     , m_networkState(MediaPlayer::NetworkState::Empty)
@@ -101,106 +97,42 @@ MediaPlayerPrivate::~MediaPlayerPrivate()
 {
     delete m_soundPlayer;
 
-    cancelLoad(); // Stops threads and aborts IO
+    if (m_identifyThread >= 0)
+        wait_for_thread(m_identifyThread, NULL);
 
     if (m_videoPlayThread >= 0)
         wait_for_thread(m_videoPlayThread, NULL);
 
     BAutolock lock(m_mediaLock);
+
+    cancelLoad();
     delete m_frameBuffer;
 }
 
 #if ENABLE(MEDIA_SOURCE)
-void MediaPlayerPrivate::load(const String& url, WebCore::MediaSourcePrivateClient* client)
+void MediaPlayerPrivate::load(const String& url, WebCore::MediaSourcePrivateClient*)
 {
-    // Cleanup previous state
-    if (m_soundPlayer)
-        m_soundPlayer->Stop(false);
-    delete m_soundPlayer;
-    m_soundPlayer = nullptr;
-
-    cancelLoad(); // This waits for threads, so we must abort IO inside cancelLoad first
-
-    m_mediaLock.Lock();
-    // Reset pointers after cancelLoad
-    m_mediaFile = nullptr;
-    m_audioTrack = nullptr;
-    m_videoTrack = nullptr;
-    m_mediaLock.Unlock();
-
-    // Initialize MediaSource
-    if (client) {
-        m_mediaSourcePrivate = adoptRef(*new MediaSourcePrivateHaiku(*this, *client));
-        m_networkState = MediaPlayer::NetworkState::Loading;
-        m_readyState = MediaPlayer::ReadyState::HaveNothing;
-        m_player.networkStateChanged();
-        m_player.readyStateChanged();
-    }
-}
-
-void MediaPlayerPrivate::addSourceBuffer(SourceBufferPrivateHaiku* buffer)
-{
-    if (!buffer) return;
-
-    struct IdentifyMSEParams {
-        MediaPlayerPrivate* self;
-        RefPtr<SourceBufferPrivateHaiku> buffer;
-    };
-
-    IdentifyMSEParams* params = new IdentifyMSEParams { this, buffer };
-
-    thread_id id = spawn_thread([](void* data) -> int32 {
-        IdentifyMSEParams* params = (IdentifyMSEParams*)data;
-        params->self->IdentifyTracks(params->buffer.get());
-        delete params;
-        return 0;
-    }, "MSE Identify", B_NORMAL_PRIORITY, params);
-
-    m_mediaLock.Lock();
-    m_identifyThreads.append(id);
-    m_mediaLock.Unlock();
-
-    resume_thread(id);
-}
-
-void MediaPlayerPrivate::removeSourceBuffer(SourceBufferPrivateHaiku* buffer)
-{
-    BAutolock lock(m_mediaLock);
-
-    if (m_mseMediaFiles.contains(buffer)) {
-        BMediaFile* file = m_mseMediaFiles.get(buffer);
-
-        // Iterate tracks of file to check if they are the active ones and clear them
-        for (int32 i = 0; i < file->CountTracks(); i++) {
-            BMediaTrack* track = file->TrackAt(i);
-            if (track == m_audioTrack) {
-                m_audioTrack = nullptr;
-            }
-            if (track == m_videoTrack) {
-                m_videoTrack = nullptr;
-            }
-        }
-
-        delete file; // This deletes tracks
-        m_mseMediaFiles.remove(buffer);
-    }
+    load(url);
 }
 #endif
 
 void MediaPlayerPrivate::load(const String& url)
 {
-    // Cleanup from previous request
+    // Cleanup from previous request (can this even happen?)
     if (m_soundPlayer)
         m_soundPlayer->Stop(false);
     delete m_soundPlayer;
     m_soundPlayer = nullptr;
 
-    cancelLoad();
+    if (m_identifyThread >= 0)
+        wait_for_thread(m_identifyThread, NULL);
+
+    if (m_videoPlayThread >= 0)
+        wait_for_thread(m_videoPlayThread, NULL);
+    m_videoPlayThread = -1;
 
     m_mediaLock.Lock();
-    m_mediaFile = nullptr;
-    m_audioTrack = nullptr;
-    m_videoTrack = nullptr;
+    cancelLoad();
     m_mediaLock.Unlock();
 
     struct IdentifyParams {
@@ -209,18 +141,14 @@ void MediaPlayerPrivate::load(const String& url)
     };
     IdentifyParams* params = new IdentifyParams { this, url };
 
-    thread_id id = spawn_thread([](void* data) -> int32 {
+    m_identifyThread = spawn_thread([](void* data) -> int32 {
         IdentifyParams* params = (IdentifyParams*)data;
         params->self->IdentifyTracks(params->url);
         delete params;
         return 0;
     }, "Media Identify", B_NORMAL_PRIORITY, params);
 
-    m_mediaLock.Lock();
-    m_identifyThreads.append(id);
-    m_mediaLock.Unlock();
-
-    resume_thread(id);
+    resume_thread(m_identifyThread);
 
     m_networkState = MediaPlayer::NetworkState::Loading;
     m_player.networkStateChanged();
@@ -228,47 +156,17 @@ void MediaPlayerPrivate::load(const String& url)
 
 void MediaPlayerPrivate::cancelLoad()
 {
-#if ENABLE(MEDIA_SOURCE)
-    if (m_mediaSourcePrivate) {
-        m_mediaSourcePrivate->abortAllSourceBuffers();
-    }
-#endif
-
-    // Wait for all identification threads
-    Vector<thread_id> threads;
-    m_mediaLock.Lock();
-    threads = m_identifyThreads;
-    m_identifyThreads.clear();
-    m_mediaLock.Unlock();
-
-    for (auto id : threads) {
-        wait_for_thread(id, NULL);
-    }
-
-    if (m_videoPlayThread >= 0) {
-        m_paused = true;
-        wait_for_thread(m_videoPlayThread, NULL);
-        m_videoPlayThread = -1;
-    }
-
-    BAutolock lock(m_mediaLock);
+    // m_mediaLock is expected to be held by caller
     delete m_mediaFile;
     m_mediaFile = nullptr;
     m_audioTrack = nullptr;
     m_videoTrack = nullptr;
-
-#if ENABLE(MEDIA_SOURCE)
-    m_mediaSourcePrivate = nullptr;
-    // Delete all BMediaFiles created for MSE
-    for (auto& file : m_mseMediaFiles.values()) {
-        delete file;
-    }
-    m_mseMediaFiles.clear();
-#endif
 }
 
 void MediaPlayerPrivate::prepareToPlay()
 {
+    // No-op for BMediaFile based playback as we stream/read on demand.
+    // Resetting state happens on load().
 }
 
 void MediaPlayerPrivate::playCallback(void* cookie, void* buffer,
@@ -279,32 +177,43 @@ void MediaPlayerPrivate::playCallback(void* cookie, void* buffer,
     if (!player->m_mediaLock.Lock())
         return;
 
+    // Deleting the BMediaFile release the tracks
     if (player->m_audioTrack) {
         player->m_currentTime = player->m_audioTrack->CurrentTime() / 1000000.f;
 
         int64 size64;
         if (player->m_audioTrack->ReadFrames(buffer, &size64) != B_OK)
         {
+            // Notify that we're done playing...
             player->m_currentTime = player->m_audioTrack->Duration() / 1000000.f;
             player->m_soundPlayer->Stop(false);
 
             WeakPtr<MediaPlayerPrivate> p = WeakPtr(player);
             callOnMainThread([p] {
-                if (!p) return;
+                if (!p)
+                    return;
                 p->m_player.timeChanged();
             });
+
+            player->m_audioTrack = nullptr;
         }
     }
 
     if (player->m_videoTrack && player->m_audioTrack) {
-        if (player->m_videoTrack->CurrentTime() < player->m_audioTrack->CurrentTime()) {
+        if (player->m_videoTrack->CurrentTime()
+            < player->m_audioTrack->CurrentTime())
+        {
+            // Decode a video frame and show it on screen
             int64 count;
-            if (player->m_videoTrack->ReadFrames(player->m_frameBuffer->Bits(), &count) != B_OK) {
+            if (player->m_videoTrack->ReadFrames(player->m_frameBuffer->Bits(),
+                &count) != B_OK) {
+                player->m_videoTrack = nullptr;
             }
 
             WeakPtr<MediaPlayerPrivate> p = WeakPtr(player);
             callOnMainThread([p] {
-                if (!p) return;
+                if (!p)
+                    return;
                 p->m_player.repaint();
             });
         }
@@ -319,8 +228,9 @@ int32 MediaPlayerPrivate::videoPlayThread(void* cookie)
 
     while (!player->m_paused) {
         bigtime_t now = system_time();
+        // Handle seeking or drift: if the expected time vs actual time is too far off, reset base
         bigtime_t currentFrameTime = (bigtime_t)(player->m_currentTime * 1000000.0);
-        if (std::abs((now - startTime) - currentFrameTime) > 200000) {
+        if (std::abs((now - startTime) - currentFrameTime) > 200000) { // 0.2s tolerance
             startTime = now - currentFrameTime;
         }
 
@@ -340,17 +250,19 @@ int32 MediaPlayerPrivate::videoPlayThread(void* cookie)
                         }
                     });
                 } else {
+                    // End of stream or error
                     player->m_paused = true;
                 }
             }
         }
 
+        // Wait for next frame time
         bigtime_t targetTime = startTime + (bigtime_t)(player->m_currentTime * 1000000.0);
         bigtime_t wait = targetTime - system_time();
         if (wait > 0)
             snooze(wait);
         else
-            snooze(1000);
+            snooze(1000); // Yield briefly if we are late
     }
     return 0;
 }
@@ -426,7 +338,15 @@ WTF::MediaTime MediaPlayerPrivate::currentTime() const
 void MediaPlayerPrivate::seekToTarget(const SeekTarget& time)
 {
     BAutolock lock(m_mediaLock);
+    // Seeking logic:
+    // BMediaTrack::SeekToTime handles the underlying seek.
+    // If the media is streaming, BMediaFile/BMediaTrack handles the buffering or blocking.
+    // We update m_currentTime to reflect the seek target immediately.
+
     bigtime_t newTime = (bigtime_t)(time.time.toDouble() * 1000000);
+    // Usually, seeking the video is rounded to the nearest keyframe. This
+    // modifies newTime, and we pass the adjusted value to the audio track, to
+    // keep them in sync
     if (m_videoTrack)
         m_videoTrack->SeekToTime(&newTime);
     if (m_audioTrack)
@@ -481,6 +401,10 @@ MediaPlayer::ReadyState MediaPlayerPrivate::readyState() const
 
 PlatformTimeRanges& MediaPlayerPrivate::buffered() const
 {
+    // BMediaFile handles buffering internally (or blocks). We don't have access to the
+    // download progress of the underlying stream if we pass a URL directly.
+    // Report the full duration as buffered if we have enough data to start playing,
+    // to satisfy WebCore expectations.
     m_buffered.clear();
     if (m_readyState >= MediaPlayer::ReadyState::HaveEnoughData && duration() > MediaTime::zeroTime()) {
         m_buffered.add(MediaTime::zeroTime(), duration());
@@ -524,100 +448,6 @@ void MediaPlayerPrivate::paint(GraphicsContext& context, const FloatRect& r)
 
 // #pragma mark - private methods
 
-#if ENABLE(MEDIA_SOURCE)
-void MediaPlayerPrivate::IdentifyTracks(SourceBufferPrivateHaiku* buffer)
-{
-    BDataIO* io = buffer->dataIO();
-    BMediaFile* mediaFile = new BMediaFile(io, B_MEDIA_FILE_NO_CLOSING);
-
-    status_t err = mediaFile->InitCheck();
-
-    m_mediaLock.Lock();
-    if (err == B_OK) {
-        m_mseMediaFiles.add(buffer, mediaFile);
-    } else {
-        delete mediaFile;
-        mediaFile = nullptr;
-    }
-    m_mediaLock.Unlock();
-
-    if (err != B_OK) {
-        LOG(Media, "MediaPlayerPrivateHaiku: Failed to init BMediaFile from SourceBuffer: %s", strerror(err));
-        return;
-    }
-
-    m_mediaLock.Lock();
-    for (int i = mediaFile->CountTracks() - 1; i >= 0; i--)
-    {
-        BMediaTrack* track = mediaFile->TrackAt(i);
-        if (!track) continue;
-
-        media_format format;
-        memset(&format, 0, sizeof(format));
-        if (track->DecodedFormat(&format) != B_OK) {
-             mediaFile->ReleaseTrack(track);
-             continue;
-        }
-
-        if (format.IsVideo()) {
-            if (!m_videoTrack) {
-                format.u.raw_video.display.format = B_RGB32;
-                if (track->DecodedFormat(&format) != B_OK) {
-                     format.u.raw_video.display.format = 0;
-                     if (track->DecodedFormat(&format) != B_OK) {
-                         mediaFile->ReleaseTrack(track);
-                         continue;
-                     }
-                }
-                m_videoTrack = track;
-                m_frameBuffer = new BBitmap(
-                    BRect(0, 0, format.Width() - 1, format.Height() - 1),
-                    format.u.raw_video.display.format);
-            } else {
-                mediaFile->ReleaseTrack(track);
-            }
-        } else if (format.IsAudio()) {
-            if (!m_audioTrack) {
-                m_audioTrack = track;
-                m_soundPlayer = new BSoundPlayer(&format.u.raw_audio,
-                    "HTML5 Audio", playCallback, NULL, this);
-
-                if (m_soundPlayer->InitCheck() != B_OK) {
-                    delete m_soundPlayer;
-                    m_soundPlayer = nullptr;
-                    m_audioTrack = nullptr;
-                    mediaFile->ReleaseTrack(track);
-                } else {
-                    m_soundPlayer->SetVolume(m_volume);
-                    if (!m_paused)
-                        m_soundPlayer->Start();
-                }
-            } else {
-                 mediaFile->ReleaseTrack(track);
-            }
-        } else {
-            mediaFile->ReleaseTrack(track);
-        }
-    }
-    m_mediaLock.Unlock();
-
-    WeakPtr<MediaPlayerPrivate> p = WeakPtr(this);
-    callOnMainThread([p] {
-        if (!p) return;
-        p->m_player.characteristicChanged();
-        p->m_player.durationChanged();
-        p->m_player.sizeChanged();
-        if (p->m_videoTrack)
-            p->m_player.firstVideoFrameAvailable();
-
-        p->m_readyState = MediaPlayer::ReadyState::HaveEnoughData;
-        p->m_networkState = MediaPlayer::NetworkState::Loaded;
-        p->m_player.networkStateChanged();
-        p->m_player.readyStateChanged();
-    });
-}
-#endif
-
 void MediaPlayerPrivate::IdentifyTracks(const String& url)
 {
 #if B_HAIKU_VERSION <= B_HAIKU_VERSION_1_BETA_5
@@ -636,12 +466,16 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
         for (int i = m_mediaFile->CountTracks() - 1; i >= 0; i--)
         {
             BMediaTrack* track = m_mediaFile->TrackAt(i);
-            if (!track) continue;
+            if (!track) {
+                LOG(Media, "MediaPlayerPrivateHaiku: Failed to get track %d", i);
+                continue;
+            }
 
             media_format format;
             memset(&format, 0, sizeof(format));
 
             if (track->DecodedFormat(&format) != B_OK) {
+                 LOG(Media, "MediaPlayerPrivateHaiku: Failed to get decoded format for track %d", i);
                  m_mediaFile->ReleaseTrack(track);
                  continue;
             }
@@ -649,11 +483,14 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
             m_mediaLock.Lock();
             if (format.IsVideo()) {
                 if (!m_videoTrack) {
+                    // Request B_RGB32 for video to avoid software conversion during blit
                     format.u.raw_video.display.format = B_RGB32;
                     status_t err = track->DecodedFormat(&format);
                     if (err != B_OK) {
-                         format.u.raw_video.display.format = 0;
+                         LOG(Media, "MediaPlayerPrivateHaiku: Failed to set RGB32 format for video track %d, retrying with wildcard", i);
+                         format.u.raw_video.display.format = 0; // Wildcard
                          if (track->DecodedFormat(&format) != B_OK) {
+                             LOG(Media, "MediaPlayerPrivateHaiku: Failed to get any decoded format for video track %d", i);
                              m_mediaFile->ReleaseTrack(track);
                              m_mediaLock.Unlock();
                              continue;
@@ -663,7 +500,7 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
                     m_videoTrack = track;
                     m_frameBuffer = new BBitmap(
                         BRect(0, 0, format.Width() - 1, format.Height() - 1),
-                        format.u.raw_video.display.format);
+                        format.u.raw_video.display.format); // Use the negotiated format
                 } else {
                     m_mediaFile->ReleaseTrack(track);
                 }
@@ -674,6 +511,7 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
                         "HTML5 Audio", playCallback, NULL, this);
 
                     if (m_soundPlayer->InitCheck() != B_OK) {
+                        LOG(Media, "MediaPlayerPrivateHaiku: Failed to initialize BSoundPlayer");
                         delete m_soundPlayer;
                         m_soundPlayer = nullptr;
                         m_audioTrack = nullptr;
@@ -695,6 +533,7 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
         LOG(Media, "MediaPlayerPrivateHaiku: Failed to init BMediaFile: %s", strerror(err));
     }
 
+    // Notify main thread
     WeakPtr<MediaPlayerPrivate> p = WeakPtr(this);
     callOnMainThread([p, err] {
         if (!p) return;
@@ -714,7 +553,11 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
         p->m_player.networkStateChanged();
         p->m_player.readyStateChanged();
     });
+
+    m_identifyThread = -1;
 }
+
+// #pragma mark - static methods
 
 static HashSet<String> mimeTypeCache()
 {
@@ -727,6 +570,7 @@ static HashSet<String> mimeTypeCache()
     int32 cookie = 0;
     media_file_format mfi;
 
+    // Add the types the Haiku Media Kit add-ons advertise support for
     while(get_next_file_format(&cookie, &mfi) == B_OK) {
         cache.get().add(String::fromUTF8(mfi.mime_type));
     }
@@ -745,6 +589,7 @@ MediaPlayer::SupportsType MediaPlayerPrivate::supportsType(const MediaEngineSupp
     if (parameters.type.isEmpty())
         return MediaPlayer::SupportsType::IsNotSupported;
 
+    // spec says we should not return "probably" if the codecs string is empty
     if (mimeTypeCache().contains(parameters.type.containerType())) {
         return parameters.type.codecs().isEmpty() ? MediaPlayer::SupportsType::MayBeSupported : MediaPlayer::SupportsType::IsSupported;
     }
