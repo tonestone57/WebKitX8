@@ -30,6 +30,7 @@
 
 #include "MediaSourcePrivateHaiku.h"
 #include <wtf/Logger.h>
+#include <DataIO.h>
 
 namespace WebCore {
 
@@ -57,15 +58,29 @@ SourceBufferPrivateHaiku::~SourceBufferPrivateHaiku()
 Ref<MediaPromise> SourceBufferPrivateHaiku::appendInternal(Ref<SharedBuffer>&& data)
 {
     ALWAYS_LOG(LOGIDENTIFIER, "data size: ", data->size());
-    // FIXME: Implement parsing and append logic
-    // For now, just resolve the promise to simulate success
+
+    // Accumulate data using SharedBufferBuilder
+    m_builder.append(data.get());
+
     return MediaPromise::createAndResolve();
 }
 
 void SourceBufferPrivateHaiku::resetParserStateInternal()
 {
     ALWAYS_LOG(LOGIDENTIFIER);
-    // FIXME: Implement
+    m_builder = SharedBufferBuilder();
+}
+
+void SourceBufferPrivateHaiku::removedFromMediaSource()
+{
+    ALWAYS_LOG(LOGIDENTIFIER);
+    m_builder = SharedBufferBuilder();
+    SourceBufferPrivate::removedFromMediaSource();
+}
+
+Ref<SharedBuffer> SourceBufferPrivateHaiku::copyData() const
+{
+    return m_builder.copyBuffer()->makeContiguous();
 }
 
 } // namespace WebCore

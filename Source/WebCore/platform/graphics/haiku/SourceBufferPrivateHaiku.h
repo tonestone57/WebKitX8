@@ -30,6 +30,7 @@
 
 #include "ContentType.h"
 #include "SourceBufferPrivate.h"
+#include <wtf/SharedBuffer.h>
 
 namespace WebCore {
 
@@ -41,6 +42,11 @@ public:
     virtual ~SourceBufferPrivateHaiku();
 
     constexpr MediaPlatformType platformType() const override { return MediaPlatformType::Haiku; }
+
+    void removedFromMediaSource() override;
+
+    // Returns a copy of the current accumulated data as a SharedBuffer
+    Ref<SharedBuffer> copyData() const;
 
 #if !RELEASE_LOG_DISABLED
     const Logger& sourceBufferLogger() const override { return m_logger; }
@@ -54,6 +60,7 @@ private:
     void resetParserStateInternal() override;
 
     ContentType m_contentType;
+    SharedBufferBuilder m_builder;
 
 #if !RELEASE_LOG_DISABLED
     Ref<const Logger> m_logger;
