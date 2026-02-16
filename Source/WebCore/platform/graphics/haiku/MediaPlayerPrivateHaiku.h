@@ -113,9 +113,9 @@ public:
     constexpr MediaPlayerType mediaPlayerType() const final { return MediaPlayerType::Haiku; }
 private:
 #if ENABLE(MEDIA_SOURCE)
-        void IdentifyTracks(WeakPtr<MediaPlayerPrivate>, const String& url, RefPtr<StreamingDataController> controller = nullptr);
+        static void IdentifyTracks(WeakPtr<MediaPlayerPrivate>, const String& url, RefPtr<StreamingDataController> controller = nullptr);
 #else
-        void IdentifyTracks(WeakPtr<MediaPlayerPrivate>, const String& url);
+        static void IdentifyTracks(WeakPtr<MediaPlayerPrivate>, const String& url);
 #endif
         static int32 videoPlayThread(void* cookie);
 
