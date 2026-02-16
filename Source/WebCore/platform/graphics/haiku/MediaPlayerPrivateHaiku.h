@@ -142,6 +142,7 @@ private:
 #if ENABLE(MEDIA_SOURCE)
         Vector<RefPtr<StreamingDataController>> m_pendingControllers;
         Vector<RefPtr<StreamingDataController>> m_activeControllers;
+        BLocker m_controllersLock;
 #endif
 
         MediaPlayer& m_player;

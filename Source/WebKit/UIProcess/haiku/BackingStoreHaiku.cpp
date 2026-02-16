@@ -43,6 +43,18 @@
 namespace WebKit {
 using namespace WebCore;
 
+static BRect scaledRect(const IntRect& rect, float scale)
+{
+    BRect r(rect);
+    if (scale == 1.0f)
+        return r;
+    r.left *= scale;
+    r.top *= scale;
+    r.right = (r.right + 1) * scale - 1;
+    r.bottom = (r.bottom + 1) * scale - 1;
+    return r;
+}
+
 // BackingStore stores and updates a bitmap of the rendered webpage.
 
 BackingStore::BackingStore(const WebCore::IntSize& size, float deviceScaleFactor)
@@ -66,11 +78,7 @@ void BackingStore::paint(BView* into, const WebCore::IntRect& rect)
     // while the destination BView and rect are in logical coordinates.
     // We must scale the source rectangle to match the physical backing store.
 
-    BRect srcRect(rect);
-    srcRect.left *= m_deviceScaleFactor;
-    srcRect.top *= m_deviceScaleFactor;
-    srcRect.right = (srcRect.right + 1) * m_deviceScaleFactor - 1;
-    srcRect.bottom = (srcRect.bottom + 1) * m_deviceScaleFactor - 1;
+    BRect srcRect = scaledRect(rect, m_deviceScaleFactor);
 
     into->PushState();
     into->SetDrawingMode(B_OP_COPY);
@@ -101,13 +109,14 @@ void BackingStore::incorporateUpdate(UpdateInfo&& updateInfo)
 
     if (m_bitmap.Lock()) {
         m_view.PushState();
+        m_view.SetDrawingMode(B_OP_COPY);
         for (const auto& updateRect : updateInfo.updateRects) {
             IntRect srcRect = updateRect;
             srcRect.move(-updateRectLocation.x(), -updateRectLocation.y());
             // DrawBitmap draws from source to destination.
             // srcRect is in the coordinate system of the 'bitmap' (the update tile).
             // updateRect is in the coordinate system of 'm_view' (the backing store).
-            m_view.DrawBitmap(bitmap.get(), srcRect, updateRect);
+            m_view.DrawBitmap(bitmap.get(), scaledRect(srcRect, m_deviceScaleFactor), scaledRect(updateRect, m_deviceScaleFactor));
         }
         m_view.Sync();
         m_view.PopState();
@@ -141,7 +150,7 @@ void BackingStore::scroll(const WebCore::IntRect& scrollRect, const WebCore::Int
     sourceRect.move(-scrollOffset);
 
     if (m_bitmap.Lock()) {
-        m_view.CopyBits(sourceRect, targetRect);
+        m_view.CopyBits(scaledRect(sourceRect, m_deviceScaleFactor), scaledRect(targetRect, m_deviceScaleFactor));
         m_view.Sync();
         m_bitmap.Unlock();
     }

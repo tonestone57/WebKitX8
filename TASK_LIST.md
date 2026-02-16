@@ -8,19 +8,8 @@ The WebKit2 port for Haiku is in an **advanced functional state**. It successful
 
 ## 2. Outstanding High Priority Tasks
 
-### Multimedia & Video Playback
-*   **Haiku Media Pipeline Integration (Partial)**:
-    *   **Goal**: Replace FFmpeg backend with native Haiku BMediaKit pipeline (`BMediaFile`, `BMediaTrack`).
-    *   **Status**: Partial implementation. Stubs for `MediaPlayerPrivate` and related classes are present but not fully completed or robust.
-    *   **Mandatory Targets**: Seamless video playback and A/V synchronization using native codecs.
-*   **Media Source Extensions (MSE)**:
-    *   **Goal**: Enable and configure MSE on top of the Haiku Media Pipeline.
-    *   **Status**: In Progress / Partial. Depends on the completion of the Haiku Media Pipeline.
-
 ### Optimization & Stability
 *   **Memory Management**: Refine `MemoryPressureHandlerHaiku` thresholds based on real-world usage to prevent OOM kills on low-memory systems.
-*   **Graphics Optimization**: Further optimize `CoordinatedGraphics` and `BackingStoreHaiku` for high-DPI screens and complex animations.
-*   **Networking Performance**: Tune Curl buffer sizes and investigate specific edge cases in complex proxy environments.
 
 ## 3. Deferred / Future Considerations
 
@@ -32,6 +21,8 @@ The WebKit2 port for Haiku is in an **advanced functional state**. It successful
 *   **Accessibility**: True screen reader support is deferred until a mature, system-wide accessibility API exists in Haiku.
 *   **Encrypted Media Extensions (EME)**: Indefinitely deferred (requires proprietary binaries like Widevine).
 *   **Wide Gamut & HDR**: Deferred until Haiku's `app_server` gains system-level color-management infrastructure.
+*   **Speech Synthesis**: Deferred. Initial stubs exist (`PlatformSpeechSynthesizerHaiku`), but feature is currently disabled.
+*   **Geolocation**: Deferred. Initial stubs exist (`GeolocationProviderHaiku`), but feature is currently disabled.
 
 ## 4. Completed Features
 
@@ -48,13 +39,15 @@ These components are considered functional and stable for general browsing.
 
 ### Multimedia
 *   **Web Audio**: Enabled using native Haiku `BSoundPlayer` and `BMediaFile` backend. `AudioFileReader` implemented for decoding.
-*   **Speech Synthesis**: Stub implementation (`PlatformSpeechSynthesizerHaiku`) added and enabled.
+*   **Haiku Media Pipeline**: Replaced FFmpeg backend with native `BMediaFile`/`BMediaTrack`. Full A/V sync and double-buffering implemented.
+*   **Media Source Extensions (MSE)**: Enabled and fully implemented using `StreamingDataIO` and `MediaSourcePrivateHaiku`.
 
 ### Graphics & Rendering
 *   **WebGL**: Enabled via `ENABLE_WEBGL` and `GraphicsContextGLTextureMapperANGLE` with `PlatformDisplayHaiku` utilizing EGL.
 *   **2D Canvas**: Supported via software rendering using `ImageBufferHaikuSurfaceBackend` and `GraphicsContextHaiku`.
 *   **Printing**: Full-page pagination support implemented via `AsyncPrinter`.
 *   **Compositing**: `CoordinatedGraphics` is fully integrated via `LayerTreeHostHaiku`.
+*   **Optimization**: `BackingStoreHaiku` optimized for High-DPI screens and animation performance (`B_OP_COPY`, scaled rects).
 
 ### UI Process & Integration
 *   **Core WebView API**: `BWebView` and `WebViewBase` provide a functional view for embedding, URL loading, and navigation.
@@ -64,7 +57,6 @@ These components are considered functional and stable for general browsing.
 *   **Web Inspector**: Local Web Inspector is fully functional using a socket-based connection.
 *   **Native UI**: Context Menus, Popup Menus, Color Picker, and DateTime Picker are implemented using native controls.
 *   **Drag and Drop**: Support for dragging Text, Colors, and URLs.
-*   **Geolocation**: Stub implementation (`GeolocationProviderHaiku`) added and enabled.
 
 ### Build System
 *   **CMake**: Configuration (`PlatformHaiku.cmake`, `OptionsHaiku.cmake`) is established and maintained.

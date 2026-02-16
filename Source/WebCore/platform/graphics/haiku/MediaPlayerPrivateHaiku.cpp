@@ -84,6 +84,9 @@ MediaPlayerPrivate::MediaPlayerPrivate(MediaPlayer& player)
     , m_videoBuffer(nullptr)
     , m_drawBuffer(nullptr)
     , m_videoPlayThread(-1)
+#if ENABLE(MEDIA_SOURCE)
+    , m_controllersLock("MSE Controllers Lock")
+#endif
     , m_player(player)
     , m_networkState(MediaPlayer::NetworkState::Empty)
     , m_readyState(MediaPlayer::ReadyState::HaveNothing)
@@ -101,7 +104,7 @@ MediaPlayerPrivate::~MediaPlayerPrivate()
     delete m_soundPlayer;
 
 #if ENABLE(MEDIA_SOURCE)
-    m_mediaLock.Lock();
+    m_controllersLock.Lock();
     for (auto& controller : m_pendingControllers) {
         if (controller)
             controller->setEOS();
@@ -112,7 +115,7 @@ MediaPlayerPrivate::~MediaPlayerPrivate()
             controller->setEOS();
     }
     m_activeControllers.clear();
-    m_mediaLock.Unlock();
+    m_controllersLock.Unlock();
 #endif
 
     for (thread_id tid : m_identifyThreads)
@@ -132,7 +135,7 @@ MediaPlayerPrivate::~MediaPlayerPrivate()
 void MediaPlayerPrivate::load(const URL&, const LoadOptions&, MediaSourcePrivateClient&)
 {
     // Signal EOS to unblock any pending reads
-    m_mediaLock.Lock();
+    m_controllersLock.Lock();
     for (auto& controller : m_pendingControllers) {
         if (controller)
             controller->setEOS();
@@ -143,7 +146,7 @@ void MediaPlayerPrivate::load(const URL&, const LoadOptions&, MediaSourcePrivate
             controller->setEOS();
     }
     m_activeControllers.clear();
-    m_mediaLock.Unlock();
+    m_controllersLock.Unlock();
 
     // Wait for threads to finish
     for (thread_id tid : m_identifyThreads)
@@ -177,7 +180,7 @@ void MediaPlayerPrivate::addStreamingSource(RefPtr<StreamingDataController> cont
         return;
 
     {
-        BAutolock lock(m_mediaLock);
+        BAutolock lock(m_controllersLock);
         m_pendingControllers.append(controller);
     }
 
@@ -207,7 +210,7 @@ void MediaPlayerPrivate::addStreamingSource(RefPtr<StreamingDataController> cont
 void MediaPlayerPrivate::load(const String& url)
 {
 #if ENABLE(MEDIA_SOURCE)
-    m_mediaLock.Lock();
+    m_controllersLock.Lock();
     for (auto& controller : m_pendingControllers) {
         if (controller)
             controller->setEOS();
@@ -218,7 +221,7 @@ void MediaPlayerPrivate::load(const String& url)
             controller->setEOS();
     }
     m_activeControllers.clear();
-    m_mediaLock.Unlock();
+    m_controllersLock.Unlock();
 #endif
 
     for (thread_id tid : m_identifyThreads)
@@ -614,10 +617,10 @@ void MediaPlayerPrivate::IdentifyTracks(const String& url)
     } else {
 #if ENABLE(MEDIA_SOURCE)
         if (controller) {
-            m_mediaLock.Lock();
+            m_controllersLock.Lock();
             m_pendingControllers.removeFirst(controller);
             m_activeControllers.append(controller);
-            m_mediaLock.Unlock();
+            m_controllersLock.Unlock();
 
             mediaFile = new BMediaFile(new StreamingDataIO(controller.copyRef()));
         }
