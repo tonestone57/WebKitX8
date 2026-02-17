@@ -81,7 +81,7 @@ static ApplicationMemoryStats sampleMemoryAllocatedForApplication()
         else if (area.protection & B_WRITE_AREA)
             applicationStats.dataStackSize += area.size; // Heap / Data
         else
-            applicationStats.sharedSize += area.size; // Read-only data (likely shared)
+            applicationStats.sharedSize += area.ram_size; // Read-only data (likely shared)
     }
 
     return applicationStats;

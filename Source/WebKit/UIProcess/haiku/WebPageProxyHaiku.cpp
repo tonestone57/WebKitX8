@@ -68,9 +68,11 @@ void WebPageProxy::saveRecentSearches(IPC::Connection&, const String& name, cons
     path.Append("RecentSearches");
 
     BMessage message;
-    BFile file(path.Path(), B_READ_WRITE | B_CREATE_FILE);
-    if (file.InitCheck() == B_OK)
-        message.Unflatten(&file);
+    {
+        BFile file(path.Path(), B_READ_ONLY);
+        if (file.InitCheck() == B_OK)
+            message.Unflatten(&file);
+    }
 
     BMessage searches;
     for (const auto& item : searchItems) {
@@ -80,9 +82,19 @@ void WebPageProxy::saveRecentSearches(IPC::Connection&, const String& name, cons
     message.RemoveName(name.utf8().data());
     message.AddMessage(name.utf8().data(), &searches);
 
-    file.Seek(0, SEEK_SET);
-    file.SetSize(0);
-    message.Flatten(&file);
+    BPath tempPath(path);
+    if (tempPath.GetParent(&tempPath) != B_OK)
+        return;
+    tempPath.Append("RecentSearches.tmp");
+
+    BFile tempFile(tempPath.Path(), B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
+    if (tempFile.InitCheck() == B_OK) {
+        if (message.Flatten(&tempFile) == B_OK) {
+            tempFile.Unset();
+            BEntry tempEntry(tempPath.Path());
+            tempEntry.Rename(path.Leaf(), true);
+        }
+    }
 }
 
 void WebPageProxy::loadRecentSearches(IPC::Connection&, const String& name, CompletionHandler<void(Vector<WebCore::RecentSearch>&&)>&& completionHandler)
