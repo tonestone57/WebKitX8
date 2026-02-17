@@ -38,14 +38,26 @@ namespace WebCore {
 
 
 static BMessageRunner* runner = nullptr;
+static uint32_t s_timerGeneration = 0;
 
 
 class SharedTimerHandlerHaiku: public BHandler
 {
-    void MessageReceived(BMessage* message)
+public:
+    void MessageReceived(BMessage* message) override
     {
         if (message->what == 'shrt')
         {
+            uint32_t generation = 0;
+            // Legacy check: if no generation is found, it's 0. But new timer starts at 1?
+            // Actually let's assume all new messages have generation.
+            if (message->FindUInt32("generation", (uint32*)&generation) != B_OK)
+                generation = 0;
+
+            // If the generation doesn't match, this is an old message from a stopped timer.
+            if (generation != s_timerGeneration)
+                return;
+
             delete runner;
             runner = NULL;
             MainThreadSharedTimer::singleton().fired();
@@ -64,6 +76,8 @@ void MainThreadSharedTimer::stop()
 {
     delete runner;
     runner = NULL;
+    // Increment generation to invalidate any pending messages
+    s_timerGeneration++;
 }
 
 void MainThreadSharedTimer::setFireInterval(WTF::Seconds interval)
@@ -74,13 +88,16 @@ void MainThreadSharedTimer::setFireInterval(WTF::Seconds interval)
         be_app->AddHandler(handler);
     }
 
-    if (!runner)
-    {
-        runner = new BMessageRunner(handler, new BMessage('shrt'),
-            interval.microseconds(), 1);
+    if (runner) {
+        delete runner;
+        runner = NULL;
     }
 
-    runner->SetInterval(interval.microseconds());
+    s_timerGeneration++;
+    BMessage msg('shrt');
+    msg.AddUInt32("generation", s_timerGeneration);
+
+    runner = new BMessageRunner(handler, &msg, (bigtime_t)interval.microseconds(), 1);
 }
 
 void MainThreadSharedTimer::invalidate()
@@ -88,5 +105,3 @@ void MainThreadSharedTimer::invalidate()
 }
 
 }
-
-
