@@ -156,8 +156,8 @@ void FontCascade::drawGlyphs(GraphicsContext& graphicsContext, const Font& font,
         bfont.SetFlags(B_FORCE_ANTIALIASING);
     view->SetFont(&bfont);
 
-    BPoint offsets[glyphs.size()];
-    char buffer[4];
+    Vector<BPoint> offsets(glyphs.size());
+    char buffer[8];
     BString utf8;
     int32 realGlyphCount = 0;
     float offset = point.x();
@@ -182,7 +182,7 @@ void FontCascade::drawGlyphs(GraphicsContext& graphicsContext, const Font& font,
         realGlyphCount++;
     }
 
-    view->DrawString(utf8, offsets, realGlyphCount);
+    view->DrawString(utf8, offsets.data(), realGlyphCount);
     view->PopState();
 }
 
