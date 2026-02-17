@@ -73,6 +73,9 @@ BackingStore::~BackingStore()
 
 void BackingStore::paint(BView* into, const WebCore::IntRect& rect)
 {
+    if (m_bitmap.InitCheck() != B_OK)
+        return;
+
     // Paint the contents of our bitmap into the BView.
     // The backing store bitmap is scaled by m_deviceScaleFactor (physical pixels),
     // while the destination BView and rect are in logical coordinates.
@@ -88,6 +91,9 @@ void BackingStore::paint(BView* into, const WebCore::IntRect& rect)
 
 void BackingStore::incorporateUpdate(UpdateInfo&& updateInfo)
 {
+    if (m_bitmap.InitCheck() != B_OK)
+        return;
+
     // Take the changes given in updateInfo and incorporate them into our
     // bitmap. This can involve scrolling our bitmap and copying rectangles
     // from a bitmap containing updates into our bitmap.
@@ -126,6 +132,9 @@ void BackingStore::incorporateUpdate(UpdateInfo&& updateInfo)
 
 void BackingStore::scroll(const WebCore::IntRect& scrollRect, const WebCore::IntSize& scrollOffset)
 {
+    if (m_bitmap.InitCheck() != B_OK)
+        return;
+
     // Shift the content inside of scrollRect by scrollOffset. Any existing
     // part of the bitmap that ends up outside of the scrollRect will be
     // clipped. It doesn't matter what is done with newly-exposed regions that
