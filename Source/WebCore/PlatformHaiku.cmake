@@ -90,7 +90,6 @@ list(APPEND WebCore_SOURCES
   platform/haiku/KURLHaiku.cpp
   platform/haiku/MIMETypeRegistryHaiku.cpp
   platform/haiku/MainThreadSharedTimerHaiku.cpp
-  platform/haiku/MemoryPressureHandlerHaiku.cpp
   platform/haiku/PasteboardHaiku.cpp
   platform/haiku/PlatformKeyboardEventHaiku.cpp
   platform/haiku/PlatformMouseEventHaiku.cpp
