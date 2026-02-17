@@ -151,8 +151,13 @@ void BUrlRequestWrapper::abort()
 
     // If the receive thread is still blocked, unblock it so that it
     // become aware of the state change.
-    if (locked)
+    if (locked) {
+        if (m_verificationSem >= 0) {
+            delete_sem(m_verificationSem);
+            m_verificationSem = -1;
+        }
         m_receiveMutex.Unlock();
+    }
 
     if (m_request)
         m_request->Stop();
@@ -270,21 +275,36 @@ void BUrlRequestWrapper::RequestCompleted(BPrivate::Network::BUrlRequest* caller
 bool BUrlRequestWrapper::CertificateVerificationFailed(BPrivate::Network::BUrlRequest*,
     BCertificate& certificate, const char* message)
 {
-    bool result = false;
-    sem_id sem = create_sem(0, "CertVerification");
+    m_receiveMutex.Lock();
+    if (!m_handler) {
+        m_receiveMutex.Unlock();
+        return false;
+    }
+    m_verificationSem = create_sem(0, "CertVerification");
+    m_verificationResult = false;
+    m_receiveMutex.Unlock();
 
     // We can't copy BCertificate easily (it's Haiku object), but we block so reference is valid
-    callOnMainThread([&] {
+    callOnMainThread([protectedThis = Ref { *this }, &certificate, message] {
         {
-            BAutolock lock(m_receiveMutex);
-            if (m_handler)
-                result = m_handler->didReceiveInvalidCertificate(certificate, message);
+            BAutolock lock(protectedThis->m_receiveMutex);
+            if (protectedThis->m_handler)
+                protectedThis->m_verificationResult = protectedThis->m_handler->didReceiveInvalidCertificate(certificate, message);
+            if (protectedThis->m_verificationSem >= 0)
+                release_sem(protectedThis->m_verificationSem);
         }
-        release_sem(sem);
     });
 
-    acquire_sem(sem);
-    delete_sem(sem);
+    status_t error = acquire_sem(m_verificationSem);
+
+    m_receiveMutex.Lock();
+    if (m_verificationSem >= 0) {
+        delete_sem(m_verificationSem);
+        m_verificationSem = -1;
+    }
+    bool result = (error == B_OK && m_verificationResult);
+    m_receiveMutex.Unlock();
+
     return result;
 }
 
