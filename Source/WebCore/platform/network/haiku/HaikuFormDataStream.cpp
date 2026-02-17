@@ -117,7 +117,7 @@ void BFormDataIO::computeContentLength()
 
 std::optional<size_t> BFormDataIO::readFromFile(const FormDataElement::EncodedFileData& fileData, char* buffer, size_t size)
 {
-    if (m_fileHandle == FileSystem::invalidPlatformFileHandle)
+    if (!FileSystem::isHandleValid(m_fileHandle))
         m_fileHandle = FileSystem::openFile(fileData.filename, FileSystem::FileOpenMode::Read);
 
     if (!FileSystem::isHandleValid(m_fileHandle)) {
@@ -192,8 +192,8 @@ std::optional<size_t> BFormDataIO::readFromBlob(const FormDataElement::EncodedBl
 		}
 		break;
     case BlobDataItem::Type::File: {
-		// Open the file if not done yet
-		if (m_fileHandle == FileSystem::invalidPlatformFileHandle)
+		// Only open the file if we don't have a valid handle yet
+		if (!FileSystem::isHandleValid(m_fileHandle))
 		{
 			std::optional<WallTime> fileModificationTime = FileSystem::fileModificationTime(blobItem.file()->path());
 			if (fileModificationTime
