@@ -116,9 +116,6 @@ BUrlRequestWrapper::BUrlRequestWrapper(BUrlProtocolHandler* handler, NetworkStor
     // the main dispatcher.
     ref();
 
-    // Block the receiving thread until headers are parsed.
-    m_receiveMutex.Lock();
-
     if (m_request->Run() < B_OK) {
         deref();
 
@@ -158,111 +155,132 @@ void BUrlRequestWrapper::abort()
 
 void BUrlRequestWrapper::HeadersReceived(BPrivate::Network::BUrlRequest* caller)
 {
-    ASSERT(isMainThread());
-
-    if (!m_handler)
-        return;
-
     const BPrivate::Network::BUrlResult& result = caller->Result();
 
     String contentType = String::fromUTF8(result.ContentType());
-    ResourceResponse response(URL(caller->Url()),
-        extractMIMETypeFromMediaType(contentType), result.Length(),
-        extractCharsetFromMediaType(contentType).toString());
+    URL url(caller->Url());
+    String mimeType = extractMIMETypeFromMediaType(contentType);
+    long long length = result.Length();
+    String charset = extractCharsetFromMediaType(contentType).toString();
 
     const BPrivate::Network::BHttpResult* httpResult = dynamic_cast<const BPrivate::Network::BHttpResult*>(&result);
+    std::optional<String> suggestedFilename;
+    int statusCode = 0;
+    String statusText;
+    Vector<std::pair<String, String>> headers;
+
     if (httpResult) {
-        StringView suggestedFilename = filenameFromHTTPContentDisposition(
+        StringView filename = filenameFromHTTPContentDisposition(
             String::fromUTF8(httpResult->Headers()["Content-Disposition"]));
+        if (!filename.isEmpty())
+            suggestedFilename = filename.toString();
 
-        if (!suggestedFilename.isEmpty())
-            response.setSuggestedFilename(suggestedFilename.toString());
+        statusCode = httpResult->StatusCode();
+        statusText = String::fromUTF8(httpResult->StatusText().String());
 
-        response.setHTTPStatusCode(httpResult->StatusCode());
-        response.setHTTPStatusText(AtomString::fromUTF8(httpResult->StatusText().String()));
-
-        // Add remaining headers.
         const BPrivate::Network::BHttpHeaders& resultHeaders = httpResult->Headers();
         for (int i = 0; i < resultHeaders.CountHeaders(); i++) {
             BPrivate::Network::BHttpHeader& headerPair = resultHeaders.HeaderAt(i);
-            response.setHTTPHeaderField(String::fromUTF8(headerPair.Name()), String::fromUTF8(headerPair.Value()));
+            headers.append({String::fromUTF8(headerPair.Name()), String::fromUTF8(headerPair.Value())});
         }
-
-        if (response.isRedirection() && !response.httpHeaderField(HTTPHeaderName::Location).isEmpty()) {
-            m_handler->willSendRequest(response);
-            return;
-        }
-
-        if (response.httpStatusCode() == 401 && m_handler->didReceiveAuthenticationChallenge(response))
-            return;
     }
 
-    ResourceResponse responseCopy = response;
-    m_handler->didReceiveResponse(WTFMove(responseCopy));
+    callOnMainThread([this, protectedThis = Ref { *this }, url = WTFMove(url), mimeType = WTFMove(mimeType), length, charset = WTFMove(charset), suggestedFilename = WTFMove(suggestedFilename), statusCode, statusText = WTFMove(statusText), headers = WTFMove(headers)] {
+        BAutolock lock(m_receiveMutex);
+        if (!m_handler)
+            return;
 
-    // Unblock receive thread
-    if (m_receiveMutex.IsLocked()) {
-        m_receiveMutex.Unlock();
-    }
+        ResourceResponse response(url, mimeType, length, charset);
+        if (suggestedFilename)
+            response.setSuggestedFilename(*suggestedFilename);
+
+        if (statusCode != 0) {
+            response.setHTTPStatusCode(statusCode);
+            response.setHTTPStatusText(AtomString { statusText });
+
+            for (const auto& header : headers)
+                response.setHTTPHeaderField(header.first, header.second);
+
+            if (response.isRedirection() && !response.httpHeaderField(HTTPHeaderName::Location).isEmpty()) {
+                m_handler->willSendRequest(response);
+                return;
+            }
+
+            if (response.httpStatusCode() == 401 && m_handler->didReceiveAuthenticationChallenge(response))
+                return;
+        }
+
+        ResourceResponse responseCopy = response;
+        m_handler->didReceiveResponse(WTFMove(responseCopy));
+    });
 }
 
 void BUrlRequestWrapper::UploadProgress(BPrivate::Network::BUrlRequest*, off_t bytesSent, off_t bytesTotal)
 {
-    ASSERT(isMainThread());
+    callOnMainThread([this, protectedThis = Ref { *this }, bytesSent, bytesTotal] {
+        BAutolock lock(m_receiveMutex);
+        if (!m_handler)
+            return;
 
-    if (!m_handler)
-        return;
-
-    m_handler->didSendData(bytesSent, bytesTotal);
+        m_handler->didSendData(bytesSent, bytesTotal);
+    });
 }
 
 void BUrlRequestWrapper::RequestCompleted(BPrivate::Network::BUrlRequest* caller, bool success)
 {
-    ASSERT(isMainThread());
-
-    // We held a pointer to keep the main dispatcher alive for the duration
-    // of the request run.
-    //
-    // As the request completes, we adopt the ref here so that it can
-    // release itself after completion.
-    auto releaseThis = adoptRef(*this);
-
-    if (!m_handler)
-        return;
+    URL url(caller->Url());
+    status_t status = caller->Status();
+    int httpStatusCode = 0;
 
     BPrivate::Network::BHttpRequest* httpRequest = dynamic_cast<BPrivate::Network::BHttpRequest*>(m_request);
-
-    if (success || (httpRequest && m_didReceiveData)) {
-        m_handler->didFinishLoading();
-        return;
-    } else if (httpRequest) {
+    if (httpRequest) {
         const BPrivate::Network::BHttpResult& result = static_cast<const BPrivate::Network::BHttpResult&>(httpRequest->Result());
-        int httpStatusCode = result.StatusCode();
+        httpStatusCode = result.StatusCode();
+    }
 
-        if (httpStatusCode != 0) {
+    callOnMainThread([this, success, url = WTFMove(url), status, httpStatusCode] {
+        // Adopt the reference created in constructor to ensure destruction on main thread
+        auto releaseThis = adoptRef(*this);
+
+        BAutolock lock(m_receiveMutex);
+        if (!m_handler)
+            return;
+
+        if (success || (httpStatusCode != 0 && m_didReceiveData)) {
+            m_handler->didFinishLoading();
+            return;
+        } else if (httpStatusCode != 0) {
             ResourceError error(ASCIILiteral::fromLiteralUnsafe("HTTP"), httpStatusCode,
-                URL(caller->Url()), String::fromUTF8(strerror(caller->Status())));
-
+                url, String::fromUTF8(strerror(status)));
             m_handler->didFail(error);
             return;
         }
-    }
 
-    // If we get here, it means we are in failure without an HTTP error code
-    // (DNS error, or error from a protocol other than HTTP).
-    ResourceError error(ASCIILiteral::fromLiteralUnsafe("BUrlRequest"), caller->Status(), URL(caller->Url()), String::fromUTF8(strerror(caller->Status())));
-    m_handler->didFail(error);
+        ResourceError error(ASCIILiteral::fromLiteralUnsafe("BUrlRequest"), status, url, String::fromUTF8(strerror(status)));
+        m_handler->didFail(error);
+    });
 }
 
 bool BUrlRequestWrapper::CertificateVerificationFailed(BPrivate::Network::BUrlRequest*,
     BCertificate& certificate, const char* message)
 {
-    ASSERT(isMainThread());
+    bool result = false;
+    sem_id sem = create_sem(0, "CertVerification");
 
-    if (!m_handler)
-        return false;
+    // We can't copy BCertificate easily (it's Haiku object), but we block so reference is valid
+    callOnMainThread([&] {
+        {
+            BAutolock lock(m_receiveMutex);
+            if (m_handler) {
+                result = m_handler->didReceiveInvalidCertificate(certificate, message);
+            }
+        }
+        release_sem(sem);
+    });
 
-    return m_handler->didReceiveInvalidCertificate(certificate, message);
+    acquire_sem(sem);
+    delete_sem(sem);
+    return result;
 }
 
 ssize_t BUrlRequestWrapper::Write(const void* data, size_t size)
