@@ -9,7 +9,7 @@ The WebKit2 port for Haiku is in an **advanced functional state**. It successful
 ## 2. Outstanding High Priority Tasks
 
 ### Optimization & Stability
-*   **Memory Management**: Refine `MemoryPressureHandlerHaiku` thresholds based on real-world usage to prevent OOM kills on low-memory systems.
+*   *None currently.*
 
 ## 3. Deferred / Future Considerations
 
@@ -57,6 +57,7 @@ These components are considered functional and stable for general browsing.
 *   **Web Inspector**: Local Web Inspector is fully functional using a socket-based connection.
 *   **Native UI**: Context Menus, Popup Menus, Color Picker, and DateTime Picker are implemented using native controls.
 *   **Drag and Drop**: Support for dragging Text, Colors, and URLs.
+*   **Memory Management**: `MemoryPressureHandlerHaiku` thresholds refined for real-world usage (VMs & High-RAM) preventing OOM kills.
 
 ### Build System
 *   **CMake**: Configuration (`PlatformHaiku.cmake`, `OptionsHaiku.cmake`) is established and maintained.

@@ -65,6 +65,11 @@ static const size_t s_minimumBytesFreedToUseMinimumHoldOffTime = 1 * MB;
 static const unsigned s_holdOffMultiplier = 20;
 
 #if OS(HAIKU)
+static const Seconds s_memoryPressurePollingInterval { 2_s };
+static const size_t s_memoryPressureAbsoluteThreshold = 96 * MB;
+static const double s_memoryPressureRelativeThreshold = 0.15;
+static const size_t s_memoryPressureRelativeThresholdCap = 512 * MB;
+
 static std::unique_ptr<RunLoop::Timer> s_memoryPressureTimer;
 #endif
 
@@ -105,17 +110,17 @@ void MemoryPressureHandler::install()
                 uint64_t freeMemory = (uint64_t)info.free_memory + ((uint64_t)info.cached_pages * B_PAGE_SIZE);
                 uint64_t totalMemory = (uint64_t)info.max_pages * B_PAGE_SIZE;
 
-                // Trigger if less than 64MB or (10% memory free AND less than 256MB free)
-                // Haiku VMs often run with 512MB RAM, so 128MB is too high (25%).
-                // 64MB is a safer floor for critical pressure.
+                // Trigger if less than s_memoryPressureAbsoluteThreshold or (s_memoryPressureRelativeThreshold memory free AND less than s_memoryPressureRelativeThresholdCap free)
+                // Haiku VMs often run with 512MB RAM, so 128MB is considered too high (25%).
+                // 96MB is a safer floor for critical pressure.
                 // We cap the percentage check to avoid triggering on systems with large RAM (e.g. 16GB) when 1GB is free.
-                if (freeMemory < 64 * 1024 * 1024 || (totalMemory > 0 && (double)freeMemory / totalMemory < 0.10 && freeMemory < 256 * 1024 * 1024)) {
+                if (freeMemory < s_memoryPressureAbsoluteThreshold || (totalMemory > 0 && (double)freeMemory / totalMemory < s_memoryPressureRelativeThreshold && freeMemory < s_memoryPressureRelativeThresholdCap)) {
                     MemoryPressureHandler::singleton().triggerMemoryPressureEvent(true);
                 }
             }
         });
     }
-    s_memoryPressureTimer->startRepeating(10_s);
+    s_memoryPressureTimer->startRepeating(s_memoryPressurePollingInterval);
 #endif
 }
 

@@ -388,7 +388,7 @@ public:
 #endif
 
     void fullKeyboardAccessModeChanged(bool fullKeyboardAccessEnabled);
-#if OS(LINUX)
+#if OS(LINUX) || OS(HAIKU)
     void sendMemoryPressureEvent(bool isCritical);
 #endif
     void textCheckerStateChanged();
