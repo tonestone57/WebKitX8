@@ -80,6 +80,8 @@ MediaPlayerPrivate::MediaPlayerPrivate(MediaPlayer& player)
     : m_didReceiveData(false)
     , m_audioTrack(nullptr)
     , m_videoTrack(nullptr)
+    , m_audioFile(nullptr)
+    , m_videoFile(nullptr)
     , m_soundPlayer(nullptr)
     , m_videoBuffer(nullptr)
     , m_drawBuffer(nullptr)
@@ -311,8 +313,16 @@ void MediaPlayerPrivate::cancelLoad()
     // So we are safe.
 #endif
 
-    m_audioTrack = nullptr;
-    m_videoTrack = nullptr;
+    if (m_audioFile && m_audioTrack) {
+        m_audioFile->ReleaseTrack(m_audioTrack);
+        m_audioTrack = nullptr;
+        m_audioFile = nullptr;
+    }
+    if (m_videoFile && m_videoTrack) {
+        m_videoFile->ReleaseTrack(m_videoTrack);
+        m_videoTrack = nullptr;
+        m_videoFile = nullptr;
+    }
 
     delete m_videoBuffer;
     m_videoBuffer = nullptr;
@@ -352,7 +362,11 @@ void MediaPlayerPrivate::playCallback(void* cookie, void* buffer,
                 p->m_player.timeChanged();
             });
 
-            player->m_audioTrack = nullptr;
+            if (player->m_audioFile) {
+                player->m_audioFile->ReleaseTrack(player->m_audioTrack);
+                player->m_audioTrack = nullptr;
+                player->m_audioFile = nullptr;
+            }
         }
     }
 
@@ -364,7 +378,11 @@ void MediaPlayerPrivate::playCallback(void* cookie, void* buffer,
             int64 count;
             if (player->m_videoTrack->ReadFrames(player->m_videoBuffer->Bits(),
                 &count) != B_OK) {
-                player->m_videoTrack = nullptr;
+                if (player->m_videoFile) {
+                    player->m_videoFile->ReleaseTrack(player->m_videoTrack);
+                    player->m_videoTrack = nullptr;
+                    player->m_videoFile = nullptr;
+                }
             } else {
                  BAutolock lock(player->m_drawLock);
                  std::swap(player->m_videoBuffer, player->m_drawBuffer);
@@ -643,12 +661,13 @@ void MediaPlayerPrivate::IdentifyTracks(WeakPtr<MediaPlayerPrivate> weakSelf, co
 
     status_t err = mediaFile ? mediaFile->InitCheck() : B_ERROR;
 
-    m_mediaLock.Lock();
-    if (mediaFile && err == B_OK)
-        m_mediaFiles.append(mediaFile);
-    else if (mediaFile)
-        delete mediaFile;
-    m_mediaLock.Unlock();
+    {
+        BAutolock lock(m_mediaLock);
+        if (mediaFile && err == B_OK)
+            m_mediaFiles.append(mediaFile);
+        else if (mediaFile)
+            delete mediaFile;
+    }
 
     if (err == B_OK) {
         for (int i = mediaFile->CountTracks() - 1; i >= 0; i--)
@@ -668,7 +687,7 @@ void MediaPlayerPrivate::IdentifyTracks(WeakPtr<MediaPlayerPrivate> weakSelf, co
                  continue;
             }
 
-            m_mediaLock.Lock();
+            BAutolock lock(m_mediaLock);
             if (format.IsVideo()) {
                 if (!m_videoTrack) {
                     // Request B_RGB32 for video to avoid software conversion during blit
@@ -680,12 +699,12 @@ void MediaPlayerPrivate::IdentifyTracks(WeakPtr<MediaPlayerPrivate> weakSelf, co
                          if (track->DecodedFormat(&format) != B_OK) {
                              LOG(Media, "MediaPlayerPrivateHaiku: Failed to get any decoded format for video track %d", i);
                              mediaFile->ReleaseTrack(track);
-                             m_mediaLock.Unlock();
                              continue;
                          }
                     }
 
                     m_videoTrack = track;
+                    m_videoFile = mediaFile;
                     delete m_videoBuffer;
                     m_videoBuffer = new BBitmap(
                         BRect(0, 0, format.Width() - 1, format.Height() - 1),
@@ -713,6 +732,7 @@ void MediaPlayerPrivate::IdentifyTracks(WeakPtr<MediaPlayerPrivate> weakSelf, co
                         m_audioTrack = nullptr;
                         mediaFile->ReleaseTrack(track);
                     } else {
+                        m_audioFile = mediaFile;
                         m_soundPlayer->SetVolume(m_volume);
                         if (!m_paused)
                             m_soundPlayer->Start();
@@ -723,7 +743,6 @@ void MediaPlayerPrivate::IdentifyTracks(WeakPtr<MediaPlayerPrivate> weakSelf, co
             } else {
                 mediaFile->ReleaseTrack(track);
             }
-            m_mediaLock.Unlock();
         }
     } else {
         LOG(Media, "MediaPlayerPrivateHaiku: Failed to init BMediaFile: %s", strerror(err));
