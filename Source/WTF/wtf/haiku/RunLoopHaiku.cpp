@@ -71,7 +71,8 @@ class LoopHandler: public BHandler
             } else if (message->what == 'tmrf') {
                 RunLoop::TimerBase* timer
                     = (RunLoop::TimerBase*)message->GetPointer("timer");
-                if (timer && m_activeTimers.contains(timer))
+                uint64_t generation = message->GetUInt64("generation", 0);
+                if (timer && m_activeTimers.contains(timer) && timer->m_generation == generation)
                     timer->timerFired();
             } else {
                 BHandler::MessageReceived(message);
@@ -212,9 +213,11 @@ void RunLoop::TimerBase::start(Seconds nextFireInterval, bool repeat)
     m_isRepeating = repeat;
     m_interval = nextFireInterval;
     m_nextFireDate = MonotonicTime::now() + m_interval;
+    m_generation++;
 
     BMessage* message = new BMessage('tmrf');
     message->AddPointer("timer", this);
+    message->AddUInt64("generation", m_generation);
 
     bigtime_t interval = (bigtime_t)nextFireInterval.microseconds();
 

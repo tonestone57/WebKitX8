@@ -137,11 +137,15 @@ static void recursiveDelete(BDirectory& dir)
     BEntry entry;
     dir.Rewind();
     while (dir.GetNextEntry(&entry) == B_OK) {
-        if (entry.IsDirectory()) {
+        if (entry.IsSymLink()) {
+            entry.Remove();
+        } else if (entry.IsDirectory()) {
             BDirectory subDir(&entry);
             recursiveDelete(subDir);
+            entry.Remove();
+        } else {
+            entry.Remove();
         }
-        entry.Remove();
     }
 }
 
