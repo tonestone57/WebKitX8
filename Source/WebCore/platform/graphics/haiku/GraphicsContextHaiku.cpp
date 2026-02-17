@@ -361,6 +361,7 @@ void GraphicsContextHaiku::fillRect(const FloatRect& rect, const Color& color)
     }
     // cannot be async because bitmap might change before the draw is executed
     m_view->DrawTiledBitmap(m_fillBitmap, BRect(rect));
+    m_view->Sync();
     m_fillBitmap->Unlock();
 }
 
@@ -387,6 +388,14 @@ void GraphicsContextHaiku::fillRect(const FloatRect& rect, RequiresClipToRect re
         return;
     }
 
+    if (compositeOperation() == CompositeOperator::SourceOver) {
+        m_view->PushState();
+        m_view->SetHighColor(r, g, b, a);
+        m_view->FillRect(rect);
+        m_view->PopState();
+        return;
+    }
+
     // FillRect doesn't respect blending modes, DrawBitmap does
     const uint32_t c = ((a << 24) | (r << 16) | (g << 8) | b);
     m_fillBitmap->Lock();
@@ -396,6 +405,7 @@ void GraphicsContextHaiku::fillRect(const FloatRect& rect, RequiresClipToRect re
     }
     // cannot be async because bitmap might change before the draw is executed
     m_view->DrawTiledBitmap(m_fillBitmap, BRect(rect));
+    m_view->Sync();
     m_fillBitmap->Unlock();
 }
 

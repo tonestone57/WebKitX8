@@ -110,12 +110,7 @@ WTF::RefPtr<WebCore::NativeImage> ImageBufferHaikuSurfaceBackend::copyNativeImag
 
 WTF::RefPtr<WebCore::NativeImage> ImageBufferHaikuSurfaceBackend::createNativeImageReference()
 {
-    if (m_data.m_view)
-        m_data.m_view->Sync();
-
-    // This just creates a new reference to the existing BBitmap
-    PlatformImagePtr ref = m_data.m_image;
-    return NativeImage::create(std::move(ref));
+    return copyNativeImage();
 }
 
 

@@ -71,6 +71,8 @@ private:
     // - Whether data can be received.
     // - Synchronizing cancellation via m_handler.
     BLocker m_receiveMutex;
+    sem_id m_verificationSem { -1 };
+    bool m_verificationResult { false };
 };
 
 class BUrlProtocolHandler : public ThreadSafeRefCounted<BUrlProtocolHandler> {

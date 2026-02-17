@@ -138,16 +138,26 @@ void BUrlRequestWrapper::abort()
 {
     ASSERT(isMainThread());
 
+    bool locked = false;
+
     // Lock if we have already unblocked the receive thread to
     // synchronize cancellation status.
-    if (!m_receiveMutex.IsLocked())
+    if (!m_receiveMutex.IsLocked()) {
         m_receiveMutex.Lock();
+        locked = true;
+    }
 
     m_handler = nullptr;
 
     // If the receive thread is still blocked, unblock it so that it
     // become aware of the state change.
-    m_receiveMutex.Unlock();
+    if (locked) {
+        if (m_verificationSem >= 0) {
+            delete_sem(m_verificationSem);
+            m_verificationSem = -1;
+        }
+        m_receiveMutex.Unlock();
+    }
 
     if (m_request)
         m_request->Stop();
@@ -190,6 +200,8 @@ void BUrlRequestWrapper::HeadersReceived(BPrivate::Network::BUrlRequest* caller)
         if (!m_handler)
             return;
 
+        RefPtr<BUrlProtocolHandler> protectedHandler(m_handler);
+
         ResourceResponse response(url, mimeType, length, charset);
         if (suggestedFilename)
             response.setSuggestedFilename(*suggestedFilename);
@@ -202,16 +214,16 @@ void BUrlRequestWrapper::HeadersReceived(BPrivate::Network::BUrlRequest* caller)
                 response.setHTTPHeaderField(header.first, header.second);
 
             if (response.isRedirection() && !response.httpHeaderField(HTTPHeaderName::Location).isEmpty()) {
-                m_handler->willSendRequest(response);
+                protectedHandler->willSendRequest(response);
                 return;
             }
 
-            if (response.httpStatusCode() == 401 && m_handler->didReceiveAuthenticationChallenge(response))
+            if (response.httpStatusCode() == 401 && protectedHandler->didReceiveAuthenticationChallenge(response))
                 return;
         }
 
         ResourceResponse responseCopy = response;
-        m_handler->didReceiveResponse(WTFMove(responseCopy));
+        protectedHandler->didReceiveResponse(WTFMove(responseCopy));
     });
 }
 
@@ -222,7 +234,8 @@ void BUrlRequestWrapper::UploadProgress(BPrivate::Network::BUrlRequest*, off_t b
         if (!m_handler)
             return;
 
-        m_handler->didSendData(bytesSent, bytesTotal);
+        RefPtr<BUrlProtocolHandler> protectedHandler(m_handler);
+        protectedHandler->didSendData(bytesSent, bytesTotal);
     });
 }
 
@@ -246,40 +259,57 @@ void BUrlRequestWrapper::RequestCompleted(BPrivate::Network::BUrlRequest* caller
         if (!m_handler)
             return;
 
+        RefPtr<BUrlProtocolHandler> protectedHandler(m_handler);
+
         if (success || (httpStatusCode && m_didReceiveData)) {
-            m_handler->didFinishLoading();
+            protectedHandler->didFinishLoading();
             return;
         }
         if (httpStatusCode) {
             ResourceError error(ASCIILiteral::fromLiteralUnsafe("HTTP"), httpStatusCode,
                 url, String::fromUTF8(strerror(status)));
-            m_handler->didFail(error);
+            protectedHandler->didFail(error);
             return;
         }
 
         ResourceError error(ASCIILiteral::fromLiteralUnsafe("BUrlRequest"), status, url, String::fromUTF8(strerror(status)));
-        m_handler->didFail(error);
+        protectedHandler->didFail(error);
     });
 }
 
 bool BUrlRequestWrapper::CertificateVerificationFailed(BPrivate::Network::BUrlRequest*,
     BCertificate& certificate, const char* message)
 {
-    bool result = false;
-    sem_id sem = create_sem(0, "CertVerification");
+    m_receiveMutex.Lock();
+    if (!m_handler) {
+        m_receiveMutex.Unlock();
+        return false;
+    }
+    m_verificationSem = create_sem(0, "CertVerification");
+    m_verificationResult = false;
+    m_receiveMutex.Unlock();
 
     // We can't copy BCertificate easily (it's Haiku object), but we block so reference is valid
-    callOnMainThread([&] {
+    callOnMainThread([protectedThis = Ref { *this }, &certificate, message] {
         {
-            BAutolock lock(m_receiveMutex);
-            if (m_handler)
-                result = m_handler->didReceiveInvalidCertificate(certificate, message);
+            BAutolock lock(protectedThis->m_receiveMutex);
+            if (protectedThis->m_handler)
+                protectedThis->m_verificationResult = protectedThis->m_handler->didReceiveInvalidCertificate(certificate, message);
+            if (protectedThis->m_verificationSem >= 0)
+                release_sem(protectedThis->m_verificationSem);
         }
-        release_sem(sem);
     });
 
-    acquire_sem(sem);
-    delete_sem(sem);
+    status_t error = acquire_sem(m_verificationSem);
+
+    m_receiveMutex.Lock();
+    if (m_verificationSem >= 0) {
+        delete_sem(m_verificationSem);
+        m_verificationSem = -1;
+    }
+    bool result = (error == B_OK && m_verificationResult);
+    m_receiveMutex.Unlock();
+
     return result;
 }
 
@@ -296,8 +326,10 @@ ssize_t BUrlRequestWrapper::Write(const void* data, size_t size)
         auto buffer = SharedBuffer::create(reinterpret_cast<const char*>(data), size);
 
         callOnMainThread([this, protectedThis = Ref { *this }, buffer = WTFMove(buffer)]() mutable {
-            if (m_handler)
-                m_handler->didReceiveBuffer(WTFMove(buffer));
+            if (m_handler) {
+                RefPtr<BUrlProtocolHandler> protectedHandler(m_handler);
+                protectedHandler->didReceiveBuffer(WTFMove(buffer));
+            }
         });
     }
 

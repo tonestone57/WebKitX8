@@ -107,12 +107,12 @@ void ComplexTextController::collectComplexTextRunsForCharacters(std::span<const 
         if (glyphCount == 0)
             continue;
 
-        BPoint escapements[glyphCount];
-        BPoint offsets[glyphCount];
+        Vector<BPoint> escapements(glyphCount);
+        Vector<BPoint> offsets(glyphCount);
         BFont bfont = *font->platformData().font();
         float fontSize = bfont.Size();
 
-        bfont.GetEscapements(utf8, glyphCount, NULL, escapements, offsets);
+        bfont.GetEscapements(utf8, glyphCount, NULL, escapements.data(), offsets.data());
         for (unsigned i = 0; i < glyphCount; i++) {
             advances.append(FloatSize(escapements[i].x * fontSize, escapements[i].y * fontSize));
             origins.append(FloatPoint(offsets[i].x * fontSize, offsets[i].y * fontSize));
