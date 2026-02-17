@@ -200,6 +200,8 @@ void BUrlRequestWrapper::HeadersReceived(BPrivate::Network::BUrlRequest* caller)
         if (!m_handler)
             return;
 
+        RefPtr<BUrlProtocolHandler> protectedHandler(m_handler);
+
         ResourceResponse response(url, mimeType, length, charset);
         if (suggestedFilename)
             response.setSuggestedFilename(*suggestedFilename);
@@ -212,16 +214,16 @@ void BUrlRequestWrapper::HeadersReceived(BPrivate::Network::BUrlRequest* caller)
                 response.setHTTPHeaderField(header.first, header.second);
 
             if (response.isRedirection() && !response.httpHeaderField(HTTPHeaderName::Location).isEmpty()) {
-                m_handler->willSendRequest(response);
+                protectedHandler->willSendRequest(response);
                 return;
             }
 
-            if (response.httpStatusCode() == 401 && m_handler->didReceiveAuthenticationChallenge(response))
+            if (response.httpStatusCode() == 401 && protectedHandler->didReceiveAuthenticationChallenge(response))
                 return;
         }
 
         ResourceResponse responseCopy = response;
-        m_handler->didReceiveResponse(WTFMove(responseCopy));
+        protectedHandler->didReceiveResponse(WTFMove(responseCopy));
     });
 }
 
@@ -232,7 +234,8 @@ void BUrlRequestWrapper::UploadProgress(BPrivate::Network::BUrlRequest*, off_t b
         if (!m_handler)
             return;
 
-        m_handler->didSendData(bytesSent, bytesTotal);
+        RefPtr<BUrlProtocolHandler> protectedHandler(m_handler);
+        protectedHandler->didSendData(bytesSent, bytesTotal);
     });
 }
 
@@ -256,19 +259,21 @@ void BUrlRequestWrapper::RequestCompleted(BPrivate::Network::BUrlRequest* caller
         if (!m_handler)
             return;
 
+        RefPtr<BUrlProtocolHandler> protectedHandler(m_handler);
+
         if (success || (httpStatusCode && m_didReceiveData)) {
-            m_handler->didFinishLoading();
+            protectedHandler->didFinishLoading();
             return;
         }
         if (httpStatusCode) {
             ResourceError error(ASCIILiteral::fromLiteralUnsafe("HTTP"), httpStatusCode,
                 url, String::fromUTF8(strerror(status)));
-            m_handler->didFail(error);
+            protectedHandler->didFail(error);
             return;
         }
 
         ResourceError error(ASCIILiteral::fromLiteralUnsafe("BUrlRequest"), status, url, String::fromUTF8(strerror(status)));
-        m_handler->didFail(error);
+        protectedHandler->didFail(error);
     });
 }
 
@@ -321,8 +326,10 @@ ssize_t BUrlRequestWrapper::Write(const void* data, size_t size)
         auto buffer = SharedBuffer::create(reinterpret_cast<const char*>(data), size);
 
         callOnMainThread([this, protectedThis = Ref { *this }, buffer = WTFMove(buffer)]() mutable {
-            if (m_handler)
-                m_handler->didReceiveBuffer(WTFMove(buffer));
+            if (m_handler) {
+                RefPtr<BUrlProtocolHandler> protectedHandler(m_handler);
+                protectedHandler->didReceiveBuffer(WTFMove(buffer));
+            }
         });
     }
 
