@@ -105,10 +105,11 @@ void MemoryPressureHandler::install()
                 uint64_t freeMemory = (uint64_t)info.free_memory + ((uint64_t)info.cached_pages * B_PAGE_SIZE);
                 uint64_t totalMemory = (uint64_t)info.max_pages * B_PAGE_SIZE;
 
-                // Trigger if less than 64MB or 10% memory free
+                // Trigger if less than 64MB or (10% memory free AND less than 256MB free)
                 // Haiku VMs often run with 512MB RAM, so 128MB is too high (25%).
                 // 64MB is a safer floor for critical pressure.
-                if (freeMemory < 64 * 1024 * 1024 || (totalMemory > 0 && (double)freeMemory / totalMemory < 0.10)) {
+                // We cap the percentage check to avoid triggering on systems with large RAM (e.g. 16GB) when 1GB is free.
+                if (freeMemory < 64 * 1024 * 1024 || (totalMemory > 0 && (double)freeMemory / totalMemory < 0.10 && freeMemory < 256 * 1024 * 1024)) {
                     MemoryPressureHandler::singleton().triggerMemoryPressureEvent(true);
                 }
             }
