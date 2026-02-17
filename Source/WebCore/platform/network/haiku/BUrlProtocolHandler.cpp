@@ -138,16 +138,21 @@ void BUrlRequestWrapper::abort()
 {
     ASSERT(isMainThread());
 
+    bool locked = false;
+
     // Lock if we have already unblocked the receive thread to
     // synchronize cancellation status.
-    if (!m_receiveMutex.IsLocked())
+    if (!m_receiveMutex.IsLocked()) {
         m_receiveMutex.Lock();
+        locked = true;
+    }
 
     m_handler = nullptr;
 
     // If the receive thread is still blocked, unblock it so that it
     // become aware of the state change.
-    m_receiveMutex.Unlock();
+    if (locked)
+        m_receiveMutex.Unlock();
 
     if (m_request)
         m_request->Stop();
