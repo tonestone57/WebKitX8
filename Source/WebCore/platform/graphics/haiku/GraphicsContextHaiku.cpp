@@ -135,6 +135,7 @@ GraphicsContextHaiku::GraphicsContextHaiku(BView* view, RefPtr<BitmapRef> bitmap
 
 GraphicsContextHaiku::~GraphicsContextHaiku()
 {
+    delete m_fillBitmap;
 }
 
 // Draws a filled rectangle with a stroked border.
