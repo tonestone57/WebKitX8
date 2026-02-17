@@ -38,6 +38,7 @@
 #if OS(LINUX)
 #include <wtf/linux/CurrentProcessMemoryStatus.h>
 #elif OS(HAIKU)
+#include <OS.h>
 #include <wtf/haiku/CurrentProcessMemoryStatus.h>
 #elif OS(FREEBSD)
 #include <sys/sysctl.h>
@@ -62,6 +63,10 @@ static const Seconds s_minimumHoldOffTime { 5_s };
 static const Seconds s_maximumHoldOffTime { 30_s };
 static const size_t s_minimumBytesFreedToUseMinimumHoldOffTime = 1 * MB;
 static const unsigned s_holdOffMultiplier = 20;
+
+#if OS(HAIKU)
+static std::unique_ptr<RunLoop::Timer> s_memoryPressureTimer;
+#endif
 
 void MemoryPressureHandler::triggerMemoryPressureEvent(bool isCritical)
 {
@@ -89,6 +94,28 @@ void MemoryPressureHandler::install()
         return;
 
     m_installed = true;
+
+#if OS(HAIKU)
+    if (!s_memoryPressureTimer) {
+        s_memoryPressureTimer = makeUnique<RunLoop::Timer>(Ref { RunLoop::mainSingleton() }, "HaikuMemoryPressure"_s, [] {
+            system_info info;
+            if (get_system_info(&info) == B_OK) {
+                // Include cached pages as available memory since Haiku caches aggressively.
+                // Note: free_memory is in bytes, cached_pages is in pages.
+                uint64_t freeMemory = (uint64_t)info.free_memory + ((uint64_t)info.cached_pages * B_PAGE_SIZE);
+                uint64_t totalMemory = (uint64_t)info.max_pages * B_PAGE_SIZE;
+
+                // Trigger if less than 64MB or 10% memory free
+                // Haiku VMs often run with 512MB RAM, so 128MB is too high (25%).
+                // 64MB is a safer floor for critical pressure.
+                if (freeMemory < 64 * 1024 * 1024 || (totalMemory > 0 && (double)freeMemory / totalMemory < 0.10)) {
+                    MemoryPressureHandler::singleton().triggerMemoryPressureEvent(true);
+                }
+            }
+        });
+    }
+    s_memoryPressureTimer->startRepeating(10_s);
+#endif
 }
 
 void MemoryPressureHandler::uninstall()
@@ -97,6 +124,11 @@ void MemoryPressureHandler::uninstall()
         return;
 
     m_holdOffTimer.stop();
+
+#if OS(HAIKU)
+    if (s_memoryPressureTimer)
+        s_memoryPressureTimer->stop();
+#endif
 
     m_installed = false;
 }

@@ -57,7 +57,7 @@ private:
     size_t m_blobItemIndex { 0 };
 
     FileSystem::PlatformFileHandle m_fileHandle { FileSystem::invalidPlatformFileHandle };
-    size_t m_dataOffset { 0 };
+    uint64_t m_dataOffset { 0 };
 };
 
 };

@@ -35,6 +35,8 @@
 #include <stdio.h>
 #include <errno.h>
 
+#include <wtf/HashSet.h>
+
 namespace WTF {
 
 class LoopHandler: public BHandler
@@ -52,6 +54,16 @@ class LoopHandler: public BHandler
                 m_runLoop.m_handler = nullptr;
         }
 
+        void registerTimer(RunLoop::TimerBase* timer)
+        {
+            m_activeTimers.add(timer);
+        }
+
+        void unregisterTimer(RunLoop::TimerBase* timer)
+        {
+            m_activeTimers.remove(timer);
+        }
+
         void MessageReceived(BMessage* message) override
         {
             if (message->what == 'loop') {
@@ -59,7 +71,7 @@ class LoopHandler: public BHandler
             } else if (message->what == 'tmrf') {
                 RunLoop::TimerBase* timer
                     = (RunLoop::TimerBase*)message->GetPointer("timer");
-                if (timer)
+                if (timer && m_activeTimers.contains(timer))
                     timer->timerFired();
             } else {
                 BHandler::MessageReceived(message);
@@ -68,6 +80,7 @@ class LoopHandler: public BHandler
 
     private:
         RunLoop& m_runLoop;
+        HashSet<RunLoop::TimerBase*> m_activeTimers;
 };
 
 RunLoop::RunLoop()
@@ -206,12 +219,16 @@ void RunLoop::TimerBase::start(Seconds nextFireInterval, bool repeat)
     bigtime_t interval = (bigtime_t)nextFireInterval.microseconds();
 
     if (m_runLoop->m_handler) {
+        LoopHandler* handler = static_cast<LoopHandler*>(m_runLoop->m_handler);
+        handler->registerTimer(this);
+
         m_messageRunner = new BMessageRunner(m_runLoop->m_handler,
             message, interval, repeat ? -1 : 1);
 
         if (m_messageRunner->InitCheck() != B_OK) {
             delete m_messageRunner;
             m_messageRunner = nullptr;
+            handler->unregisterTimer(this);
         }
     }
     delete message;
@@ -224,8 +241,15 @@ bool RunLoop::TimerBase::isActive() const
 
 void RunLoop::TimerBase::stop()
 {
-    delete m_messageRunner;
-    m_messageRunner = nullptr;
+    if (m_messageRunner) {
+        delete m_messageRunner;
+        m_messageRunner = nullptr;
+
+        if (m_runLoop->m_handler) {
+            LoopHandler* handler = static_cast<LoopHandler*>(m_runLoop->m_handler);
+            handler->unregisterTimer(this);
+        }
+    }
 }
 
 Seconds RunLoop::TimerBase::secondsUntilFire() const
