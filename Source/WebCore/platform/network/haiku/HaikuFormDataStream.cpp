@@ -45,6 +45,7 @@ BFormDataIO::BFormDataIO(const FormData* formData, PAL::SessionID sessionID)
 
 BFormDataIO::~BFormDataIO()
 {
+    FileSystem::closeFile(m_fileHandle);
 }
 
 ssize_t BFormDataIO::Size()
@@ -146,8 +147,8 @@ std::optional<size_t> BFormDataIO::readFromFile(const FormDataElement::EncodedFi
 
 std::optional<size_t> BFormDataIO::readFromData(const Vector<uint8_t>& data, char* buffer, size_t size)
 {
-    size_t elementSize = data.size() - m_dataOffset;
-    const uint8_t* elementBuffer = data.data() + m_dataOffset;
+    size_t elementSize = data.size() - (size_t)m_dataOffset;
+    const uint8_t* elementBuffer = data.data() + (size_t)m_dataOffset;
 
     size_t readBytes = elementSize > size ? size : elementSize;
     memcpy(buffer, elementBuffer, readBytes);
@@ -171,13 +172,13 @@ std::optional<size_t> BFormDataIO::readFromBlob(const FormDataElement::EncodedBl
 		return std::nullopt;
 
 	auto& blobItem = blobData->items().at(m_blobItemIndex);
-	off_t readBytes;
+	ssize_t readBytes = 0;
 
     switch (blobItem.type()) {
 		case BlobDataItem::Type::Data:
 		{
-			size_t elementSize = blobItem.data()->size() - m_dataOffset;
-			const uint8_t* elementBuffer = blobItem.data()->data() + m_dataOffset;
+			size_t elementSize = blobItem.data()->size() - (size_t)m_dataOffset;
+			const uint8_t* elementBuffer = blobItem.data()->data() + (size_t)m_dataOffset;
 
 			readBytes = elementSize > size ? size : elementSize;
 			memcpy(buffer, elementBuffer, readBytes);
@@ -196,30 +197,52 @@ std::optional<size_t> BFormDataIO::readFromBlob(const FormDataElement::EncodedBl
 		{
 			std::optional<WallTime> fileModificationTime = FileSystem::fileModificationTime(blobItem.file()->path());
 			if (fileModificationTime
-					&& fileModificationTime == blobItem.file()->expectedModificationTime())
+					&& fileModificationTime == blobItem.file()->expectedModificationTime()) {
 				m_fileHandle = FileSystem::openFile(blobItem.file()->path(), FileSystem::FileOpenMode::Read);
 
-			// FIXME the blob can specify an offset and chunk size inside the file
-			// So we should seek there and make sure we stop at the right time.
+                if (FileSystem::isHandleValid(m_fileHandle)) {
+                    // Seek to the starting offset for this blob item + any progress we made
+                    FileSystem::seekFile(m_fileHandle, blobItem.offset() + m_dataOffset, FileSystem::FileSeekOrigin::Beginning);
+                }
+            }
 		}
-
 
 		if (!FileSystem::isHandleValid(m_fileHandle)) {
 			LOG(Network, "Haiku - Failed while trying to open %s for upload\n", blobItem.file()->path().utf8().data());
 			m_fileHandle = FileSystem::invalidPlatformFileHandle;
 			readBytes = -1;
 		} else {
-			// Note: there is no management of a file offset, we just keep the file
-			// handle open and read from the current position.
-			readBytes = FileSystem::readFromFile(m_fileHandle, buffer, size);
+            size_t bytesToRead = size;
+            // Respect the length of the blob item slice if specified
+            if (blobItem.length() != BlobDataItem::toEndOfFile) {
+                uint64_t remaining = (uint64_t)blobItem.length() - m_dataOffset;
+                if (bytesToRead > remaining)
+                    bytesToRead = (size_t)remaining;
+            }
+
+            if (bytesToRead == 0) {
+                readBytes = 0;
+            } else {
+			    readBytes = FileSystem::readFromFile(m_fileHandle, buffer, bytesToRead);
+            }
+
 			if (readBytes < 0) {
 				LOG(Network, "Haiku - Failed while trying to read %s for upload\n", blobItem.file()->path().utf8().data());
 			}
 		}
 
-		if (readBytes <= 0) {
+        if (readBytes > 0)
+            m_dataOffset += readBytes;
+
+        bool done = false;
+        if (readBytes < 0) done = true; // Error
+        else if (readBytes == 0) done = true; // EOF or limit reached
+        else if (blobItem.length() != BlobDataItem::toEndOfFile && m_dataOffset >= (uint64_t)blobItem.length()) done = true;
+
+		if (done) {
 			FileSystem::closeFile(m_fileHandle);
 			m_fileHandle = FileSystem::invalidPlatformFileHandle;
+            m_dataOffset = 0;
 			m_blobItemIndex++;
 		}
     }
@@ -227,7 +250,7 @@ std::optional<size_t> BFormDataIO::readFromBlob(const FormDataElement::EncodedBl
     }
 
 	// Should we advance to the next form element yet?
-	if (m_blobItemIndex > blobData->items().size())
+	if (m_blobItemIndex >= blobData->items().size())
 	{
 		m_elementPosition++;
 		m_blobItemIndex = 0;
@@ -235,7 +258,7 @@ std::optional<size_t> BFormDataIO::readFromBlob(const FormDataElement::EncodedBl
 
 	if (readBytes < 0)
 		return std::nullopt;
-    return readBytes;
+    return (size_t)readBytes;
 }
 
 };
