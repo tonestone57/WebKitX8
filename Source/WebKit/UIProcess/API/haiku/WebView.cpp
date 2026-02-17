@@ -59,11 +59,11 @@ BWebView::BWebView(BRect frame, BWindow* myWindow)
     RefPtr<WebPreferences> prefs = WebPreferences::create(String(), "WebKit2."_s, "WebKit2."_s);
     prefs->setDeveloperExtrasEnabled(true);
     prefs->setAcceleratedCompositingEnabled(false);
-    config->setPreferences(std::move(prefs));
+    config->setPreferences(WTFMove(prefs));
 
     RefPtr<API::ProcessPoolConfiguration> apiConfiguration = API::ProcessPoolConfiguration::create();
     RefPtr<WebProcessPool> processPool = WebProcessPool::create(*apiConfiguration.get());
-    config->setProcessPool(std::move(processPool));
+    config->setProcessPool(WTFMove(processPool));
 
     fWebViewBase = WebViewBase::create("Webkit", frame, myWindow, *config.get());
 }

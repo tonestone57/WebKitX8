@@ -194,7 +194,7 @@ void BUrlRequestWrapper::HeadersReceived(BPrivate::Network::BUrlRequest* caller)
         if (suggestedFilename)
             response.setSuggestedFilename(*suggestedFilename);
 
-        if (statusCode != 0) {
+        if (statusCode) {
             response.setHTTPStatusCode(statusCode);
             response.setHTTPStatusText(AtomString { statusText });
 
@@ -246,10 +246,11 @@ void BUrlRequestWrapper::RequestCompleted(BPrivate::Network::BUrlRequest* caller
         if (!m_handler)
             return;
 
-        if (success || (httpStatusCode != 0 && m_didReceiveData)) {
+        if (success || (httpStatusCode && m_didReceiveData)) {
             m_handler->didFinishLoading();
             return;
-        } else if (httpStatusCode != 0) {
+        }
+        if (httpStatusCode) {
             ResourceError error(ASCIILiteral::fromLiteralUnsafe("HTTP"), httpStatusCode,
                 url, String::fromUTF8(strerror(status)));
             m_handler->didFail(error);
@@ -271,9 +272,8 @@ bool BUrlRequestWrapper::CertificateVerificationFailed(BPrivate::Network::BUrlRe
     callOnMainThread([&] {
         {
             BAutolock lock(m_receiveMutex);
-            if (m_handler) {
+            if (m_handler)
                 result = m_handler->didReceiveInvalidCertificate(certificate, message);
-            }
         }
         release_sem(sem);
     });
@@ -295,7 +295,7 @@ ssize_t BUrlRequestWrapper::Write(const void* data, size_t size)
 
         auto buffer = SharedBuffer::create(reinterpret_cast<const char*>(data), size);
 
-        callOnMainThread([this, protectedThis = Ref{*this}, buffer = WTFMove(buffer)]() mutable {
+        callOnMainThread([this, protectedThis = Ref { *this }, buffer = WTFMove(buffer)]() mutable {
             if (m_handler)
                 m_handler->didReceiveBuffer(WTFMove(buffer));
         });
