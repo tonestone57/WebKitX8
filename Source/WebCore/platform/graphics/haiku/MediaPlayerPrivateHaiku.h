@@ -130,6 +130,8 @@ private:
         Vector<BMediaFile*> m_mediaFiles;
         BMediaTrack* m_audioTrack;
         BMediaTrack* m_videoTrack;
+        BMediaFile* m_audioFile;
+        BMediaFile* m_videoFile;
         BSoundPlayer* m_soundPlayer;
         BBitmap* m_videoBuffer;
         BBitmap* m_drawBuffer;

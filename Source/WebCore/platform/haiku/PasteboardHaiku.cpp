@@ -512,13 +512,14 @@ String Pasteboard::readString(const String& type)
     PasteboardTransaction transaction(context());
     if (transaction.isValid()) {
         BMessage* data = transaction.message();
-        const char* buffer;
-        ssize_t bufferLength;
+        const char* buffer = nullptr;
+        ssize_t bufferLength = 0;
         if (data) {
-            data->FindData(type.utf8().data(), B_MIME_TYPE, 
-                reinterpret_cast<const void**>(&buffer), &bufferLength);
+            if (data->FindData(type.utf8().data(), B_MIME_TYPE,
+                reinterpret_cast<const void**>(&buffer), &bufferLength) == B_OK) {
+                result.SetTo(buffer, bufferLength);
+            }
         }
-        result.SetTo(buffer, bufferLength);
     }
 
     return String::fromUTF8(result.String());

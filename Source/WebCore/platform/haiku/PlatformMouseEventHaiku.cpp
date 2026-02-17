@@ -39,11 +39,11 @@ namespace WebCore {
 PlatformMouseEvent::PlatformMouseEvent(const BMessage* message)
     : PlatformEvent(PlatformEvent::Type::MouseMoved)
 {
-    BPoint where;
+    BPoint where(0, 0);
     if (message->FindPoint("be:view_where", &where) == B_OK)
         m_position = where;
 
-    BPoint screenWhere;
+    BPoint screenWhere(0, 0);
     if (message->FindPoint("screen_where", &screenWhere) == B_OK)
         m_globalPosition = screenWhere;
 

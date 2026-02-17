@@ -183,6 +183,8 @@ void ScrollbarThemeHaiku::paintScrollbarBackground(GraphicsContext& context, Scr
     rgb_color base = colorForScrollbar(B_CONTROL_BACKGROUND_COLOR,
         scrollbar.scrollableArea().useDarkAppearanceForScrollbars());
     BRect rect = trackRect(scrollbar, false);
+
+    view->PushState();
     view->SetHighColor(tint_color(base, B_DARKEN_2_TINT));
 
     enum orientation orientation;
@@ -208,6 +210,8 @@ void ScrollbarThemeHaiku::paintScrollbarBackground(GraphicsContext& context, Scr
     if (!scrollbar.enabled())
         flags |= BControlLook::B_DISABLED;
     be_control_look->DrawScrollBarBackground(view, rect, view->Bounds(), base, flags, orientation);
+
+    view->PopState();
 }
 
 void ScrollbarThemeHaiku::paintTrackBackground(GraphicsContext& context, Scrollbar& scrollbar, const IntRect& rect)

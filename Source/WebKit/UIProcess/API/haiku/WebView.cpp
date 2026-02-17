@@ -59,11 +59,11 @@ BWebView::BWebView(BRect frame, BWindow* myWindow)
     RefPtr<WebPreferences> prefs = WebPreferences::create(String(), "WebKit2."_s, "WebKit2."_s);
     prefs->setDeveloperExtrasEnabled(true);
     prefs->setAcceleratedCompositingEnabled(false);
-    config->setPreferences(std::move(prefs));
+    config->setPreferences(WTFMove(prefs));
 
     RefPtr<API::ProcessPoolConfiguration> apiConfiguration = API::ProcessPoolConfiguration::create();
     RefPtr<WebProcessPool> processPool = WebProcessPool::create(*apiConfiguration.get());
-    config->setProcessPool(std::move(processPool));
+    config->setProcessPool(WTFMove(processPool));
 
     fWebViewBase = WebViewBase::create("Webkit", frame, myWindow, *config.get());
 }
@@ -102,9 +102,9 @@ const char* BWebView::getCurrentURL()
 
 void BWebView::loadURI(BMessage* message)
 {
-    const char* uri;
-    message->FindString("url", &uri);
-    fWebViewBase->page()->loadRequest(URL { WTF::String::fromUTF8(uri) });
+    const char* uri = nullptr;
+    if (message->FindString("url", &uri) == B_OK && uri)
+        fWebViewBase->page()->loadRequest(URL { WTF::String::fromUTF8(uri) });
 }
 
 void BWebView::goForward()
