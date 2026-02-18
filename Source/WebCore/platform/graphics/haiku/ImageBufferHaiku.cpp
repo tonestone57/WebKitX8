@@ -232,8 +232,6 @@ Vector<uint8_t> encodeData(BBitmap* bitmap, const String& mimeType, std::optiona
             size_t newSize = m_position + size;
             if (newSize > m_vector.size())
                 m_vector.grow(newSize);
-            if (newSize > m_vector.size())
-                 m_vector.resize(newSize);
 
             memcpy(m_vector.data() + m_position, buffer, size);
             m_position += size;

@@ -138,12 +138,20 @@ void WebViewBase::MessageReceived(BMessage* message)
             MakeFocus(true);
             // fallthrough
         case B_MOUSE_UP:
-        case B_MOUSE_MOVED:
+        case B_MOUSE_MOVED: {
+            int32 buttons = 0;
+            if (message->FindInt32("buttons", &buttons) != B_OK)
+                buttons = 0;
+
+            message->AddInt32("webkit:last_buttons", fLastButtons);
+            fLastButtons = buttons;
+
             callOnMainRunLoop([weakThis = WeakPtr { *this }, message = *message](){
                 if (weakThis)
                     weakThis->fPage->handleMouseEvent(NativeWebMouseEvent(&message));
             });
             break;
+        }
         case B_KEY_DOWN:
         case B_KEY_UP:
         case B_UNMAPPED_KEY_DOWN:

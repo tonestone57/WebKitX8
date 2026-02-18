@@ -72,6 +72,7 @@ private:
 
     RefPtr<WebPageProxy> fPage;
     std::unique_ptr<PageClientImpl> fPageClient;
+    int32 fLastButtons { 0 };
 };
 
 }

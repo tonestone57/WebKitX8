@@ -531,14 +531,23 @@ void NetworkDataTaskHaiku::AuthenticationNeeded(BHttpRequest* request, const Res
         WebCore::ProtectionSpace::ServerType::HTTP, realm, scheme);
 
     // Using a default ResourceError as previousFailureCount
-    m_client->didReceiveAuthenticationChallenge(AuthenticationChallenge(protectionSpace, Credential(), 0, response, ResourceError()), NegotiatedLegacyTLS::No, [protectedThis = Ref { *this }](AuthenticationChallengeDisposition disposition, const Credential& credential) {
+    m_client->didReceiveAuthenticationChallenge(AuthenticationChallenge(protectionSpace, Credential(), 0, response, ResourceError()), NegotiatedLegacyTLS::No, [protectedThis = Ref { *this }, scheme](AuthenticationChallengeDisposition disposition, const Credential& credential) {
         if (disposition == AuthenticationChallengeDisposition::UseCredential && !credential.isEmpty()) {
             // Apply credentials to the request logic
             if (auto* httpRequest = dynamic_cast<BHttpRequest*>(protectedThis->m_request)) {
                 BHttpAuthentication& auth = httpRequest->Authentication();
                 auth.SetUserName(credential.user().utf8().data());
                 auth.SetPassword(credential.password().utf8().data());
-                auth.SetMethod(B_HTTP_AUTHENTICATION_BASIC); // Assuming basic for now, or infer from header
+
+                switch (scheme) {
+                case WebCore::ProtectionSpace::AuthenticationScheme::HTTPDigest:
+                    auth.SetMethod(B_HTTP_AUTHENTICATION_DIGEST);
+                    break;
+                case WebCore::ProtectionSpace::AuthenticationScheme::HTTPBasic:
+                default:
+                    auth.SetMethod(B_HTTP_AUTHENTICATION_BASIC);
+                    break;
+                }
             }
         }
     });
