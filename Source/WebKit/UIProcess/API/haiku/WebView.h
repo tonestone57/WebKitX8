@@ -25,6 +25,7 @@
 #pragma once
 
 #include <wtf/RefPtr.h>
+#include <wtf/WeakPtr.h>
 
 #include <memory>
 #include <Rect.h>
@@ -41,6 +42,7 @@ class WebViewBase;
 class BWebView {
 public:
     BWebView(BRect, BWindow*);
+    ~BWebView();
     void loadURIRequest(const char*); // use this in app to load a url
     void loadURI(BMessage*);
     void goForward();
@@ -56,7 +58,7 @@ public:
     const char* title();
 
 private:
-    RefPtr<WebKit::WebViewBase> fWebViewBase;
+    WeakPtr<WebKit::WebViewBase> fWebViewBase;
     RefPtr<WebKit::PageLoadStateObserver> fObserver;
     BLooper* fAppLooper;
 };
