@@ -33,6 +33,8 @@ namespace WebCore {
 
 struct CertificateSummary {
     String subject;
+    String issuer;
+    String fingerprint;
     Seconds validFrom;
     Seconds validUntil;
     Vector<String> dnsNames;

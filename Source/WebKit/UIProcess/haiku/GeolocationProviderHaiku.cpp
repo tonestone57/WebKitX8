@@ -47,6 +47,7 @@ GeolocationProviderHaiku::~GeolocationProviderHaiku()
 void GeolocationProviderHaiku::startUpdating(WebGeolocationManagerProxy& manager)
 {
     // FIXME: Implement real geolocation (e.g. IP-based fallback).
+    // Feature is currently deferred as per TASK_LIST.md.
     manager.providerDidFailToDeterminePosition("Geolocation not supported on Haiku yet."_s);
 }
 
