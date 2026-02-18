@@ -204,7 +204,7 @@ void NetworkDataTaskHaiku::runOnMainThread(Function<void()>&& task)
     if(isMainThread())
         task();
     else
-        callOnMainThreadAndWait(WTFMove(task));
+        callOnMainThread(WTFMove(task));
 }
 
 
@@ -292,26 +292,41 @@ void NetworkDataTaskHaiku::HeadersReceived(BUrlRequest* caller)
         ResourceRequest request = m_currentRequest;
         ResourceResponse responseCopy = response;
         request.setURL(url);
-        m_client->willPerformHTTPRedirection(WTFMove(responseCopy),WTFMove(request),
-            [this](const ResourceRequest& newRequest)
-            {
-                if(newRequest.isNull() || m_state == State::Canceling)
-                    return;
 
-                m_startTime = MonotonicTime::now();//network metrics
+        runOnMainThread([this, protectedThis = Ref { *this }, responseCopy = WTFMove(responseCopy), request = WTFMove(request)]() mutable {
+            if (m_state == State::Canceling || m_state == State::Completed)
+                return;
 
-                if( m_state != State::Suspended ){
-                    m_state = State::Suspended;
-                    resume();
-                }
+            if (m_client) {
+                m_client->willPerformHTTPRedirection(WTFMove(responseCopy),WTFMove(request),
+                    [protectedThis](const ResourceRequest& newRequest)
+                    {
+                        if(newRequest.isNull() || protectedThis->m_state == State::Canceling)
+                            return;
+
+                        protectedThis->m_startTime = MonotonicTime::now();//network metrics
+
+                        if( protectedThis->m_state != State::Suspended ){
+                            protectedThis->m_state = State::Suspended;
+                            protectedThis->resume();
+                        }
+                    }
+                );
             }
-        );
+        });
     } else {
         ResourceResponse responseCopy = response;
-        m_client->didReceiveResponse(WTFMove(responseCopy), NegotiatedLegacyTLS::No,
-            PrivateRelayed::No, [this](WebCore::PolicyAction policyAction){
-            if(m_state == State::Canceling || m_state == State::Completed){
+        runOnMainThread([this, protectedThis = Ref { *this }, responseCopy = WTFMove(responseCopy)]() mutable {
+            if (m_state == State::Canceling || m_state == State::Completed)
                 return;
+
+            if (m_client) {
+                m_client->didReceiveResponse(WTFMove(responseCopy), NegotiatedLegacyTLS::No,
+                    PrivateRelayed::No, [protectedThis](WebCore::PolicyAction policyAction){
+                    if(protectedThis->m_state == State::Canceling || protectedThis->m_state == State::Completed){
+                        return;
+                    }
+                });
             }
         });
     }
@@ -338,7 +353,11 @@ void NetworkDataTaskHaiku::DataReceived(BUrlRequest* caller, const char* data, o
         buffer.append((const uint8_t*)data, size);
 
         runOnMainThread([this, protectedThis = Ref { *this }, buffer = WTFMove(buffer)]() mutable {
-            m_client->didReceiveData(SharedBuffer::create(WTFMove(buffer)));
+            if (m_state == State::Canceling || m_state == State::Completed)
+                return;
+
+            if (m_client)
+                m_client->didReceiveData(SharedBuffer::create(WTFMove(buffer)));
         });
     }
 
@@ -360,6 +379,9 @@ void NetworkDataTaskHaiku::UploadProgress(BUrlRequest* caller, off_t bytesSent, 
 
     if (delta > 0 && m_client) {
         runOnMainThread([this, protectedThis = Ref { *this }, delta, bytesSent, bytesTotal]() {
+             if (m_state == State::Canceling || m_state == State::Completed)
+                 return;
+
              if (m_client)
                  m_client->didSendData(delta, bytesSent, bytesTotal);
         });
@@ -381,7 +403,7 @@ void NetworkDataTaskHaiku::RequestCompleted(BUrlRequest* caller, bool success)
         m_networkLoadMetrics.markComplete();
 
         runOnMainThread([this, protectedThis = Ref { *this }, error] {
-            if (m_client)
+            if (m_state != State::Canceling && m_client)
                 m_client->didCompleteWithError(error, m_networkLoadMetrics);
         });
         return;
@@ -391,7 +413,7 @@ void NetworkDataTaskHaiku::RequestCompleted(BUrlRequest* caller, bool success)
     m_networkLoadMetrics.markComplete();
 
     runOnMainThread([this, protectedThis = Ref { *this }] {
-        if (m_client)
+        if (m_state != State::Canceling && m_client)
             m_client->didFinishLoading(m_networkLoadMetrics);
     });
 }
@@ -429,7 +451,7 @@ void NetworkDataTaskHaiku::didReceiveData(const void* buffer, size_t size)
     dataVector.append((const uint8_t*)buffer, size);
 
     runOnMainThread([protectedThis = Ref { *this }, dataVector = WTFMove(dataVector)] {
-        if (protectedThis->m_client)
+        if (protectedThis->m_state != State::Canceling && protectedThis->m_client)
             protectedThis->m_client->didReceiveData(SharedBuffer::create(WTFMove(dataVector)));
     });
 }
@@ -531,24 +553,33 @@ void NetworkDataTaskHaiku::AuthenticationNeeded(BHttpRequest* request, const Res
         WebCore::ProtectionSpace::ServerType::HTTP, realm, scheme);
 
     // Using a default ResourceError as previousFailureCount
-    m_client->didReceiveAuthenticationChallenge(AuthenticationChallenge(protectionSpace, Credential(), 0, response, ResourceError()), NegotiatedLegacyTLS::No, [protectedThis = Ref { *this }, scheme](AuthenticationChallengeDisposition disposition, const Credential& credential) {
-        if (disposition == AuthenticationChallengeDisposition::UseCredential && !credential.isEmpty()) {
-            // Apply credentials to the request logic
-            if (auto* httpRequest = dynamic_cast<BHttpRequest*>(protectedThis->m_request)) {
-                BHttpAuthentication& auth = httpRequest->Authentication();
-                auth.SetUserName(credential.user().utf8().data());
-                auth.SetPassword(credential.password().utf8().data());
+    AuthenticationChallenge challenge(protectionSpace, Credential(), 0, response, ResourceError());
 
-                switch (scheme) {
-                case WebCore::ProtectionSpace::AuthenticationScheme::HTTPDigest:
-                    auth.SetMethod(B_HTTP_AUTHENTICATION_DIGEST);
-                    break;
-                case WebCore::ProtectionSpace::AuthenticationScheme::HTTPBasic:
-                default:
-                    auth.SetMethod(B_HTTP_AUTHENTICATION_BASIC);
-                    break;
+    runOnMainThread([this, protectedThis = Ref { *this }, challenge = WTFMove(challenge), scheme]() mutable {
+        if (m_state == State::Canceling || m_state == State::Completed)
+            return;
+
+        if (m_client) {
+            m_client->didReceiveAuthenticationChallenge(WTFMove(challenge), NegotiatedLegacyTLS::No, [protectedThis, scheme](AuthenticationChallengeDisposition disposition, const Credential& credential) {
+                if (disposition == AuthenticationChallengeDisposition::UseCredential && !credential.isEmpty()) {
+                    // Apply credentials to the request logic
+                    if (auto* httpRequest = dynamic_cast<BHttpRequest*>(protectedThis->m_request)) {
+                        BHttpAuthentication& auth = httpRequest->Authentication();
+                        auth.SetUserName(credential.user().utf8().data());
+                        auth.SetPassword(credential.password().utf8().data());
+
+                        switch (scheme) {
+                        case WebCore::ProtectionSpace::AuthenticationScheme::HTTPDigest:
+                            auth.SetMethod(B_HTTP_AUTHENTICATION_DIGEST);
+                            break;
+                        case WebCore::ProtectionSpace::AuthenticationScheme::HTTPBasic:
+                        default:
+                            auth.SetMethod(B_HTTP_AUTHENTICATION_BASIC);
+                            break;
+                        }
+                    }
                 }
-            }
+            });
         }
     });
 }
