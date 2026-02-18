@@ -435,7 +435,7 @@ private:
         printInfo.availablePaperHeight = printableRect.Height();
         printInfo.rect = IntRect(0, 0, printableRect.Width(), printableRect.Height());
 
-        m_page.computePagesForPrinting(m_frame, printInfo, [this, protectedThis = Ref { *this }](const Vector<IntRect>& pageRects, double totalScaleFactor, const WebCore::FloatBoxExtent&) {
+        m_page->computePagesForPrinting(m_frame, printInfo, [this, protectedThis = Ref { *this }](const Vector<IntRect>& pageRects, double totalScaleFactor, const WebCore::FloatBoxExtent&) {
             m_pageRects = pageRects;
             m_scaleFactor = totalScaleFactor;
             snapshotNextPage();
@@ -475,7 +475,7 @@ private:
         printInfo.availablePaperHeight = printableRect.Height();
         printInfo.rect = IntRect(0, 0, (int)printableRect.Width(), (int)printableRect.Height());
 
-        m_page.drawRectToImage(m_frame, printInfo, rect, snapshotSize, [this, protectedThis = Ref { *this }](std::optional<ShareableBitmap::Handle>&& imageHandle) {
+        m_page->drawRectToImage(m_frame, printInfo, rect, snapshotSize, [this, protectedThis = Ref { *this }](std::optional<ShareableBitmap::Handle>&& imageHandle) {
             if (imageHandle) {
                 m_snapshots.append(ShareableBitmap::create(WTFMove(*imageHandle)));
             } else {
@@ -542,7 +542,7 @@ private:
     }
 
     WeakPtr<WebViewBase> m_view;
-    WebPageProxy& m_page;
+    Ref<WebPageProxy> m_page;
     Ref<WebFrameProxy> m_frame;
     std::shared_ptr<BPrintJob> m_printJob;
     Vector<IntRect> m_pageRects;
