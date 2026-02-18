@@ -28,6 +28,7 @@ else ()
     platform/network/haiku/HaikuFormDataStream.cpp
     platform/network/haiku/ResourceHandleHaiku.cpp
     platform/network/haiku/ResourceRequestHaiku.cpp
+    platform/network/haiku/SynchronousLoaderClientHaiku.cpp
 
     platform/network/haiku/CredentialStorageHaiku.cpp
     platform/network/haiku/NetworkStorageSessionHaiku.cpp

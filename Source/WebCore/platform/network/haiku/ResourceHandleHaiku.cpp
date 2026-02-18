@@ -39,9 +39,6 @@
 #include "ResourceHandleInternal.h"
 #include "SharedBuffer.h"
 
-// TODO move to SynchronousLoaderClientHaiku.cpp
-#include "SynchronousLoaderClient.h"
-
 namespace WebCore {
 
 ResourceHandleInternal::~ResourceHandleInternal()
@@ -237,17 +234,6 @@ void ResourceHandle::platformSetDefersLoading(bool defers)
 
     /*if (d->m_job)
         d->m_job->setLoadMode(QNetworkReplyHandler::LoadMode(defers));*/
-}
-
-
-// TODO move to SynchronousLoaderClientHaiku.cpp
-void SynchronousLoaderClient::didReceiveAuthenticationChallenge(ResourceHandle*, const AuthenticationChallenge&)
-{
-}
-
-ResourceError SynchronousLoaderClient::platformBadResponseError()
-{
-    return ResourceError();
 }
 
 } // namespace WebCore
