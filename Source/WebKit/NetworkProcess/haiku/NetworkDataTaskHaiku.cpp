@@ -548,6 +548,9 @@ void NetworkDataTaskHaiku::AuthenticationNeeded(BHttpRequest* request, const Res
 
         if (m_client) {
             m_client->didReceiveAuthenticationChallenge(WTFMove(challenge), NegotiatedLegacyTLS::No, [protectedThis, scheme](AuthenticationChallengeDisposition disposition, const Credential& credential) {
+                if (protectedThis->m_state == State::Canceling || protectedThis->m_state == State::Completed)
+                    return;
+
                 if (disposition == AuthenticationChallengeDisposition::UseCredential && !credential.isEmpty()) {
                     // Apply credentials to the request logic
                     if (auto* httpRequest = dynamic_cast<BHttpRequest*>(protectedThis->m_request)) {
