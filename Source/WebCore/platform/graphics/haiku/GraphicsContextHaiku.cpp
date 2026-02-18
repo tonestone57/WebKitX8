@@ -352,38 +352,7 @@ void GraphicsContextHaiku::fillRect(const FloatRect& rect, const Color& color)
     }
 
     const uint32_t c = ((a << 24) | (r << 16) | (g << 8) | b);
-
-    BBitmap* bitmap = nullptr;
-    for (size_t i = 0; i < m_solidBitmaps.size(); ++i) {
-        if (m_solidBitmaps[i].first == c) {
-            bitmap = m_solidBitmaps[i].second;
-            if (i > 0) {
-                m_solidBitmaps.remove(i);
-                m_solidBitmaps.insert(0, { c, bitmap });
-            }
-            break;
-        }
-    }
-
-    if (!bitmap) {
-        if (m_solidBitmaps.size() >= 16) {
-            auto pair = m_solidBitmaps.takeLast();
-            bitmap = pair.second;
-            // Ensure nobody is reading it
-            m_view->Sync();
-        } else {
-            bitmap = new BBitmap(BRect(0, 0, 5, 5), B_RGBA32);
-        }
-
-        bitmap->Lock();
-        uint32_t* bits = reinterpret_cast<uint32_t*>(bitmap->Bits());
-        std::fill(bits, bits + bitmap->BitsLength() / 4, c);
-        bitmap->Unlock();
-
-        m_solidBitmaps.insert(0, { c, bitmap });
-    }
-
-    m_view->DrawTiledBitmap(bitmap, BRect(rect));
+    m_view->DrawTiledBitmap(solidBitmap(c), BRect(rect));
 }
 
 void GraphicsContextHaiku::fillRect(const FloatRect& rect, RequiresClipToRect requiresClipToRect)
@@ -419,38 +388,7 @@ void GraphicsContextHaiku::fillRect(const FloatRect& rect, RequiresClipToRect re
 
     // FillRect doesn't respect blending modes, DrawBitmap does
     const uint32_t c = ((a << 24) | (r << 16) | (g << 8) | b);
-
-    BBitmap* bitmap = nullptr;
-    for (size_t i = 0; i < m_solidBitmaps.size(); ++i) {
-        if (m_solidBitmaps[i].first == c) {
-            bitmap = m_solidBitmaps[i].second;
-            if (i > 0) {
-                m_solidBitmaps.remove(i);
-                m_solidBitmaps.insert(0, { c, bitmap });
-            }
-            break;
-        }
-    }
-
-    if (!bitmap) {
-        if (m_solidBitmaps.size() >= 16) {
-            auto pair = m_solidBitmaps.takeLast();
-            bitmap = pair.second;
-            // Ensure nobody is reading it
-            m_view->Sync();
-        } else {
-            bitmap = new BBitmap(BRect(0, 0, 5, 5), B_RGBA32);
-        }
-
-        bitmap->Lock();
-        uint32_t* bits = reinterpret_cast<uint32_t*>(bitmap->Bits());
-        std::fill(bits, bits + bitmap->BitsLength() / 4, c);
-        bitmap->Unlock();
-
-        m_solidBitmaps.insert(0, { c, bitmap });
-    }
-
-    m_view->DrawTiledBitmap(bitmap, BRect(rect));
+    m_view->DrawTiledBitmap(solidBitmap(c), BRect(rect));
 }
 
 void GraphicsContextHaiku::fillRect(const WebCore::FloatRect& r, WebCore::Gradient& g, const WebCore::AffineTransform&, RequiresClipToRect requiresClipToRect)
@@ -1073,5 +1011,38 @@ void GraphicsContextHaiku::restore(GraphicsContextState::Purpose)
     m_view->PopState();
 }
 
+BBitmap* GraphicsContextHaiku::solidBitmap(uint32_t c)
+{
+    BBitmap* bitmap = nullptr;
+    for (size_t i = 0; i < m_solidBitmaps.size(); ++i) {
+        if (m_solidBitmaps[i].first == c) {
+            bitmap = m_solidBitmaps[i].second;
+            if (i > 0) {
+                m_solidBitmaps.remove(i);
+                m_solidBitmaps.insert(0, { c, bitmap });
+            }
+            break;
+        }
+    }
+
+    if (!bitmap) {
+        if (m_solidBitmaps.size() >= 16) {
+            auto pair = m_solidBitmaps.takeLast();
+            bitmap = pair.second;
+            // Ensure nobody is reading it
+            m_view->Sync();
+        } else {
+            bitmap = new BBitmap(BRect(0, 0, 5, 5), B_RGBA32);
+        }
+
+        bitmap->Lock();
+        uint32_t* bits = reinterpret_cast<uint32_t*>(bitmap->Bits());
+        std::fill(bits, bits + bitmap->BitsLength() / 4, c);
+        bitmap->Unlock();
+
+        m_solidBitmaps.insert(0, { c, bitmap });
+    }
+    return bitmap;
+}
 
 } // namespace WebCore
