@@ -37,6 +37,8 @@
 
 #include <span>
 #include <stack>
+#include <utility>
+#include <wtf/Vector.h>
 
 namespace WebCore {
 
@@ -106,12 +108,16 @@ public:
 
     void drawBitmap(BBitmap*, const FloatRect& destRect, const FloatRect& srcRect, const ImagePaintingOptions& = { });
     void drawBitmap(BBitmap*, const FloatSize& imageSize, const FloatRect& destRect, const FloatRect& tileRect, const AffineTransform& patternTransform, const FloatPoint& phase, const FloatSize& spacing, const ImagePaintingOptions& = { });
+
+private:
+    BBitmap* solidBitmap(uint32_t color);
+
     RefPtr<BitmapRef> m_bitmap;
         // Holds a reference to our backing bitmap. This could be a nullptr
         // and is not meant to be used directly. Use m_view instead.
     BView* m_view;
     BView* m_painter;
-    BBitmap* m_fillBitmap;
+    Vector<std::pair<uint32_t, BBitmap*>> m_solidBitmaps;
     pattern m_strokeStyle;
 
     DashArray m_dashArray;

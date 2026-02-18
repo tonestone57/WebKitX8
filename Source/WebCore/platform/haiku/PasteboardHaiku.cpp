@@ -540,20 +540,10 @@ void Pasteboard::clear()
 }
 
 #if ENABLE(DRAG_SUPPORT)
-static DragImageRef s_dragImage = nullptr;
-
 void Pasteboard::setDragImage(DragImage image, const IntPoint&)
 {
-    if (s_dragImage)
-        delete s_dragImage;
-    // We assume ownership of the bitmap
-    s_dragImage = image;
-}
-
-// Helper to access the drag image from DragClientHaiku
-DragImageRef platformDragImage()
-{
-    return s_dragImage;
+    if (auto* hContext = dynamic_cast<PasteboardContextHaiku*>(context()))
+        hContext->setDragImage(image);
 }
 #endif
 

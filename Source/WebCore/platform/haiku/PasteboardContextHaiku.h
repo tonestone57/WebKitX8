@@ -26,6 +26,7 @@
 #pragma once
 
 #include <WebCore/PasteboardContext.h>
+#include <Bitmap.h>
 #include <Message.h>
 
 namespace WebCore {
@@ -37,11 +38,26 @@ public:
     {
     }
 
+    ~PasteboardContextHaiku()
+    {
+        delete m_dragImage;
+    }
+
     bool hasMessage() const { return m_message != nullptr; }
     BMessage* message() const { return m_message; }
 
+    void setDragImage(BBitmap* image)
+    {
+        if (m_dragImage)
+            delete m_dragImage;
+        m_dragImage = image;
+    }
+
+    BBitmap* dragImage() const { return m_dragImage; }
+
 private:
     BMessage* m_message;
+    BBitmap* m_dragImage { nullptr };
 };
 
 } // namespace WebCore

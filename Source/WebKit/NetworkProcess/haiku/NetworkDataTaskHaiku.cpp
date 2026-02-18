@@ -215,9 +215,6 @@ void NetworkDataTaskHaiku::ConnectionOpened(BUrlRequest*)
 
 void NetworkDataTaskHaiku::HeadersReceived(BUrlRequest* caller)
 {
-    if (m_currentRequest.isNull())
-        return;
-
     const BHttpResult* httpResult = dynamic_cast<const BHttpResult*>(&caller->Result());
 
     WTF::String contentType = String::fromUTF8(caller->Result().ContentType().String());
@@ -272,9 +269,6 @@ void NetworkDataTaskHaiku::HeadersReceived(BUrlRequest* caller)
         }
     }
 
-    if (!m_client)
-        return;
-
     if (m_redirected) {
         m_redirectionTries--;
 
@@ -284,7 +278,11 @@ void NetworkDataTaskHaiku::HeadersReceived(BUrlRequest* caller)
 
             m_networkLoadMetrics.responseEnd = MonotonicTime::now();
             m_networkLoadMetrics.markComplete();
-            m_client->didCompleteWithError(error,m_networkLoadMetrics);
+
+            runOnMainThread([this, protectedThis = Ref { *this }, error] {
+                if (m_state != State::Canceling && m_state != State::Completed && m_client)
+                    m_client->didCompleteWithError(error, m_networkLoadMetrics);
+            });
             return;
         }
 
@@ -337,12 +335,6 @@ void NetworkDataTaskHaiku::DataReceived(BUrlRequest* caller, const char* data, o
     if (m_output)
         return;
 
-    if (m_currentRequest.isNull())
-        return;
-
-    if (!m_client)
-        return;
-
     // don't emit the "Document has moved here" type of HTML
     if (m_redirected)
         return;
@@ -390,11 +382,6 @@ void NetworkDataTaskHaiku::UploadProgress(BUrlRequest* caller, off_t bytesSent, 
 
 void NetworkDataTaskHaiku::RequestCompleted(BUrlRequest* caller, bool success)
 {
-    if (m_state == State::Canceling || m_state == State::Completed)
-        return;
-
-    m_state = State::Completed;
-
     if (!success) {
         ResourceError error(m_baseUrl.host().toString(), caller->Result().StatusCode(), m_baseUrl,
             String::fromUTF8(caller->Result().StatusText()));
@@ -403,8 +390,11 @@ void NetworkDataTaskHaiku::RequestCompleted(BUrlRequest* caller, bool success)
         m_networkLoadMetrics.markComplete();
 
         runOnMainThread([this, protectedThis = Ref { *this }, error] {
-            if (m_state != State::Canceling && m_client)
-                m_client->didCompleteWithError(error, m_networkLoadMetrics);
+            if (m_state != State::Canceling && m_state != State::Completed) {
+                m_state = State::Completed;
+                if (m_client)
+                    m_client->didCompleteWithError(error, m_networkLoadMetrics);
+            }
         });
         return;
     }
@@ -413,8 +403,11 @@ void NetworkDataTaskHaiku::RequestCompleted(BUrlRequest* caller, bool success)
     m_networkLoadMetrics.markComplete();
 
     runOnMainThread([this, protectedThis = Ref { *this }] {
-        if (m_state != State::Canceling && m_client)
-            m_client->didFinishLoading(m_networkLoadMetrics);
+        if (m_state != State::Canceling && m_state != State::Completed) {
+            m_state = State::Completed;
+            if (m_client)
+                m_client->didFinishLoading(m_networkLoadMetrics);
+        }
     });
 }
 
@@ -442,16 +435,13 @@ bool NetworkDataTaskHaiku::CertificateVerificationFailed(BUrlRequest* caller, BC
 
 void NetworkDataTaskHaiku::didReceiveData(const void* buffer, size_t size)
 {
-    if (!m_client || m_state == State::Canceling || m_state == State::Completed)
-        return;
-
     if (size == 0) return;
 
     Vector<uint8_t> dataVector;
     dataVector.append((const uint8_t*)buffer, size);
 
     runOnMainThread([protectedThis = Ref { *this }, dataVector = WTFMove(dataVector)] {
-        if (protectedThis->m_state != State::Canceling && protectedThis->m_client)
+        if (protectedThis->m_state != State::Canceling && protectedThis->m_state != State::Completed && protectedThis->m_client)
             protectedThis->m_client->didReceiveData(SharedBuffer::create(WTFMove(dataVector)));
     });
 }
@@ -474,9 +464,6 @@ void NetworkDataTaskHaiku::DebugMessage(BUrlRequest* caller, BUrlProtocolDebugMe
 
 void NetworkDataTaskHaiku::AuthenticationNeeded(BHttpRequest* request, const ResourceResponse& response)
 {
-    if (!m_client)
-        return;
-
     m_authFailureCount++;
     if (m_authFailureCount > 3) {
         // Give up after too many tries
