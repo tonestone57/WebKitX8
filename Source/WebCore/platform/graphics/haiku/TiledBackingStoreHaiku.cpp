@@ -37,13 +37,11 @@ namespace WebCore {
 
 PassRefPtr<Tile> TiledBackingStoreBackend::createTile(TiledBackingStore* backingStore, const Tile::Coordinate& tileCoordinate)
 {
-    puts("create store");
     return TileHaiku::create(backingStore, tileCoordinate);
 }
 
 void TiledBackingStoreBackend::paintCheckerPattern(GraphicsContext* context, const FloatRect& target)
 {
-    puts("···TILED PATTERN···");
     BView* v = context->platformContext();
     v->PushState();
 
