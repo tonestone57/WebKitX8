@@ -204,6 +204,7 @@ public:
         bool m_isRepeating { false };
         MonotonicTime m_nextFireDate;
         Seconds m_interval { 0_s };
+        uint64_t m_generation { 0 };
 #elif USE(GENERIC_EVENT_LOOP)
         bool isActiveWithLock() const WTF_REQUIRES_LOCK(m_runLoop->m_loopLock);
         void stopWithLock() WTF_REQUIRES_LOCK(m_runLoop->m_loopLock);

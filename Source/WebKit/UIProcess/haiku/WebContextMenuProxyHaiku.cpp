@@ -114,27 +114,16 @@ void WebContextMenuProxyHaiku::showContextMenuWithItems(Vector<Ref<WebContextMen
         return;
 
     // We need to keep the data alive while the menu runs.
-    // We convert Ref<WebContextMenuItem> to WebContextMenuItemData vector to handle ownership if needed,
-    // but actually WebContextMenuItem holds the data. Ref keeps it alive.
-    // 'items' is passed by rvalue ref, so we own it.
-    // We can just keep 'items' alive in this scope.
-
-    // However, populateMenu expects Vector<WebContextMenuItemData>.
-    // We need to extract data from Ref<WebContextMenuItem>.
-    Vector<WebContextMenuItemData> rootItems;
+    // We populate m_currentItems so that the pointers stored in BMessage stay valid
+    // throughout the menu's lifetime.
+    m_currentItems.clear();
     for (const auto& item : items)
-        rootItems.append(item->data());
-
-    // NOTE: 'rootItems' is a local vector. Pointers to its elements are stable ONLY if it doesn't reallocate.
-    // But 'rootItems' won't reallocate after population.
-    // Submenu items are inside WebContextMenuItemData, which are inside rootItems.
-    // Since WebContextMenuItemData owns its submenus (Vector<WebContextMenuItemData>),
-    // pointers to those inner elements are also stable as long as rootItems is not modified.
+        m_currentItems.append(item->data());
 
     m_menu = new BPopUpMenu("ContextMenu");
     m_menu->SetRadioMode(false); // Context menus usually don't behave like radio groups unless specified
 
-    populateMenu(m_menu, rootItems);
+    populateMenu(m_menu, m_currentItems);
 
     if (!m_webView.LockLooper()) return;
 

@@ -47,7 +47,7 @@ void currentProcessMemoryStatus(ProcessMemoryStatus& memoryStatus)
         memoryStatus.resident += area.ram_size;
 
         if (area.copy_count > 0)
-            memoryStatus.shared += area.size;
+            memoryStatus.shared += area.ram_size;
 
         if (area.protection & B_EXECUTE_AREA)
             memoryStatus.text += area.size;

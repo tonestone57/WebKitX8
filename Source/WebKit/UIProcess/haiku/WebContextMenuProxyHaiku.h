@@ -54,6 +54,7 @@ private:
 
     WebViewBase& m_webView;
     BPopUpMenu* m_menu;
+    Vector<WebContextMenuItemData> m_currentItems;
 };
 
 } // namespace WebKit
