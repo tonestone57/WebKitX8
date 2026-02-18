@@ -134,7 +134,9 @@ void WebDownloadPrivate::didReceiveDataOfLength(int encodedDataLength)
 {
     m_currentSize += encodedDataLength;
 
-    // FIXME: Report total size update, if m_currentSize greater than previous total size
+    if (m_currentSize > m_expectedSize)
+        m_expectedSize = m_currentSize;
+
     BMessage message(B_DOWNLOAD_PROGRESS);
     message.AddFloat("progress", m_currentSize * 100.0 / m_expectedSize);
     message.AddInt64("current size", m_currentSize);

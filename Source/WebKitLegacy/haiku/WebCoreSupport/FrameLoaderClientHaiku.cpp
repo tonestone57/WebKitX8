@@ -704,7 +704,7 @@ bool FrameLoaderClientHaiku::canShowMIMETypeAsHTML(const String& /*MIMEType*/) c
 bool FrameLoaderClientHaiku::canShowMIMEType(const String& mimeType) const
 {
     CALLED("%s", mimeType.utf8().data());
-    // FIXME: Usually, the mime type will have been detexted. This is supposed to work around
+    // FIXME: Usually, the mime type will have been detected. This is supposed to work around
     // downloading some empty files, that can be observed.
     if (!mimeType.length())
         return true;
