@@ -44,7 +44,6 @@ namespace WebKit {
 using namespace WebCore;
 
 int32_t WebEventFactory::currentMouseButtons = 0;
-WebMouseEventButton WebEventFactory::currentMouseButton = WebMouseEventButton::None;
 
 WebMouseEvent WebEventFactory::createWebMouseEvent(const BMessage* message)
 {
@@ -65,8 +64,15 @@ WebMouseEvent WebEventFactory::createWebMouseEvent(const BMessage* message)
         break;
     }
 
+    int32_t buttons = 0;
+    if (message->FindInt32("buttons", &buttons) != B_OK)
+        buttons = 0;
+
     int32_t previousMouseButtons = currentMouseButtons;
-    message->FindInt32("buttons", &currentMouseButtons);
+    if (message->FindInt32("webkit:last_buttons", &previousMouseButtons) != B_OK)
+        previousMouseButtons = currentMouseButtons;
+
+    currentMouseButtons = buttons;
 
     WebMouseEventButton button = WebMouseEventButton::None;
     if (type != WebEventType::MouseMove) {
@@ -77,13 +83,6 @@ WebMouseEvent WebEventFactory::createWebMouseEvent(const BMessage* message)
             button = WebMouseEventButton::Right;
         else if (changedButtons & B_PRIMARY_MOUSE_BUTTON)
             button = WebMouseEventButton::Left;
-
-        if (type == WebEventType::MouseDown)
-            currentMouseButton = button;
-        else if (type == WebEventType::MouseUp)
-            currentMouseButton = WebMouseEventButton::None;
-    } else {
-        button = currentMouseButton;
     }
 
     OptionSet<WebEventModifier> modifiers;
@@ -125,7 +124,7 @@ WebMouseEvent WebEventFactory::createWebMouseEvent(const BMessage* message)
     return WebMouseEvent(
         WebEvent { type, modifiers, timestamp },
         button,
-        static_cast<unsigned short>(currentMouseButtons), // simplistic mapping
+        static_cast<unsigned short>(buttons), // simplistic mapping
         IntPoint(viewPosition),
         IntPoint(globalPosition),
         static_cast<float>(deltaX),
