@@ -233,6 +233,38 @@ static String getSubjectName(const X509* x509)
     return bio.getDataAsString();
 }
 
+static String getIssuerName(const X509* x509)
+{
+    static const unsigned long flags = (ASN1_STRFLGS_RFC2253 | ASN1_STRFLGS_ESC_QUOTE | XN_FLAG_SEP_CPLUS_SPC | XN_FLAG_DN_REV | XN_FLAG_FN_NONE | XN_FLAG_SPC_EQ) & ~ASN1_STRFLGS_ESC_MSB;
+
+    auto issuerName = X509_get_issuer_name(x509);
+    if (!issuerName)
+        return String();
+
+    BIO bio;
+    auto length = X509_NAME_print_ex(bio.get(), issuerName, 0, flags);
+    if (length <= 0)
+        return String();
+
+    return bio.getDataAsString();
+}
+
+static String getFingerprint(const X509* x509)
+{
+    unsigned char md[EVP_MAX_MD_SIZE];
+    unsigned int n;
+    if (!X509_digest(x509, EVP_sha256(), md, &n))
+        return String();
+
+    StringBuilder builder;
+    for (unsigned int i = 0; i < n; i++) {
+        if (i > 0)
+            builder.append(':');
+        builder.append(hex(md[i], 2, Uppercase));
+    }
+    return builder.toString();
+}
+
 static std::optional<Seconds> convertASN1TimeToSeconds(const ASN1_TIME* ans1Time)
 {
     if (!ans1Time)
@@ -372,6 +404,9 @@ std::optional<WebCore::CertificateSummary> createSummaryInfo(const Vector<uint8_
     summaryInfo.subject = getCommonName(x509.get());
     if (summaryInfo.subject.isNull())
         summaryInfo.subject = getSubjectName(x509.get());
+
+    summaryInfo.issuer = getIssuerName(x509.get());
+    summaryInfo.fingerprint = getFingerprint(x509.get());
 
     if (auto notBefore = convertASN1TimeToSeconds(X509_get0_notBefore(x509.get())))
         summaryInfo.validFrom = *notBefore;

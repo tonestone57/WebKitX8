@@ -37,6 +37,8 @@
 #include "WebView.h"
 #include "WebViewConstants.h"
 
+#include <WebCore/CertificateInfo.h>
+
 #include <Alert.h>
 #include <Application.h>
 #include <interface/Bitmap.h>
@@ -285,11 +287,30 @@ void BWebWindow::MessageReceived(BMessage* message)
 
         message->FindString("text", &text);
 
+        WebCore::CertificateInfo* info;
+        if (message->FindPointer("certificate info", (void**)&info) == B_OK) {
+            if (auto summary = info->summary()) {
+                text << "\n\nCertificate Information:\n";
+                text << "Subject: " << summary->subject.utf8().data() << "\n";
+                text << "Issuer: " << summary->issuer.utf8().data() << "\n";
+                text << "Fingerprint: " << summary->fingerprint.utf8().data() << "\n";
+
+                auto formatDate = [](Seconds seconds) {
+                    time_t t = static_cast<time_t>(seconds.seconds());
+                    struct tm tm;
+                    localtime_r(&t, &tm);
+                    char buffer[64];
+                    strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &tm);
+                    return String::fromUTF8(buffer);
+                };
+
+                text << "Valid from: " << formatDate(summary->validFrom).utf8().data() << "\n";
+                text << "Valid until: " << formatDate(summary->validUntil).utf8().data() << "\n";
+            }
+        }
+
         BAlert* alert = new BAlert("Unsecure SSL certificate", text,
             "Continue", "Stop", NULL, B_WIDTH_AS_USUAL, B_WARNING_ALERT);
-        // TODO add information about the certificate to the alert
-        // (in a "details" area or so)
-        // (but this can be done in WebPositive as well)
 
         int button = alert->Go();
         BMessage reply;

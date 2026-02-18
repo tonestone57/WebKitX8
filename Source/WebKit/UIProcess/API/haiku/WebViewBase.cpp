@@ -52,6 +52,7 @@
 #include <Application.h>
 #include <Cursor.h>
 #include <Window.h>
+#include <ctime>
 
 #if USE(COORDINATED_GRAPHICS) || USE(TEXTURE_MAPPER)
 #include "DrawingAreaProxyCoordinatedGraphics.h"
@@ -102,16 +103,28 @@ void WebViewBase::MessageReceived(BMessage* message)
     switch (message->what)
     {
         case SHOW_CERTIFICATE_INFO: {
-            // TODO: Fetch actual certificate info from WebPage/NetworkProcess
-            // This requires plumping the cert info from NetworkDataTaskHaiku -> ResourceResponse -> PageLoadState
-            // For now, we show a stub to verify the UI.
+            const auto& certificateInfo = fPage->pageLoadState().certificateInfo();
+            auto summary = certificateInfo.summary();
+
+            if (!summary)
+                break;
+
+            auto formatDate = [](Seconds seconds) {
+                time_t t = static_cast<time_t>(seconds.seconds());
+                struct tm tm;
+                localtime_r(&t, &tm);
+                char buffer[64];
+                strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &tm);
+                return String::fromUTF8(buffer);
+            };
+
             CertificateInfoDialog::show(
                 currentURL(),
-                "Verified by Haiku WebKit",
-                "Stub Subject",
-                "Today",
-                "Tomorrow",
-                "SHA-256: ..."
+                summary->issuer.utf8().data(),
+                summary->subject.utf8().data(),
+                formatDate(summary->validFrom).utf8().data(),
+                formatDate(summary->validUntil).utf8().data(),
+                summary->fingerprint.utf8().data()
             );
             break;
         }

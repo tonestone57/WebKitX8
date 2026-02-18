@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 Apple Inc. All rights reserved.
+ * Copyright (C) 2019 Haiku, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,22 +23,20 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma once
+#include "config.h"
+#include "SynchronousLoaderClient.h"
 
-#include <wtf/Seconds.h>
-#include <wtf/Vector.h>
-#include <wtf/text/WTFString.h>
+#include "ResourceError.h"
 
 namespace WebCore {
 
-struct CertificateSummary {
-    String subject;
-    String issuer;
-    String fingerprint;
-    Seconds validFrom;
-    Seconds validUntil;
-    Vector<String> dnsNames;
-    Vector<String> ipAddresses;
-};
+void SynchronousLoaderClient::didReceiveAuthenticationChallenge(ResourceHandle*, const AuthenticationChallenge&)
+{
+}
+
+ResourceError SynchronousLoaderClient::platformBadResponseError()
+{
+    return ResourceError();
+}
 
 } // namespace WebCore

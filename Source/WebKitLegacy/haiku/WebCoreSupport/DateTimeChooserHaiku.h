@@ -45,6 +45,18 @@
 
 namespace WebCore {
 
+class DigitFilter : public BTextFilter {
+public:
+    filter_result Filter(BTextView*, const char* bytes, int32 numBytes, int32*) override
+    {
+        for (int32 i = 0; i < numBytes; i++) {
+            if (!isdigit(bytes[i]))
+                return B_SKIP_MESSAGE;
+        }
+        return B_DISPATCH_MESSAGE;
+    }
+};
+
 class DateTimeChooserWindow: public BWindow
 {
 public:
@@ -100,7 +112,7 @@ public:
                 new BMessage('yech'));
             m_yearControl->SetModificationMessage(new BMessage('yech'));
             m_yearControl->TextView()->SetMaxBytes(6);
-            // TODO add filter on isdigit() only
+            m_yearControl->TextView()->AddFilter(new DigitFilter());
 
             // Setup month menu
             BMenu* monthMenu = new BMenu("month");
