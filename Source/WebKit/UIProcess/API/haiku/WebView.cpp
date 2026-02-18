@@ -65,11 +65,24 @@ BWebView::BWebView(BRect frame, BWindow* myWindow)
     RefPtr<WebProcessPool> processPool = WebProcessPool::create(*apiConfiguration.get());
     config->setProcessPool(WTFMove(processPool));
 
-    fWebViewBase = WebViewBase::create("Webkit", frame, myWindow, *config.get());
+    auto view = WebViewBase::create("Webkit", frame, myWindow, *config.get());
+    fWebViewBase = view.get();
+    view.leakRef();
+}
+
+BWebView::~BWebView()
+{
+    if (fWebViewBase) {
+        if (!fWebViewBase->Window())
+            fWebViewBase->deref();
+    }
 }
 
 void BWebView::navigationCallbacks()
 {
+    if (!fWebViewBase)
+        return;
+
     fWebViewBase->page()->setNavigationClient(makeUniqueRef<NavigationClient>(this));
 
     fObserver = adoptRef(*new PageLoadStateObserver(this, fAppLooper));
@@ -85,6 +98,8 @@ void BWebView::loadURIRequest(const char* uri)
 
 void BWebView::paintContent()
 {
+    if (!fWebViewBase)
+        return;
     fWebViewBase->LockLooper();
     fWebViewBase->Invalidate();
     fWebViewBase->UnlockLooper();
@@ -97,11 +112,16 @@ WebViewBase* BWebView::getRenderView()
 
 const char* BWebView::getCurrentURL()
 {
+    if (!fWebViewBase)
+        return "";
     return fWebViewBase->currentURL();
 }
 
 void BWebView::loadURI(BMessage* message)
 {
+    if (!fWebViewBase)
+        return;
+
     const char* uri = nullptr;
     if (message->FindString("url", &uri) == B_OK && uri)
         fWebViewBase->page()->loadRequest(URL { WTF::String::fromUTF8(uri) });
@@ -109,6 +129,9 @@ void BWebView::loadURI(BMessage* message)
 
 void BWebView::goForward()
 {
+    if (!fWebViewBase)
+        return;
+
     fWebViewBase->page()->goForward();
     BMessage message(URL_CHANGE);
     message.AddString("url", BString(getCurrentURL()));
@@ -117,6 +140,9 @@ void BWebView::goForward()
 
 void BWebView::goBackward()
 {
+    if (!fWebViewBase)
+        return;
+
     fWebViewBase->page()->goBack();
     BMessage message(URL_CHANGE);
     message.AddString("url", BString(getCurrentURL()));
@@ -125,15 +151,21 @@ void BWebView::goBackward()
 
 void BWebView::stop()
 {
+    if (!fWebViewBase)
+        return;
     fWebViewBase->page()->close();
 }
 
 double BWebView::progress()
 {
+    if (!fWebViewBase)
+        return 0.0;
     return fWebViewBase->page()->estimatedProgress();
 }
 
 const char* BWebView::title()
 {
+    if (!fWebViewBase)
+        return "";
     return fWebViewBase->page()->pageLoadState().title().utf8().data();
 }
