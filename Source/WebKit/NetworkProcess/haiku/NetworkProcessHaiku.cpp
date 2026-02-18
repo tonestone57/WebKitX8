@@ -132,7 +132,7 @@ void NetworkProcess::platformTerminate()
 {
 }
 
-static void recursiveDelete(BDirectory& dir)
+static void recursiveDelete(BDirectory& dir, WallTime modifiedSince)
 {
     BEntry entry;
     dir.Rewind();
@@ -141,10 +141,17 @@ static void recursiveDelete(BDirectory& dir)
             entry.Remove();
         } else if (entry.IsDirectory()) {
             BDirectory subDir(&entry);
-            recursiveDelete(subDir);
+            recursiveDelete(subDir, modifiedSince);
             entry.Remove();
         } else {
-            entry.Remove();
+            time_t modificationTime;
+            if (entry.GetModificationTime(&modificationTime) == B_OK) {
+                if (WallTime::fromRawSeconds(modificationTime) >= modifiedSince) {
+                    entry.Remove();
+                }
+            } else {
+                entry.Remove();
+            }
         }
     }
 }
@@ -157,7 +164,7 @@ void NetworkProcess::clearDiskCache(WallTime modifiedSince, CompletionHandler<vo
         BEntry entry(path.Path());
         if (entry.Exists() && entry.IsDirectory()) {
             BDirectory dir(path.Path());
-            recursiveDelete(dir);
+            recursiveDelete(dir, modifiedSince);
             entry.Remove();
         }
     }
