@@ -56,43 +56,49 @@ PlatformMouseEvent::PlatformMouseEvent(const BMessage* message)
     else
         m_timestamp = MonotonicTime::now();
 
-    int32 buttons = 0;
-    // B_MOUSE_UP usually doesn't contain "buttons" state of what is pressed NOW (which is 0),
-    // but sometimes "previous buttons". But WebKit expects the button that caused the event for Up/Down.
-    // For MouseMoved, it expects currently pressed buttons.
+    int32 buttons = 0; // Current buttons state
+    int32 activeButtons = 0; // For m_buttons
+    int32 changedButton = 0; // For m_button
+
+    message->FindInt32("buttons", &buttons);
+    activeButtons = buttons;
 
     if (message->what == B_MOUSE_UP) {
-        // We might not have "previous buttons" always, relying on "buttons" being 0.
-        // But we need to know WHICH button was released.
-        // Haiku B_MOUSE_UP doesn't explicitly tell which button was released in a separate field,
-        // but we can infer if needed or just use what we have.
-        // Actually, "buttons" in B_MOUSE_UP is usually 0 if no other button is held.
-        // But PlatformMouseEvent expects m_button to be the button changing state.
-
-        // Let's check if we have tracked state or if the message has info.
-        // For now, we might check "buttons" in B_MOUSE_DOWN/MOVED.
-
-        // If we can't determine, default to Left?
-        // Let's see if there is a "previous buttons" field? message->FindInt32("previous buttons", &buttons)?
-        // Some Haiku versions might support it?
-        // If not, we rely on the fact that B_MOUSE_UP implies a release.
+        int32 lastButtons = 0;
+        if (message->FindInt32("webkit:last_buttons", &lastButtons) == B_OK) {
+            changedButton = lastButtons ^ buttons;
+        } else {
+            // Fallback: Assume left button if we can't determine
+            changedButton = B_PRIMARY_MOUSE_BUTTON;
+        }
     } else {
-        message->FindInt32("buttons", &buttons);
+        // For Down and Moved, 'buttons' represents the current state.
+        // For Down, the changed button is the one added.
+        // If we have history, we could compute it, but usually 'buttons' is enough
+        // if only one button is pressed. If chording, we might need last_buttons too.
+        int32 lastButtons = 0;
+        if (message->what == B_MOUSE_DOWN && message->FindInt32("webkit:last_buttons", &lastButtons) == B_OK) {
+            changedButton = lastButtons ^ buttons;
+        } else {
+            changedButton = buttons;
+        }
     }
 
-    // Map buttons
-    if (buttons & B_PRIMARY_MOUSE_BUTTON) {
-        m_button = MouseButton::Left;
+    auto mapButton = [](int32 b) {
+        if (b & B_PRIMARY_MOUSE_BUTTON) return MouseButton::Left;
+        if (b & B_SECONDARY_MOUSE_BUTTON) return MouseButton::Right;
+        if (b & B_TERTIARY_MOUSE_BUTTON) return MouseButton::Middle;
+        return MouseButton::None;
+    };
+
+    m_button = mapButton(changedButton);
+
+    if (activeButtons & B_PRIMARY_MOUSE_BUTTON)
         m_buttons |= 1; // Left
-    } else if (buttons & B_SECONDARY_MOUSE_BUTTON) {
-        m_button = MouseButton::Right;
-         m_buttons |= 2; // Right
-    } else if (buttons & B_TERTIARY_MOUSE_BUTTON) {
-        m_button = MouseButton::Middle;
-         m_buttons |= 4; // Middle
-    } else {
-        m_button = MouseButton::None;
-    }
+    if (activeButtons & B_SECONDARY_MOUSE_BUTTON)
+        m_buttons |= 2; // Right
+    if (activeButtons & B_TERTIARY_MOUSE_BUTTON)
+        m_buttons |= 4; // Middle
 
     switch (message->what) {
     case B_MOUSE_DOWN:
@@ -100,15 +106,11 @@ PlatformMouseEvent::PlatformMouseEvent(const BMessage* message)
         break;
     case B_MOUSE_UP:
         m_type = PlatformEvent::Type::MouseReleased;
-        // Logic to try to guess which button was released if m_button is None?
-        // If we are releasing, 'buttons' is 0. So m_button becomes None.
-        // But PlatformMouseEvent requires m_button to be set to the button being released.
-        // We'll set it to Left as fallback if None, or maybe we just leave it.
-        if (m_button == MouseButton::None) m_button = MouseButton::Left;
         break;
     case B_MOUSE_MOVED:
     default:
         m_type = PlatformEvent::Type::MouseMoved;
+        m_button = MouseButton::None; // Explicitly None for move
         break;
     };
 
