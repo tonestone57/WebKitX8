@@ -231,8 +231,9 @@ public:
                 }
 
                 String dateString = String::fromUTF8(str.String());
-                RunLoop::main().dispatch([picker = &m_picker, dateString]() {
-                    picker->didChooseDate(dateString);
+                RunLoop::main().dispatch([picker = m_picker, dateString]() {
+                    if (picker)
+                        picker->didChooseDate(dateString);
                 });
                 [[fallthrough]];
             }
@@ -270,14 +271,17 @@ public:
     }
 
     bool QuitRequested() override {
-        RunLoop::main().dispatch([picker = &m_picker]() {
-            picker->didEndChooser();
-        });
+        if (m_picker) {
+            RunLoop::main().dispatch([picker = m_picker]() {
+                if (picker)
+                    picker->didEndChooser();
+            });
+        }
         return false;
     }
 
 private:
-    WebDateTimePickerHaiku& m_picker;
+    WeakPtr<WebDateTimePickerHaiku> m_picker;
     BPrivate::BCalendarView* m_calendar;
     BTextControl* m_yearControl;
     BButton* m_okButton;

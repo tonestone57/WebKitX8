@@ -35,6 +35,8 @@ class BMenu;
 
 namespace WebKit {
 
+class WebPageProxy;
+
 class WebPopupMenuProxyHaiku : public WebPopupMenuProxy {
 public:
     static Ref<WebPopupMenuProxyHaiku> create(WebViewBase& webView, WebPopupMenuProxy::Client& client)
@@ -52,6 +54,7 @@ private:
 
     WebViewBase& m_webView;
     WeakPtr<WebViewBase> m_weakWebView;
+    WeakPtr<WebPageProxy> m_page;
     BPopUpMenu* m_menu;
 };
 
