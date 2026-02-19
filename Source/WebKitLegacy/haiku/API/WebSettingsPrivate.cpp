@@ -100,16 +100,21 @@ void WebSettingsPrivate::apply()
 	    settings->setDefaultTextEncodingName(ASCIILiteral::fromLiteralUnsafe("UTF-8"));
         settings->setNeedsSiteSpecificQuirks(true);
 
-        char path[256];
+        BPath path;
         status_t result = find_path(B_CURRENT_IMAGE_SYMBOL,
             B_FIND_PATH_DATA_DIRECTORY,
-            "/WebKit/Directory Listing Template.html", path, 256);
+            "WebKit/Directory Listing Template.html",
+            path.LockBuffer(), B_PATH_NAME_LENGTH);
+        path.UnlockBuffer();
+
         if (result != B_OK) {
-            find_directory(B_SYSTEM_NONPACKAGED_DATA_DIRECTORY, 0, false, path,
-				256);
-            strcat(path, "/WebKit/Directory Listing Template.html");
+            result = find_directory(B_SYSTEM_NONPACKAGED_DATA_DIRECTORY, &path);
+            if (result == B_OK)
+                result = path.Append("WebKit/Directory Listing Template.html");
         }
-        settings->setFTPDirectoryTemplatePath(String::fromUTF8(path));
+
+        if (result == B_OK)
+            settings->setFTPDirectoryTemplatePath(String::fromUTF8(path.Path()));
 
 //      settings->setShowDebugBorders(true);
 
