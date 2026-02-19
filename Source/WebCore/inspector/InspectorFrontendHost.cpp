@@ -579,23 +579,28 @@ static void populateContextMenu(Vector<InspectorFrontendHost::ContextMenuItem>&&
 void InspectorFrontendHost::showContextMenu(Event& event, Vector<ContextMenuItem>&& items)
 {
 #if ENABLE(CONTEXT_MENUS)
-    // FIXME: What guarantees m_frontendPage is non-null?
-    // FIXME: What guarantees globalObject's return value is non-null?
-    ASSERT(m_frontendPage);
+    if (!m_frontendPage)
+        return;
+
     RefPtr localMainFrame = m_frontendPage->localMainFrame();
     if (!localMainFrame)
         return;
-    auto& globalObject = *localMainFrame->script().globalObject(debuggerWorldSingleton());
-    auto& vm = globalObject.vm();
-    auto value = globalObject.get(&globalObject, JSC::Identifier::fromString(vm, "InspectorFrontendAPI"_s));
-    ASSERT(value);
-    ASSERT(value.isObject());
+
+    auto* globalObject = localMainFrame->script().globalObject(debuggerWorldSingleton());
+    if (!globalObject)
+        return;
+
+    auto& vm = globalObject->vm();
+    auto value = globalObject->get(globalObject, JSC::Identifier::fromString(vm, "InspectorFrontendAPI"_s));
+    if (!value || !value.isObject())
+        return;
+
     auto* frontendAPIObject = asObject(value);
 
     ContextMenu menu;
     populateContextMenu(WTF::move(items), menu);
 
-    Ref menuProvider = FrontendMenuProvider::create(this, &globalObject, frontendAPIObject, menu.items());
+    Ref menuProvider = FrontendMenuProvider::create(this, globalObject, frontendAPIObject, menu.items());
     m_menuProvider = menuProvider;
     m_frontendPage->contextMenuController().showContextMenu(event, menuProvider);
 #else
