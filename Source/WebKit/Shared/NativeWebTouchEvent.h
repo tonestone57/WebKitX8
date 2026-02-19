@@ -42,6 +42,10 @@
 #include <wpe/wpe.h>
 #endif
 
+#if PLATFORM(HAIKU)
+#include <Message.h>
+#endif
+
 #if PLATFORM(WPE) && ENABLE(WPE_PLATFORM)
 #include <wpe/GRefPtrWPE.h>
 typedef struct _WPEEvent WPEEvent;
@@ -75,6 +79,9 @@ public:
     NativeWebTouchEvent(WPEEvent*, Vector<WebPlatformTouchPoint>&&);
     WPEEvent* nativeEvent() const { return m_nativeEvent.get(); }
 #endif
+#elif PLATFORM(HAIKU)
+    NativeWebTouchEvent(const BMessage*);
+    const BMessage* nativeEvent() const { return &m_nativeEvent; }
 #elif PLATFORM(WIN)
     NativeWebTouchEvent();
 #endif
@@ -97,6 +104,8 @@ private:
 #if ENABLE(WPE_PLATFORM)
     GRefPtr<WPEEvent> m_nativeEvent;
 #endif
+#elif PLATFORM(HAIKU)
+    const BMessage m_nativeEvent;
 #endif
 };
 

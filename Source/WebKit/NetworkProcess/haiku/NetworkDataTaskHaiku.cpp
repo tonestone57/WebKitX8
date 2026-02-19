@@ -540,7 +540,7 @@ void NetworkDataTaskHaiku::AuthenticationNeeded(BHttpRequest* request, const Res
         WebCore::ProtectionSpace::ServerType::HTTP, realm, scheme);
 
     // Using a default ResourceError as previousFailureCount
-    AuthenticationChallenge challenge(protectionSpace, Credential(), 0, response, ResourceError());
+    AuthenticationChallenge challenge(protectionSpace, Credential(), m_authFailureCount, response, ResourceError());
 
     runOnMainThread([this, protectedThis = Ref { *this }, challenge = WTFMove(challenge), scheme]() mutable {
         if (m_state == State::Canceling || m_state == State::Completed)

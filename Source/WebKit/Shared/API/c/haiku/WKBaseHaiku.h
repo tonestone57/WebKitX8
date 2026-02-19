@@ -17,8 +17,8 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef WKBaseEfl_h
-#define WKBaseEfl_h
+#ifndef WKBaseHaiku_h
+#define WKBaseHaiku_h
 
 #ifndef WKBase_h
 #error "Please #include \"WKBase.h\" instead of this file directly."
@@ -30,4 +30,4 @@ typedef const struct OpaqueWKPopupMenuListener* WKPopupMenuListenerRef;
 typedef const struct OpaqueWKTouchPoint* WKTouchPointRef;
 typedef const struct OpaqueWKTouchEvent* WKTouchEventRef;
 
-#endif /* WKBaseEfl_h */
+#endif /* WKBaseHaiku_h */
