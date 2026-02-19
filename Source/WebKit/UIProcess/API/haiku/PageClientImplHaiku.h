@@ -32,6 +32,7 @@
 
 #include <WebCore/IntPoint.h>
 #include <WebCore/IntRect.h>
+#include <wtf/WeakPtr.h>
 
 namespace WebKit {
 
@@ -131,7 +132,7 @@ private:
     std::unique_ptr<WebFullScreenManagerProxyClient> m_fullScreenManagerProxyClient;
 #endif
 
-    WebViewBase& fWebView;
+    WeakPtr<WebViewBase> fWebView;
 };
 
 }

@@ -67,26 +67,32 @@ public:
 
     void closeFullScreenManager() override { }
     bool isFullScreen() override {
-        if (auto* window = m_view.Window())
+        if (!m_view)
+            return false;
+        if (auto* window = m_view->Window())
             return window->IsFullScreen();
         return false;
     }
     void enterFullScreen(WebCore::FloatSize, CompletionHandler<void(bool)>&& completionHandler) override {
-        if (auto* window = m_view.Window()) {
-            if (window->Lock()) {
-                window->SetFullScreen(true);
-                window->Unlock();
-                completionHandler(true);
-                return;
+        if (m_view) {
+            if (auto* window = m_view->Window()) {
+                if (window->Lock()) {
+                    window->SetFullScreen(true);
+                    window->Unlock();
+                    completionHandler(true);
+                    return;
+                }
             }
         }
         completionHandler(false);
     }
     void exitFullScreen(CompletionHandler<void()>&& completionHandler) override {
-        if (auto* window = m_view.Window()) {
-            if (window->Lock()) {
-                window->SetFullScreen(false);
-                window->Unlock();
+        if (m_view) {
+            if (auto* window = m_view->Window()) {
+                if (window->Lock()) {
+                    window->SetFullScreen(false);
+                    window->Unlock();
+                }
             }
         }
         completionHandler();
@@ -95,7 +101,7 @@ public:
     void beganExitFullScreen(const WebCore::IntRect&, const WebCore::IntRect&, CompletionHandler<void()>&& completionHandler) override { completionHandler(); }
 
 private:
-    WebViewBase& m_view;
+    WeakPtr<WebViewBase> m_view;
 };
 #endif
 
@@ -110,7 +116,9 @@ PageClientImpl::PageClientImpl(WebViewBase& view)
 WTF::Ref<DrawingAreaProxy> PageClientImpl::createDrawingAreaProxy(WebKit::WebProcessProxy& processProxy)
 {
 #if USE(COORDINATED_GRAPHICS) || USE(TEXTURE_MAPPER)
-    return DrawingAreaProxyCoordinatedGraphics::create(*fWebView.page(), processProxy);
+    if (fWebView && fWebView->page())
+        return DrawingAreaProxyCoordinatedGraphics::create(*fWebView->page(), processProxy);
+    RELEASE_ASSERT_NOT_REACHED();
 #else
     RELEASE_ASSERT_NOT_REACHED();
 #endif
@@ -118,35 +126,35 @@ WTF::Ref<DrawingAreaProxy> PageClientImpl::createDrawingAreaProxy(WebKit::WebPro
 
 void PageClientImpl::setViewNeedsDisplay(const WebCore::Region& region)
 {
-    if (fWebView.LockLooper()) {
-        fWebView.Invalidate(region.bounds());
-        fWebView.UnlockLooper();
+    if (fWebView && fWebView->LockLooper()) {
+        fWebView->Invalidate(region.bounds());
+        fWebView->UnlockLooper();
     }
 }
 
 void PageClientImpl::requestScroll(const WebCore::FloatPoint& scrollPosition, const WebCore::IntPoint&, WebCore::ScrollIsAnimated)
 {
-    if (fWebView.LockLooper()) {
-        fWebView.ScrollTo(scrollPosition);
-        fWebView.UnlockLooper();
+    if (fWebView && fWebView->LockLooper()) {
+        fWebView->ScrollTo(scrollPosition);
+        fWebView->UnlockLooper();
     }
 }
 
 WebCore::FloatPoint PageClientImpl::viewScrollPosition()
 {
     BPoint position;
-    if (fWebView.LockLooper()) {
-        position = fWebView.LeftTop();
-        fWebView.UnlockLooper();
+    if (fWebView && fWebView->LockLooper()) {
+        position = fWebView->LeftTop();
+        fWebView->UnlockLooper();
     }
     return position;
 }
 
 WebCore::IntSize PageClientImpl::viewSize()
 {
-    if (fWebView.LockLooper()) {
-        BRect bounds = fWebView.Bounds();
-        fWebView.UnlockLooper();
+    if (fWebView && fWebView->LockLooper()) {
+        BRect bounds = fWebView->Bounds();
+        fWebView->UnlockLooper();
         return IntSize(bounds.IntegerWidth() + 1, bounds.IntegerHeight() + 1);
     }
     return IntSize();
@@ -154,57 +162,66 @@ WebCore::IntSize PageClientImpl::viewSize()
 
 bool PageClientImpl::isViewWindowActive()
 {
-    if (fWebView.Window())
-        return fWebView.Window()->IsActive();
+    if (fWebView) {
+        if (auto* window = fWebView->Window())
+            return window->IsActive();
+    }
     return false;
 }
 
 bool PageClientImpl::isViewFocused()
 {
-    if (fWebView.Window())
-        return fWebView.IsFocus();
+    if (fWebView) {
+        if (auto* window = fWebView->Window())
+            return fWebView->IsFocus();
+    }
     return false;
 }
 
 bool PageClientImpl::isActiveViewVisible()
 {
-    return !fWebView.IsHidden();
+    return fWebView && !fWebView->IsHidden();
 }
 
 bool PageClientImpl::isViewInWindow()
 {
-    return fWebView.Window() != nullptr;
+    return fWebView && fWebView->Window() != nullptr;
 }
 
 void PageClientImpl::processDidExit()
 {
-    if (BWindow* window = fWebView.Window())
-        window->PostMessage(PROCESS_DID_EXIT);
+    if (fWebView) {
+        if (BWindow* window = fWebView->Window())
+            window->PostMessage(PROCESS_DID_EXIT);
+    }
 }
 
 void PageClientImpl::didRelaunchProcess()
 {
-    if (BWindow* window = fWebView.Window())
-        window->PostMessage(PROCESS_DID_RELAUNCH);
+    if (fWebView) {
+        if (BWindow* window = fWebView->Window())
+            window->PostMessage(PROCESS_DID_RELAUNCH);
+    }
 }
 
 void PageClientImpl::toolTipChanged(const String&, const String& newToolTip)
 {
-    fWebView.setToolTip(newToolTip.utf8().data());
+    if (fWebView)
+        fWebView->setToolTip(newToolTip.utf8().data());
 }
 
 void PageClientImpl::setCursor(const WebCore::Cursor& cursor)
 {
-    if (fWebView.LockLooper()) {
-        fWebView.SetViewCursor(cursor.platformCursor());
-        fWebView.UnlockLooper();
+    if (fWebView && fWebView->LockLooper()) {
+        fWebView->SetViewCursor(cursor.platformCursor());
+        fWebView->UnlockLooper();
     }
 }
 
 void PageClientImpl::setCursorHiddenUntilMouseMoves(bool hiddenUntilMouseMoves)
 {
-    if (hiddenUntilMouseMoves)
-        fWebView.ObscureCursor();
+    if (fWebView && hiddenUntilMouseMoves)
+        fWebView->ObscureCursor();
 }
 
 void PageClientImpl::registerEditCommand(Ref<WebEditCommandProxy>&& command, UndoOrRedo undoOrRedo)
@@ -229,10 +246,10 @@ void PageClientImpl::executeUndoRedo(UndoOrRedo undoOrRedo)
 
 FloatRect PageClientImpl::convertToDeviceSpace(const FloatRect& viewRect)
 {
-    if (fWebView.LockLooper()) {
+    if (fWebView && fWebView->LockLooper()) {
         BRect rect(viewRect);
-        rect = fWebView.ConvertToScreen(rect);
-        fWebView.UnlockLooper();
+        rect = fWebView->ConvertToScreen(rect);
+        fWebView->UnlockLooper();
         return rect;
     }
     return viewRect;
@@ -240,10 +257,10 @@ FloatRect PageClientImpl::convertToDeviceSpace(const FloatRect& viewRect)
 
 FloatRect PageClientImpl::convertToUserSpace(const FloatRect& viewRect)
 {
-    if (fWebView.LockLooper()) {
+    if (fWebView && fWebView->LockLooper()) {
         BRect rect(viewRect);
-        rect = fWebView.ConvertFromScreen(rect);
-        fWebView.UnlockLooper();
+        rect = fWebView->ConvertFromScreen(rect);
+        fWebView->UnlockLooper();
         return rect;
     }
     return viewRect;
@@ -251,10 +268,10 @@ FloatRect PageClientImpl::convertToUserSpace(const FloatRect& viewRect)
 
 IntPoint PageClientImpl::screenToRootView(const IntPoint& point)
 {
-    if (fWebView.LockLooper()) {
+    if (fWebView && fWebView->LockLooper()) {
         BPoint p(point);
-        p = fWebView.ConvertFromScreen(p);
-        fWebView.UnlockLooper();
+        p = fWebView->ConvertFromScreen(p);
+        fWebView->UnlockLooper();
         return IntPoint(p);
     }
     return point;
@@ -262,10 +279,10 @@ IntPoint PageClientImpl::screenToRootView(const IntPoint& point)
 
 IntRect PageClientImpl::rootViewToScreen(const IntRect& rect)
 {
-    if (fWebView.LockLooper()) {
+    if (fWebView && fWebView->LockLooper()) {
         BRect r(rect);
-        r = fWebView.ConvertToScreen(r);
-        fWebView.UnlockLooper();
+        r = fWebView->ConvertToScreen(r);
+        fWebView->UnlockLooper();
         return IntRect(r);
     }
     return rect;
@@ -273,10 +290,10 @@ IntRect PageClientImpl::rootViewToScreen(const IntRect& rect)
 
 IntPoint PageClientImpl::rootViewToScreen(const IntPoint& point)
 {
-    if (fWebView.LockLooper()) {
+    if (fWebView && fWebView->LockLooper()) {
         BPoint p(point);
-        p = fWebView.ConvertToScreen(p);
-        fWebView.UnlockLooper();
+        p = fWebView->ConvertToScreen(p);
+        fWebView->UnlockLooper();
         return IntPoint(p);
     }
     return point;
@@ -290,13 +307,27 @@ void PageClientImpl::doneWithKeyEvent(const NativeWebKeyboardEvent& event, bool 
 
 RefPtr<WebPopupMenuProxy> PageClientImpl::createPopupMenuProxy(WebPageProxy& page)
 {
-    return WebPopupMenuProxyHaiku::create(fWebView, page);
+    if (fWebView)
+        return WebPopupMenuProxyHaiku::create(*fWebView, page);
+    return nullptr;
 }
 
 #if ENABLE(CONTEXT_MENUS)
 Ref<WebContextMenuProxy> PageClientImpl::createContextMenuProxy(WebPageProxy& page, FrameInfoData&& frameInfo, ContextMenuContextData&& context, const UserData& userData)
 {
-    return WebContextMenuProxyHaiku::create(fWebView, page, WTF::move(frameInfo), WTF::move(context), userData);
+    if (fWebView)
+        return WebContextMenuProxyHaiku::create(*fWebView, page, WTF::move(frameInfo), WTF::move(context), userData);
+    // This method returns Ref, so we can't return nullptr.
+    // However, createContextMenuProxy should arguably effectively check if the view is alive.
+    // But if fWebView is null, we are likely shutting down.
+    // We can't easily construct a valid Ref<WebContextMenuProxy> without a WebViewBase reference if the constructor requires it.
+    // Let's assume for now this won't be called if WebViewBase is dead (since PageClient is usually destroyed soon after).
+    // But to be safe, if we must return something, we might crash if we dereference fWebView.
+    // But fWebView is WeakPtr. *fWebView would crash if null.
+    // We should probably ASSERT or handle it.
+    // Given the architecture, if fWebView is null, the PageClientImpl should be dead or dying.
+    RELEASE_ASSERT(fWebView);
+    return WebContextMenuProxyHaiku::create(*fWebView, page, WTF::move(frameInfo), WTF::move(context), userData);
 }
 #endif
 
@@ -328,33 +359,39 @@ void PageClientImpl::updateAcceleratedCompositingMode(const LayerTreeContext& la
 
 void PageClientImpl::pageClosed()
 {
-    if (BWindow* window = fWebView.Window())
-        window->PostMessage(PAGE_CLOSED);
+    if (fWebView) {
+        if (BWindow* window = fWebView->Window())
+            window->PostMessage(PAGE_CLOSED);
+    }
 }
 
 void PageClientImpl::preferencesDidChange()
 {
     // Force a redraw
-    if (fWebView.LockLooper()) {
-        fWebView.Invalidate();
-        fWebView.UnlockLooper();
+    if (fWebView && fWebView->LockLooper()) {
+        fWebView->Invalidate();
+        fWebView->UnlockLooper();
     }
 }
 
 void PageClientImpl::didChangeContentSize(const IntSize& size)
 {
-    if (BWindow* window = fWebView.Window()) {
-        BMessage message(CONTENT_SIZE_CHANGED);
-        message.AddFloat("width", size.width());
-        message.AddFloat("height", size.height());
-        window->PostMessage(&message);
+    if (fWebView) {
+        if (BWindow* window = fWebView->Window()) {
+            BMessage message(CONTENT_SIZE_CHANGED);
+            message.AddFloat("width", size.width());
+            message.AddFloat("height", size.height());
+            window->PostMessage(&message);
+        }
     }
 }
 
 void PageClientImpl::didCommitLoadForMainFrame(const String&, bool)
 {
-    if (BWindow* window = fWebView.Window())
-        window->PostMessage(LOAD_COMMITTED);
+    if (fWebView) {
+        if (BWindow* window = fWebView->Window())
+            window->PostMessage(LOAD_COMMITTED);
+    }
 }
 
 void PageClientImpl::wheelEventWasNotHandledByWebCore(const NativeWebWheelEvent& event)
@@ -396,8 +433,10 @@ void PageClientImpl::didRemoveNavigationGestureSnapshot()
 
 void PageClientImpl::didFirstVisuallyNonEmptyLayoutForMainFrame()
 {
-    if (BWindow* window = fWebView.Window())
-        window->PostMessage(DID_FIRST_VISUALLY_NON_EMPTY_LAYOUT);
+    if (fWebView) {
+        if (BWindow* window = fWebView->Window())
+            window->PostMessage(DID_FIRST_VISUALLY_NON_EMPTY_LAYOUT);
+    }
 }
 
 class AsyncPrinter : public RefCounted<AsyncPrinter> {
@@ -553,43 +592,52 @@ private:
 
 void PageClientImpl::printFrame(WebFrameProxy& frame)
 {
-    AsyncPrinter::Print(fWebView, *fWebView.page(), frame);
+    if (fWebView && fWebView->page())
+        AsyncPrinter::Print(*fWebView, *fWebView->page(), frame);
 }
 
 void PageClientImpl::didFinishNavigation(API::Navigation*)
 {
-    if (BWindow* window = fWebView.Window())
-        window->PostMessage(DID_FINISH_NAVIGATION);
+    if (fWebView) {
+        if (BWindow* window = fWebView->Window())
+            window->PostMessage(DID_FINISH_NAVIGATION);
+    }
 }
 
 void PageClientImpl::didFailNavigation(API::Navigation*)
 {
-    if (BWindow* window = fWebView.Window())
-        window->PostMessage(DID_FAIL_NAVIGATION);
+    if (fWebView) {
+        if (BWindow* window = fWebView->Window())
+            window->PostMessage(DID_FAIL_NAVIGATION);
+    }
 }
 
 void PageClientImpl::didSameDocumentNavigationForMainFrame(SameDocumentNavigationType)
 {
-    if (BWindow* window = fWebView.Window())
-        window->PostMessage(DID_SAME_DOCUMENT_NAVIGATION);
+    if (fWebView) {
+        if (BWindow* window = fWebView->Window())
+            window->PostMessage(DID_SAME_DOCUMENT_NAVIGATION);
+    }
 }
 
 void PageClientImpl::didChangeBackgroundColor()
 {
-    if (auto* page = fWebView.page()) {
-        if (std::optional<WebCore::Color> color = page->backgroundColor()) {
-             auto srgba = color->toColorTypeLossy<SRGBA<uint8_t>>();
-             if (fWebView.LockLooper()) {
-                 rgb_color haikuColor = {
-                     srgba.red,
-                     srgba.green,
-                     srgba.blue,
-                     srgba.alpha
-                 };
-                 fWebView.SetViewColor(haikuColor);
-                 fWebView.Invalidate();
-                 fWebView.UnlockLooper();
-             }
+    if (fWebView) {
+        if (auto* page = fWebView->page()) {
+            if (std::optional<WebCore::Color> color = page->backgroundColor()) {
+                 auto srgba = color->toColorTypeLossy<SRGBA<uint8_t>>();
+                 if (fWebView->LockLooper()) {
+                     rgb_color haikuColor = {
+                         srgba.red,
+                         srgba.green,
+                         srgba.blue,
+                         srgba.alpha
+                     };
+                     fWebView->SetViewColor(haikuColor);
+                     fWebView->Invalidate();
+                     fWebView->UnlockLooper();
+                 }
+            }
         }
     }
 }
@@ -600,13 +648,15 @@ void PageClientImpl::isPlayingAudioWillChange()
 
 void PageClientImpl::isPlayingAudioDidChange()
 {
-    if (BWindow* window = fWebView.Window()) {
-        BMessage message(IS_PLAYING_AUDIO_CHANGED);
-        bool isPlaying = false;
-        if (auto* page = fWebView.page())
-            isPlaying = page->isPlayingAudio();
-        message.AddBool("playing", isPlaying);
-        window->PostMessage(&message);
+    if (fWebView) {
+        if (BWindow* window = fWebView->Window()) {
+            BMessage message(IS_PLAYING_AUDIO_CHANGED);
+            bool isPlaying = false;
+            if (auto* page = fWebView->page())
+                isPlaying = page->isPlayingAudio();
+            message.AddBool("playing", isPlaying);
+            window->PostMessage(&message);
+        }
     }
 }
 
@@ -622,7 +672,7 @@ void PageClientImpl::derefView()
 
 WebViewBase* PageClientImpl::viewWidget()
 {
-    return &fWebView;
+    return fWebView.get();
 }
 
 RefPtr<WebDateTimePicker> PageClientImpl::createDateTimePicker(WebPageProxy& page)
@@ -639,7 +689,7 @@ WebFullScreenManagerProxyClient& PageClientImpl::fullScreenManagerProxyClient()
 
 void PageClientImpl::startDrag(const WebCore::DragItem& dragItem, WebCore::ShareableBitmap::Handle&& dragImageHandle, const std::optional<WebCore::NodeIdentifier>&)
 {
-    if (!fWebView.LockLooper())
+    if (!fWebView || !fWebView->LockLooper())
         return;
 
     BMessage dragMessage;
@@ -664,12 +714,12 @@ void PageClientImpl::startDrag(const WebCore::DragItem& dragItem, WebCore::Share
     // Use the anchor point from DragItem to position the image correctly relative to the cursor
     BPoint offset(-dragItem.imageAnchorPoint.x(), -dragItem.imageAnchorPoint.y());
 
-    fWebView.DragMessage(&dragMessage, dragBitmap, B_OP_ALPHA, offset);
+    fWebView->DragMessage(&dragMessage, dragBitmap, B_OP_ALPHA, offset);
 
     // The bitmap is owned by the drag message once DragMessage is called.
     // It will be deleted by the system when the drag is finished.
 
-    fWebView.UnlockLooper();
+    fWebView->UnlockLooper();
 }
 
 }
