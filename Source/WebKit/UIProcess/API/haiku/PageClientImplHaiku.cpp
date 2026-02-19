@@ -716,8 +716,9 @@ void PageClientImpl::startDrag(const WebCore::DragItem& dragItem, WebCore::Share
 
     fWebView->DragMessage(&dragMessage, dragBitmap, B_OP_ALPHA, offset);
 
-    // The bitmap is owned by the drag message once DragMessage is called.
-    // It will be deleted by the system when the drag is finished.
+    // The bitmap is NOT owned by the drag message, but copied by the system.
+    // We are responsible for deleting it.
+    delete dragBitmap;
 
     fWebView->UnlockLooper();
 }
