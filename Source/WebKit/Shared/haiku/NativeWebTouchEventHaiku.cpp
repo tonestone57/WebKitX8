@@ -27,6 +27,7 @@
 #include "NativeWebTouchEvent.h"
 
 #include "WebEventFactory.h"
+#include <Message.h>
 
 namespace WebKit {
 
