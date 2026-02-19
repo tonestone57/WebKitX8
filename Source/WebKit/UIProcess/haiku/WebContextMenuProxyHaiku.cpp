@@ -45,6 +45,8 @@ namespace WebKit {
 WebContextMenuProxyHaiku::WebContextMenuProxyHaiku(WebViewBase& webView, WebPageProxy& page, FrameInfoData&& frameInfo, ContextMenuContextData&& context, const UserData& userData)
     : WebContextMenuProxy(page, WTF::move(frameInfo), WTF::move(context), userData)
     , m_webView(webView)
+    , m_weakWebView(webView)
+    , m_weakPage(page)
     , m_menu(nullptr)
 {
 }
@@ -105,6 +107,8 @@ void WebContextMenuProxyHaiku::populateMenu(BMenu* menu, const Vector<WebContext
 
 void WebContextMenuProxyHaiku::showContextMenuWithItems(Vector<Ref<WebContextMenuItem>>&& items)
 {
+    Ref<WebContextMenuProxyHaiku> protectedThis(*this);
+
     if (m_menu) {
         delete m_menu;
         m_menu = nullptr;
@@ -138,6 +142,9 @@ void WebContextMenuProxyHaiku::showContextMenuWithItems(Vector<Ref<WebContextMen
     m_webView.UnlockLooper();
 
     BMenuItem* selectedItem = m_menu->Go(screenPoint, false, false);
+
+    if (!m_weakWebView || !m_weakPage)
+        return;
 
     if (selectedItem) {
         BMessage* msg = selectedItem->Message();

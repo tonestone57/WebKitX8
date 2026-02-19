@@ -28,11 +28,13 @@
 #if ENABLE(CONTEXT_MENUS)
 
 #include "WebContextMenuProxy.h"
+#include "WebPageProxy.h"
+#include "WebViewBase.h"
 #include <wtf/Vector.h>
+#include <wtf/WeakPtr.h>
 
 class BPopUpMenu;
 class BMenu;
-class WebViewBase;
 
 namespace WebKit {
 
@@ -53,6 +55,8 @@ private:
     void populateMenu(BMenu* menu, const Vector<WebContextMenuItemData>& items);
 
     WebViewBase& m_webView;
+    WeakPtr<WebViewBase> m_weakWebView;
+    WeakPtr<WebPageProxy> m_weakPage;
     BPopUpMenu* m_menu;
     Vector<WebContextMenuItemData> m_currentItems;
 };
