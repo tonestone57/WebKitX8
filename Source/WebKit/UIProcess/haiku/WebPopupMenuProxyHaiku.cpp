@@ -41,6 +41,7 @@ namespace WebKit {
 WebPopupMenuProxyHaiku::WebPopupMenuProxyHaiku(WebViewBase& webView, WebPopupMenuProxy::Client& client)
     : WebPopupMenuProxy(client)
     , m_webView(webView)
+    , m_weakWebView(webView)
     , m_menu(nullptr)
 {
 }
@@ -53,6 +54,8 @@ WebPopupMenuProxyHaiku::~WebPopupMenuProxyHaiku()
 
 void WebPopupMenuProxyHaiku::showPopupMenu(const WebCore::IntRect& rect, WebCore::TextDirection, double pageScaleFactor, const Vector<WebPopupItem>& items, const PlatformPopupMenuData&, int32_t selectedIndex)
 {
+    Ref<WebPopupMenuProxyHaiku> protectedThis(*this);
+
     if (m_menu) {
         delete m_menu;
         m_menu = nullptr;
@@ -89,6 +92,9 @@ void WebPopupMenuProxyHaiku::showPopupMenu(const WebCore::IntRect& rect, WebCore
     m_webView.UnlockLooper();
 
     BMenuItem* selectedItem = m_menu->Go(screenPoint, false, true);
+
+    if (!m_weakWebView)
+        return;
 
     if (selectedItem) {
         BMessage* msg = selectedItem->Message();

@@ -26,11 +26,12 @@
 #pragma once
 
 #include "WebPopupMenuProxy.h"
+#include "WebViewBase.h"
 #include <wtf/Vector.h>
+#include <wtf/WeakPtr.h>
 
 class BPopUpMenu;
 class BMenu;
-class WebViewBase;
 
 namespace WebKit {
 
@@ -50,6 +51,7 @@ private:
     WebPopupMenuProxyHaiku(WebViewBase&, WebPopupMenuProxy::Client&);
 
     WebViewBase& m_webView;
+    WeakPtr<WebViewBase> m_weakWebView;
     BPopUpMenu* m_menu;
 };
 
