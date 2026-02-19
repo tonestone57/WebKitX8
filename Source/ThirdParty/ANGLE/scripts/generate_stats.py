@@ -3,7 +3,7 @@
 # [VPYTHON:BEGIN]
 # wheel: <
 #   name: "infra/python/wheels/google-auth-py2_py3"
-#   version: "version:1.2.1"
+#   version: "version:1.25.0"
 # >
 #
 # wheel: <
@@ -94,7 +94,7 @@
 #   -h, --help            show this help message and exit
 #   --auth_path [AUTH_PATH]
 #                         path to directory containing authorization data (credentials.json and
-#                         token.pickle). [default=<home>/.auth]
+#                         token.json). [default=<home>/.auth]
 #   --spreadsheet [SPREADSHEET]
 #                         ID of the spreadsheet to write stats to. [default
 #                         ='1D6Yh7dAPP-aYLbX3HHQD8WubJV9XPuxvkKowmn2qhIw']
@@ -104,14 +104,15 @@
 
 import argparse
 import datetime
+import json
 import logging
 import os
-import pickle
 import re
 import subprocess
 import sys
 import urllib
 from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 
@@ -708,7 +709,7 @@ def update_spreadsheet(service, spreadsheet_id, info):
 # an open connection.
 def get_sheets_service(auth_path):
     credentials_path = auth_path + '/credentials.json'
-    token_path = auth_path + '/token.pickle'
+    token_path = auth_path + '/token.json'
     creds = None
     if not os.path.exists(auth_path):
         LOGGER.info("Creating auth dir '" + auth_path + "'")
@@ -720,8 +721,8 @@ def get_sheets_service(auth_path):
                         "Click 'DOWNLOAD CLIENT CONFIGURATION'\n"
                         'Save to your auth_path (' + auth_path + ') as credentials.json')
     if os.path.exists(token_path):
-        with open(token_path, 'rb') as token:
-            creds = pickle.load(token)
+        with open(token_path, 'r') as token:
+            creds = Credentials.from_authorized_user_info(json.load(token), SCOPES)
             LOGGER.info('Loaded credentials from ' + token_path)
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
@@ -731,8 +732,8 @@ def get_sheets_service(auth_path):
             LOGGER.info('Could not find credentials. Requesting new credentials.')
             flow = InstalledAppFlow.from_client_secrets_file(credentials_path, SCOPES)
             creds = flow.run_local_server()
-        with open(token_path, 'wb') as token:
-            pickle.dump(creds, token)
+        with open(token_path, 'w') as token:
+            token.write(creds.to_json())
     service = build('sheets', 'v4', credentials=creds)
     sheets = service.spreadsheets()
     return sheets
@@ -746,7 +747,7 @@ def parse_args():
         default=HOME_DIR + '/.auth',
         nargs='?',
         help='path to directory containing authorization data '
-        '(credentials.json and token.pickle). '
+        '(credentials.json and token.json). '
         '[default=<home>/.auth]')
     parser.add_argument(
         '--spreadsheet',
