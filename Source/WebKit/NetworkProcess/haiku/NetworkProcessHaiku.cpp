@@ -29,6 +29,7 @@
 
 #include "NetworkProcessCreationParameters.h"
 #include <WebCore/NotImplemented.h>
+#include <wtf/Assertions.h>
 #include <wtf/Language.h>
 #include <wtf/HashSet.h>
 #include <wtf/Lock.h>
@@ -138,19 +139,34 @@ static void recursiveDelete(BDirectory& dir, WallTime modifiedSince)
     dir.Rewind();
     while (dir.GetNextEntry(&entry) == B_OK) {
         if (entry.IsSymLink()) {
-            entry.Remove();
+            time_t modificationTime;
+            if (entry.GetModificationTime(&modificationTime) == B_OK) {
+                if (WallTime::fromRawSeconds(modificationTime) >= modifiedSince) {
+                    if (entry.Remove() != B_OK)
+                        WTFLogAlways("Failed to remove symlink\n");
+                }
+            } else {
+                if (entry.Remove() != B_OK)
+                    WTFLogAlways("Failed to remove symlink\n");
+            }
         } else if (entry.IsDirectory()) {
             BDirectory subDir(&entry);
             recursiveDelete(subDir, modifiedSince);
-            entry.Remove();
+            // If the directory still contains files (because they were preserved), Remove() will fail with B_DIRECTORY_NOT_EMPTY.
+            // We ignore that error intentionally to preserve older content.
+            status_t result = entry.Remove();
+            if (result != B_OK && result != B_DIRECTORY_NOT_EMPTY)
+                WTFLogAlways("Failed to remove directory: %s\n", strerror(result));
         } else {
             time_t modificationTime;
             if (entry.GetModificationTime(&modificationTime) == B_OK) {
                 if (WallTime::fromRawSeconds(modificationTime) >= modifiedSince) {
-                    entry.Remove();
+                    if (entry.Remove() != B_OK)
+                        WTFLogAlways("Failed to remove file\n");
                 }
             } else {
-                entry.Remove();
+                if (entry.Remove() != B_OK)
+                    WTFLogAlways("Failed to remove file\n");
             }
         }
     }
@@ -165,6 +181,7 @@ void NetworkProcess::clearDiskCache(WallTime modifiedSince, CompletionHandler<vo
         if (entry.Exists() && entry.IsDirectory()) {
             BDirectory dir(path.Path());
             recursiveDelete(dir, modifiedSince);
+            // Try to remove the root WebKit cache dir if empty.
             entry.Remove();
         }
     }

@@ -35,11 +35,13 @@ class BMenu;
 
 namespace WebKit {
 
+class WebPageProxy;
+
 class WebPopupMenuProxyHaiku : public WebPopupMenuProxy {
 public:
-    static Ref<WebPopupMenuProxyHaiku> create(WebViewBase& webView, WebPopupMenuProxy::Client& client)
+    static Ref<WebPopupMenuProxyHaiku> create(WebViewBase& webView, WebPageProxy& page)
     {
-        return adoptRef(*new WebPopupMenuProxyHaiku(webView, client));
+        return adoptRef(*new WebPopupMenuProxyHaiku(webView, page));
     }
 
     ~WebPopupMenuProxyHaiku();
@@ -48,10 +50,11 @@ public:
     void hidePopupMenu() override;
 
 private:
-    WebPopupMenuProxyHaiku(WebViewBase&, WebPopupMenuProxy::Client&);
+    WebPopupMenuProxyHaiku(WebViewBase&, WebPageProxy&);
 
     WebViewBase& m_webView;
     WeakPtr<WebViewBase> m_weakWebView;
+    WeakPtr<WebPageProxy> m_page;
     BPopUpMenu* m_menu;
 };
 

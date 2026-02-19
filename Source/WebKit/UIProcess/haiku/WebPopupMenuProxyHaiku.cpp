@@ -27,6 +27,7 @@
 #include "WebPopupMenuProxyHaiku.h"
 
 #include "PageClientImplHaiku.h"
+#include "WebPageProxy.h"
 #include "WebPopupItem.h"
 #include "../../API/haiku/WebViewBase.h"
 #include <WebCore/IntRect.h>
@@ -38,10 +39,11 @@
 
 namespace WebKit {
 
-WebPopupMenuProxyHaiku::WebPopupMenuProxyHaiku(WebViewBase& webView, WebPopupMenuProxy::Client& client)
-    : WebPopupMenuProxy(client)
+WebPopupMenuProxyHaiku::WebPopupMenuProxyHaiku(WebViewBase& webView, WebPageProxy& page)
+    : WebPopupMenuProxy(page.popupMenuClient())
     , m_webView(webView)
     , m_weakWebView(webView)
+    , m_page(page)
     , m_menu(nullptr)
 {
 }
@@ -94,6 +96,10 @@ void WebPopupMenuProxyHaiku::showPopupMenu(const WebCore::IntRect& rect, WebCore
     BMenuItem* selectedItem = m_menu->Go(screenPoint, false, true);
 
     if (!m_weakWebView)
+        return;
+
+    // Check if page (client) is still alive
+    if (!m_page)
         return;
 
     if (selectedItem) {

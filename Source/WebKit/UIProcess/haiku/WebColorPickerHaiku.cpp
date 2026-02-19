@@ -74,11 +74,14 @@ public:
         switch(message->what) {
             case 'chng':
             case 'alph': {
+                if (!m_picker) return;
+
                 rgb_color rgb = m_colorControl->ValueAsColor();
                 uint8 alpha = (uint8)m_alphaSlider->Value();
                 Color color(SRGBA<uint8_t> { rgb.red, rgb.green, rgb.blue, alpha });
-                RunLoop::main().dispatch([picker = &m_picker, color]() {
-                    picker->didChooseColor(color);
+                RunLoop::main().dispatch([picker = m_picker, color]() {
+                    if (picker)
+                        picker->didChooseColor(color);
                 });
                 break;
             }
@@ -88,14 +91,17 @@ public:
     }
 
     bool QuitRequested() override {
-        RunLoop::main().dispatch([picker = &m_picker]() {
-            picker->didEndChooser();
-        });
+        if (m_picker) {
+            RunLoop::main().dispatch([picker = m_picker]() {
+                if (picker)
+                    picker->didEndChooser();
+            });
+        }
         return false;
     }
 
 private:
-    WebColorPickerHaiku& m_picker;
+    WeakPtr<WebColorPickerHaiku> m_picker;
     BColorControl* m_colorControl;
     BSlider* m_alphaSlider;
 };

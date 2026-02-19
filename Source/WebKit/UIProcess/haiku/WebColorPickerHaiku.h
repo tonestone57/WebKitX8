@@ -27,6 +27,7 @@
 
 #include "WebColorPicker.h"
 #include <WebCore/Color.h>
+#include <wtf/WeakPtr.h>
 
 class BWindow;
 class BColorControl;
@@ -35,7 +36,7 @@ namespace WebKit {
 
 class WebPageProxy;
 
-class WebColorPickerHaiku final : public WebColorPicker {
+class WebColorPickerHaiku final : public WebColorPicker, public CanMakeWeakPtr<WebColorPickerHaiku> {
 public:
     static Ref<WebColorPickerHaiku> create(WebPageProxy&, const WebCore::Color& initialColor);
     ~WebColorPickerHaiku();
