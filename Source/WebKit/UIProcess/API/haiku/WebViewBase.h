@@ -53,6 +53,8 @@ public:
         auto fWebView = adoptRef(*new WebViewBase(name, rect, parentWindow, config));
         return fWebView;
     }
+    virtual ~WebViewBase();
+
     WebPageProxy* page() const { return fPage.get(); }
     const char* currentURL() const;
 
