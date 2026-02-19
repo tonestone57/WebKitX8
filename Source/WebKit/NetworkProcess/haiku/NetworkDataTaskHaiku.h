@@ -31,6 +31,7 @@
 #if !USE(CURL)
 
 #include <wtf/MonotonicTime.h>
+#include <atomic>
 
 #include <WebCore/ResourceResponse.h>
 #include <WebCore/ResourceRequest.h>
@@ -115,7 +116,7 @@ private:
     bool m_redirected;
     off_t m_position;
     off_t m_lastBytesSent { 0 };
-    bool m_isWaitingForAuth { false };
+    std::atomic<bool> m_isWaitingForAuth { false };
 
     int m_redirectionTries;
 };

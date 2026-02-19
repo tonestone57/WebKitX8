@@ -267,10 +267,8 @@ void NetworkDataTaskHaiku::HeadersReceived(BUrlRequest* caller)
             if (m_currentRequest.isNull())
                 return;
 
-            if (m_isWaitingForAuth) {
-                m_request->Stop();
+            if (m_isWaitingForAuth)
                 return;
-            }
         }
     }
 

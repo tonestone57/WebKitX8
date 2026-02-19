@@ -196,6 +196,9 @@ void ResourceHandle::receivedCredential(const AuthenticationChallenge& challenge
     internal->m_user = credential.user();
     internal->m_password = credential.password();
 
+    if (internal->m_urlrequest)
+        internal->m_urlrequest->continueAfterAuthentication(credential);
+
     clearAuthentication();
 }
 
@@ -207,12 +210,17 @@ void ResourceHandle::receivedRequestToContinueWithoutCredential(const Authentica
     internal->m_user = String();
     internal->m_password = String();
 
+    if (internal->m_urlrequest)
+        internal->m_urlrequest->authenticationCancelled();
+
     clearAuthentication();
 }
 
 void ResourceHandle::receivedCancellation(const AuthenticationChallenge&)
 {
-    // TODO
+    ResourceHandleInternal* internal = getInternal();
+    if (internal->m_urlrequest)
+        internal->m_urlrequest->authenticationCancelled();
 }
 
 

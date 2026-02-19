@@ -504,7 +504,31 @@ bool BUrlProtocolHandler::didReceiveAuthenticationChallenge(const ResourceRespon
         return true;
     }
 
-    return false;
+    // Wait for the client to provide credentials asynchronously
+    m_request->abort();
+    return true;
+}
+
+void BUrlProtocolHandler::continueAfterAuthentication(const Credential& credential)
+{
+    ASSERT(isMainThread());
+
+    if (!m_resourceHandle)
+        return;
+
+    m_resourceRequest.setCredentials(credential.user().utf8().data(), credential.password().utf8().data());
+    m_request = BUrlRequestWrapper::create(this, m_resourceHandle->context()->storageSession(), m_resourceRequest);
+}
+
+void BUrlProtocolHandler::authenticationCancelled()
+{
+    ASSERT(isMainThread());
+
+    if (!m_resourceHandle)
+        return;
+
+    ResourceError error(m_resourceRequest.url().host().toString(), 401, m_resourceRequest.url(), ASCIILiteral::fromLiteralUnsafe("Authentication Cancelled"));
+    didFail(error);
 }
 
 void BUrlProtocolHandler::didReceiveResponse(ResourceResponse&& response)
