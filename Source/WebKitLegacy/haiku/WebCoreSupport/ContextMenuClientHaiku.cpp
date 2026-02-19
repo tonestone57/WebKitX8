@@ -67,7 +67,7 @@ void ContextMenuClientHaiku::searchWithGoogle(const LocalFrame* frame)
     encoded = makeStringByReplacingAll(encoded, "%20"_s, "+"_s);
 
     StringBuilder url;
-    url.append("http://www.google.com/search?q="_s);
+    url.append("https://www.google.com/search?q="_s);
     url.append(encoded);
 
     if (Page* page = frame->page()) {
