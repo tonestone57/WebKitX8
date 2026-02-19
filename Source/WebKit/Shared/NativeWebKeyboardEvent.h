@@ -105,7 +105,7 @@ public:
 #elif PLATFORM(GTK)
     GdkEvent* nativeEvent() const { return m_nativeEvent.get(); }
 #elif PLATFORM(HAIKU)
-    const BMessage* nativeEvent() const { return m_nativeEvent; }
+    const BMessage* nativeEvent() const { return &m_nativeEvent; }
 #elif PLATFORM(IOS_FAMILY)
     ::WebEvent* nativeEvent() const { return m_nativeEvent.get(); }
 #elif PLATFORM(WIN)
@@ -123,7 +123,7 @@ private:
 #elif PLATFORM(GTK)
     GUniquePtr<GdkEvent> m_nativeEvent;
 #elif PLATFORM(HAIKU)
-    const BMessage* m_nativeEvent;
+    const BMessage m_nativeEvent;
 #elif PLATFORM(IOS_FAMILY)
     RetainPtr<::WebEvent> m_nativeEvent;
 #elif PLATFORM(WIN)

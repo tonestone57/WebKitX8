@@ -34,7 +34,7 @@ namespace WebKit {
 
 NativeWebKeyboardEvent::NativeWebKeyboardEvent(const BMessage* keyboardEvent)
 	: WebKeyboardEvent(WebEventFactory::createWebKeyboardEvent(keyboardEvent))
-	, m_nativeEvent(keyboardEvent)
+	, m_nativeEvent(*keyboardEvent)
 {
 }
 

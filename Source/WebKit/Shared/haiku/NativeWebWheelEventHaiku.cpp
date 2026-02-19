@@ -35,7 +35,7 @@ namespace WebKit {
 
 NativeWebWheelEvent::NativeWebWheelEvent(const BMessage* wheelEvent)
 	: WebWheelEvent(WebEventFactory::createWebWheelEvent(wheelEvent))
-	, m_nativeEvent(wheelEvent)
+	, m_nativeEvent(*wheelEvent)
 {
 }
 
