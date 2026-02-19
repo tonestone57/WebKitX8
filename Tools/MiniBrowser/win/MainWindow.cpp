@@ -591,7 +591,7 @@ void MainWindow::loadURL(std::wstring url)
             url = fileURL;
     }
     if (url.find(L"://") == url.npos)
-        url = L"http://" + url;
+        url = L"https://" + url;
 
     if (FAILED(m_browserWindow->loadURL(_bstr_t(url.c_str()))))
         return;
