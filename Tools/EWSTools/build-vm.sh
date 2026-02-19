@@ -46,11 +46,11 @@ sudo mount /dev/sdb1 /mnt
 
 echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | sudo debconf-set-selections
 
-curl http://src.chromium.org/svn/trunk/src/build/install-build-deps.sh > install-build-deps.sh
-bash install-build-deps.sh --no-prompt
+curl -sS https://raw.githubusercontent.com/chromium/chromium/main/build/install-build-deps.py > install-build-deps.py
+python3 install-build-deps.py --no-prompt
 sudo apt-get install xvfb screen git-svn zip -y
 
-# install-build-deps.sh will install flashplugin-installer, which causes some plug-in tests to crash.
+# install-build-deps.py will install flashplugin-installer, which causes some plug-in tests to crash.
 sudo apt-get remove flashplugin-installer -y
 
 cd /mnt
