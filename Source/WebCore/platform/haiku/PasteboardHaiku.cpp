@@ -50,6 +50,7 @@
 
 #include <BitmapStream.h>
 #include <TranslatorRoster.h>
+#include <wtf/Scope.h>
 
 
 namespace WebCore {
@@ -236,15 +237,15 @@ void WebCore::Pasteboard::write(WebCore::PasteboardImage const& pasteboardImage)
     if (roster) {
         // BBitmapStream takes the bitmap but we must detach it to prevent deletion
         BBitmapStream stream(platformImage.get());
+        BBitmap* tmp = nullptr;
+        auto detach = makeScopeExit([&] { stream.DetachBitmap(&tmp); });
+
         BMallocIO outStream;
 
         // Translate to PNG
         if (roster->Translate(&stream, NULL, NULL, &outStream, B_PNG_FORMAT) == B_OK) {
              data->AddData("image/png", B_MIME_TYPE, outStream.Buffer(), outStream.BufferLength());
         }
-
-        BBitmap* tmp = NULL;
-        stream.DetachBitmap(&tmp);
     }
 
     transaction.commit();

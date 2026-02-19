@@ -115,6 +115,7 @@ private:
     bool m_redirected;
     off_t m_position;
     off_t m_lastBytesSent { 0 };
+    bool m_isWaitingForAuth { false };
 
     int m_redirectionTries;
 };
