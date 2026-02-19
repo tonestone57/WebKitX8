@@ -81,6 +81,8 @@ public:
     virtual ~BUrlProtocolHandler();
 
     void abort();
+    void continueAfterAuthentication(const Credential&);
+    void authenticationCancelled();
 
     bool isValid() const { return m_request && m_request->isValid(); }
 

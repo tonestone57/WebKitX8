@@ -83,6 +83,16 @@ WebViewBase::WebViewBase(const char* name, BRect rect, BWindow* parentWindow,
     }
 }
 
+WebViewBase::~WebViewBase()
+{
+    // Ensure WebPageProxy and PageClient are destroyed on the Main Thread (RunLoop)
+    // as they are not thread-safe and were likely created there.
+    callOnMainRunLoop([page = std::move(fPage), client = std::move(fPageClient)] {
+        if (page)
+            page->close();
+    });
+}
+
 const char* WebViewBase::currentURL() const
 {
     return page()->pageLoadState().activeURL().utf8().data();
@@ -91,10 +101,12 @@ const char* WebViewBase::currentURL() const
 void WebViewBase::FrameResized(float newWidth, float newHeight)
 {
 #if USE(COORDINATED_GRAPHICS) || USE(TEXTURE_MAPPER)
-    auto drawingArea = static_cast<DrawingAreaProxyCoordinatedGraphics*>(page()->drawingArea());
-    if (!drawingArea)
-        return;
-    drawingArea->setSize(IntSize(newWidth + 1, newHeight + 1));
+    callOnMainRunLoop([weakThis = WeakPtr { *this }, size = IntSize(newWidth + 1, newHeight + 1)] {
+        if (!weakThis)
+            return;
+        if (auto* drawingArea = static_cast<DrawingAreaProxyCoordinatedGraphics*>(weakThis->page()->drawingArea()))
+            drawingArea->setSize(size);
+    });
 #endif
 }
 

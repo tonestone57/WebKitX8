@@ -266,6 +266,9 @@ void NetworkDataTaskHaiku::HeadersReceived(BUrlRequest* caller)
 
             if (m_currentRequest.isNull())
                 return;
+
+            if (m_isWaitingForAuth)
+                return;
         }
     }
 
@@ -382,6 +385,11 @@ void NetworkDataTaskHaiku::UploadProgress(BUrlRequest* caller, off_t bytesSent, 
 
 void NetworkDataTaskHaiku::RequestCompleted(BUrlRequest* caller, bool success)
 {
+    // If we are waiting for auth, we intentionally stopped the request.
+    // Ignore this completion event.
+    if (m_isWaitingForAuth)
+        return;
+
     if (!success) {
         ResourceError error(m_baseUrl.host().toString(), caller->Result().StatusCode(), m_baseUrl,
             String::fromUTF8(caller->Result().StatusText()));
@@ -391,6 +399,7 @@ void NetworkDataTaskHaiku::RequestCompleted(BUrlRequest* caller, bool success)
 
         runOnMainThread([this, protectedThis = Ref { *this }, error] {
             if (m_state != State::Canceling && m_state != State::Completed) {
+                if (m_isWaitingForAuth) return;
                 m_state = State::Completed;
                 if (m_client)
                     m_client->didCompleteWithError(error, m_networkLoadMetrics);
@@ -404,6 +413,7 @@ void NetworkDataTaskHaiku::RequestCompleted(BUrlRequest* caller, bool success)
 
     runOnMainThread([this, protectedThis = Ref { *this }] {
         if (m_state != State::Canceling && m_state != State::Completed) {
+            if (m_isWaitingForAuth) return;
             m_state = State::Completed;
             if (m_client)
                 m_client->didFinishLoading(m_networkLoadMetrics);
@@ -542,32 +552,43 @@ void NetworkDataTaskHaiku::AuthenticationNeeded(BHttpRequest* request, const Res
     // Using a default ResourceError as previousFailureCount
     AuthenticationChallenge challenge(protectionSpace, Credential(), m_authFailureCount, response, ResourceError());
 
+    m_isWaitingForAuth = true;
+
     runOnMainThread([this, protectedThis = Ref { *this }, challenge = WTFMove(challenge), scheme]() mutable {
-        if (m_state == State::Canceling || m_state == State::Completed)
+        if (m_state == State::Canceling || m_state == State::Completed) {
+            m_isWaitingForAuth = false;
             return;
+        }
 
         if (m_client) {
             m_client->didReceiveAuthenticationChallenge(WTFMove(challenge), NegotiatedLegacyTLS::No, [protectedThis, scheme](AuthenticationChallengeDisposition disposition, const Credential& credential) {
+                protectedThis->m_isWaitingForAuth = false;
+
                 if (protectedThis->m_state == State::Canceling || protectedThis->m_state == State::Completed)
                     return;
 
                 if (disposition == AuthenticationChallengeDisposition::UseCredential && !credential.isEmpty()) {
-                    // Apply credentials to the request logic
-                    if (auto* httpRequest = dynamic_cast<BHttpRequest*>(protectedThis->m_request)) {
-                        BHttpAuthentication& auth = httpRequest->Authentication();
-                        auth.SetUserName(credential.user().utf8().data());
-                        auth.SetPassword(credential.password().utf8().data());
-
-                        switch (scheme) {
-                        case WebCore::ProtectionSpace::AuthenticationScheme::HTTPDigest:
-                            auth.SetMethod(B_HTTP_AUTHENTICATION_DIGEST);
-                            break;
-                        case WebCore::ProtectionSpace::AuthenticationScheme::HTTPBasic:
-                        default:
-                            auth.SetMethod(B_HTTP_AUTHENTICATION_BASIC);
-                            break;
-                        }
+                    // Clean up the old request
+                    if (protectedThis->m_request) {
+                        protectedThis->m_request->Stop();
+                        delete protectedThis->m_request;
+                        protectedThis->m_request = nullptr;
                     }
+
+                    // Apply credentials to the request URL which will be used by createRequest -> BHttpRequest
+                    URL url = protectedThis->m_currentRequest.url();
+                    url.setUser(credential.user());
+                    url.setPassword(credential.password());
+                    protectedThis->m_currentRequest.setURL(url);
+
+                    // Restart the request
+                    protectedThis->createRequest(protectedThis->m_currentRequest.isolatedCopy());
+                } else {
+                     // Authentication cancelled or failed. We stopped the original request.
+                     // Report failure to the client.
+                    ResourceError error(protectedThis->m_baseUrl.host().toString(), 401, protectedThis->m_baseUrl, "Authentication Cancelled"_s);
+                    if (protectedThis->m_client)
+                        protectedThis->m_client->didCompleteWithError(error, protectedThis->m_networkLoadMetrics);
                 }
             });
         }
