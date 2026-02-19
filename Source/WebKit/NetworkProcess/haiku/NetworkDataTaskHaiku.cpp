@@ -132,7 +132,8 @@ void NetworkDataTaskHaiku::createRequest(ResourceRequest&& request)
     if (m_request == NULL)
         return;
 
-    m_output = new NetworkDataOutput(this);
+    if (!m_output)
+        m_output = new NetworkDataOutput(this);
     m_request->SetOutput(m_output);
 
     m_baseUrl = URL(m_request->Url());
