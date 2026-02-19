@@ -77,6 +77,7 @@ void WebPageProxy::saveRecentSearches(IPC::Connection&, const String& name, cons
     BMessage searches;
     for (const auto& item : searchItems) {
         searches.AddString("items", item.string.utf8().data());
+        searches.AddDouble("times", item.time.secondsSinceEpoch().seconds());
     }
 
     message.RemoveName(name.utf8().data());
@@ -112,6 +113,9 @@ void WebPageProxy::loadRecentSearches(IPC::Connection&, const String& name, Comp
                 for (int32 i = 0; searches.FindString("items", i, &item) == B_OK; i++) {
                      WebCore::RecentSearch search;
                      search.string = String::fromUTF8(item);
+                     double time;
+                     if (searches.FindDouble("times", i, &time) == B_OK)
+                         search.time = WebCore::WallTime::fromRawSeconds(time);
                      items.append(search);
                 }
             }
