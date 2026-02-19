@@ -138,19 +138,42 @@ static void recursiveDelete(BDirectory& dir, WallTime modifiedSince)
     dir.Rewind();
     while (dir.GetNextEntry(&entry) == B_OK) {
         if (entry.IsSymLink()) {
-            entry.Remove();
+            // Symlinks don't always have reliable modification times, so we check the timestamp if we can,
+            // but default to removal if we can't determine it, or if it matches.
+            time_t modificationTime;
+            if (entry.GetModificationTime(&modificationTime) == B_OK) {
+                if (WallTime::fromRawSeconds(modificationTime) >= modifiedSince) {
+                    if (entry.Remove() != B_OK)
+                        fprintf(stderr, "Failed to remove symlink\n");
+                }
+            } else {
+                if (entry.Remove() != B_OK)
+                    fprintf(stderr, "Failed to remove symlink\n");
+            }
         } else if (entry.IsDirectory()) {
             BDirectory subDir(&entry);
             recursiveDelete(subDir, modifiedSince);
-            entry.Remove();
+            // Only try to remove the directory if it's empty (implied by success) and enough time has passed?
+            // Actually, we should probably only remove the directory if we successfully cleared everything inside it.
+            // BEntry::Remove() on a directory only succeeds if it is empty (unless recursive is not supported by backend).
+            // But we already recursively deleted content.
+            // If the directory still contains files (because they were older than modifiedSince), Remove() will fail with B_DIRECTORY_NOT_EMPTY.
+            // We ignore that error intentionally to preserve older content.
+            status_t result = entry.Remove();
+            if (result != B_OK && result != B_DIRECTORY_NOT_EMPTY)
+                fprintf(stderr, "Failed to remove directory: %s\n", strerror(result));
         } else {
             time_t modificationTime;
             if (entry.GetModificationTime(&modificationTime) == B_OK) {
                 if (WallTime::fromRawSeconds(modificationTime) >= modifiedSince) {
-                    entry.Remove();
+                    if (entry.Remove() != B_OK)
+                        fprintf(stderr, "Failed to remove file\n");
                 }
             } else {
-                entry.Remove();
+                // If we can't get the time, assume it's stale/corrupt? Or preserve it?
+                // The original code removed it. Let's stick to that but check return value.
+                if (entry.Remove() != B_OK)
+                    fprintf(stderr, "Failed to remove file\n");
             }
         }
     }
@@ -165,6 +188,7 @@ void NetworkProcess::clearDiskCache(WallTime modifiedSince, CompletionHandler<vo
         if (entry.Exists() && entry.IsDirectory()) {
             BDirectory dir(path.Path());
             recursiveDelete(dir, modifiedSince);
+            // Try to remove the root WebKit cache dir if empty.
             entry.Remove();
         }
     }
