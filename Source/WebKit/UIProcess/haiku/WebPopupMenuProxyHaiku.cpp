@@ -39,14 +39,13 @@
 
 namespace WebKit {
 
-WebPopupMenuProxyHaiku::WebPopupMenuProxyHaiku(WebViewBase& webView, WebPopupMenuProxy::Client& client)
-    : WebPopupMenuProxy(client)
+WebPopupMenuProxyHaiku::WebPopupMenuProxyHaiku(WebViewBase& webView, WebPageProxy& page)
+    : WebPopupMenuProxy(page.popupMenuClient())
     , m_webView(webView)
     , m_weakWebView(webView)
+    , m_page(page)
     , m_menu(nullptr)
 {
-    if (auto* page = dynamic_cast<WebPageProxy*>(&client))
-        m_page = *page;
 }
 
 WebPopupMenuProxyHaiku::~WebPopupMenuProxyHaiku()
