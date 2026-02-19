@@ -33,6 +33,7 @@
 
 import argparse
 import itertools
+import json
 import os
 import sys
 import textwrap
@@ -287,9 +288,8 @@ specified on the command-line:
     @util.LogEntryExit
     def _cmd_generate_within_xcode_and_return_results_to_caller(self):
         generators = self._do_generate()
-        with open(self.cmd_line_args.pickle_file, "wb") as f:
-            for generator in generators:
-                generator.pickle_to_file(f)
+        with open(self.cmd_line_args.pickle_file, "w") as f:
+            json.dump([generator.to_json() for generator in generators], f)
         return os.EX_OK
 
     @util.LogEntryExit

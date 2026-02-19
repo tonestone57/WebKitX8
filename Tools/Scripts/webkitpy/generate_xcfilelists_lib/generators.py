@@ -54,8 +54,8 @@
 # inner one is the one with all the xcfilelist information.
 
 import itertools
+import json
 import os
-import pickle
 import re
 import tempfile
 import traceback
@@ -63,7 +63,6 @@ import traceback
 import webkitpy.generate_xcfilelists_lib.util as util
 from webkitpy.xcode import xcode_hash_for_path
 from webkitpy.xcode.sdk import SDK
-from webkitpy.common.attribute_saver import AttributeSaver
 
 
 class BaseGenerator(object):
@@ -112,7 +111,7 @@ class BaseGenerator(object):
 
     @util.LogEntryExit
     def set_environment_and_generate(self):
-        with tempfile.NamedTemporaryFile() as pickle_file, tempfile.NamedTemporaryFile() as debug_file:
+        with tempfile.NamedTemporaryFile(mode="r+") as pickle_file, tempfile.NamedTemporaryFile() as debug_file:
             sublaunch_args = [
                 "PATH=\"{}:${{PATH}}\"".format(self._getenv("PATH")),  # Xcode will "sanitize" PATH, such that Python is no longer on it, so get /usr/bin back in PATH.
                 "PYTHONPATH=\"{}\"".format(self._getenv("PYTHONPATH", "")),
@@ -139,13 +138,16 @@ class BaseGenerator(object):
                         util.debug_log("{}".format(line.rstrip()))
 
             generators = []
-            while True:
-                try:
-                    generator = pickle.load(pickle_file)
-                    generator.application = self.application
-                    generators.append(generator)
-                except EOFError:
-                    break
+            try:
+                if os.stat(pickle_file.name).st_size > 0:
+                    pickle_file.seek(0)
+                    generators_data = json.load(pickle_file)
+                    for generator_data in generators_data:
+                        generator = BaseGenerator.from_json(generator_data, self.application)
+                        generators.append(generator)
+            except ValueError:
+                pass
+
             return generators
 
     # Relaunch this script under Xcode. This is performed by launching Xcode,
@@ -187,11 +189,79 @@ class BaseGenerator(object):
         self._merge_unified()
 
     @util.LogEntryExit
-    def pickle_to_file(self, f):
-        # We don't want to pickle the application reference
-        # We can't seem to pickle ex_traceback: PicklingError: Can't pickle <type 'traceback'>: it's not found as __builtin__.traceback
-        with AttributeSaver(self, "application"), AttributeSaver(self, "ex_traceback"):
-            pickle.dump(self, f, pickle.HIGHEST_PROTOCOL)
+    def to_json(self):
+        data = {
+            "class": self.__class__.__name__,
+            "project_tag": self.project_tag,
+            "platform": self.platform,
+            "configuration": self.configuration,
+            "added_lines_input_derived": list(self.added_lines_input_derived) if self.added_lines_input_derived else [],
+            "added_lines_output_derived": list(self.added_lines_output_derived) if self.added_lines_output_derived else [],
+            "added_lines_input_unified": list(self.added_lines_input_unified) if self.added_lines_input_unified else [],
+            "added_lines_output_unified": list(self.added_lines_output_unified) if self.added_lines_output_unified else [],
+            "cached_build_dirs": self.cached_build_dirs,
+            "ex_info": self._serialize_exception(),
+        }
+        return data
+
+    def _serialize_exception(self):
+        if not self.ex_value:
+            return None
+        return {
+            "type": type(self.ex_value).__name__,
+            "args": self.ex_value.args,
+            "message": str(self.ex_value),
+        }
+
+    @classmethod
+    def from_json(cls, data, application):
+        class_name = data["class"]
+        generator_class = globals().get(class_name)
+        if not generator_class:
+            raise ValueError("Unknown generator class: {}".format(class_name))
+
+        generator = generator_class(
+            application,
+            data["project_tag"],
+            data["platform"],
+            data["configuration"])
+
+        generator.added_lines_input_derived = set(data["added_lines_input_derived"])
+        generator.added_lines_output_derived = set(data["added_lines_output_derived"])
+        generator.added_lines_input_unified = set(data["added_lines_input_unified"])
+        generator.added_lines_output_unified = set(data["added_lines_output_unified"])
+
+        if data["cached_build_dirs"]:
+            generator.cached_build_dirs = tuple(data["cached_build_dirs"])
+
+        if data["ex_info"]:
+            ex_info = data["ex_info"]
+            generator.ex_value = cls._reconstruct_exception(ex_info)
+            if generator.ex_value:
+                generator.ex_type = type(generator.ex_value)
+
+        return generator
+
+    @staticmethod
+    def _reconstruct_exception(ex_info):
+        if not ex_info:
+            return None
+
+        type_name = ex_info["type"]
+        args = ex_info["args"]
+
+        cls = getattr(util, type_name, None)
+        if not cls:
+            import builtins
+            cls = getattr(builtins, type_name, None)
+
+        if cls:
+            try:
+                return cls(*args)
+            except:
+                pass
+
+        return RuntimeError("{}: {}".format(type_name, ex_info["message"]))
 
     # Return whether or not any new lines for any .xcfilelist files were
     # discovered.
