@@ -26,12 +26,12 @@
 #include "config.h"
 #include "WebEventFactory.h"
 
+#include "NativeWebTouchEvent.h"
 #include "WebEventModifier.h"
 #include "WebMouseEventButton.h"
 #include "WebEventType.h"
-#include "NativeWebTouchEvent.h"
 
-#include "WebCore/PlatformKeyboardEvent.h"
+#include "PlatformKeyboardEvent.h"
 #include <WebCore/IntPoint.h>
 #include <wtf/WallTime.h>
 
@@ -42,6 +42,35 @@
 
 namespace WebKit {
 using namespace WebCore;
+
+static OptionSet<WebEventModifier> extractModifiers(const BMessage* message)
+{
+    OptionSet<WebEventModifier> modifiers;
+    int32 nativeModifiers;
+    if (message->FindInt32("modifiers", &nativeModifiers) != B_OK)
+        return modifiers;
+
+    if (nativeModifiers & B_SHIFT_KEY)
+        modifiers.add(WebEventModifier::ShiftKey);
+    if (nativeModifiers & B_CONTROL_KEY)
+        modifiers.add(WebEventModifier::AltKey);
+    if (nativeModifiers & B_COMMAND_KEY)
+        modifiers.add(WebEventModifier::ControlKey);
+    if (nativeModifiers & B_OPTION_KEY)
+        modifiers.add(WebEventModifier::MetaKey);
+    if (nativeModifiers & B_CAPS_LOCK)
+        modifiers.add(WebEventModifier::CapsLockKey);
+
+    return modifiers;
+}
+
+static MonotonicTime extractTimestamp(const BMessage* message)
+{
+    int64 when;
+    if (message->FindInt64("when", &when) == B_OK)
+        return MonotonicTime::fromRawSeconds(when / 1000000.0);
+    return MonotonicTime::now();
+}
 
 int32_t WebEventFactory::currentMouseButtons = 0;
 
@@ -85,21 +114,7 @@ WebMouseEvent WebEventFactory::createWebMouseEvent(const BMessage* message)
             button = WebMouseEventButton::Left;
     }
 
-    OptionSet<WebEventModifier> modifiers;
-    int32 nativeModifiers;
-    if (message->FindInt32("modifiers", &nativeModifiers) != B_OK)
-        nativeModifiers = 0;
-
-    if (nativeModifiers & B_SHIFT_KEY)
-        modifiers.add(WebEventModifier::ShiftKey);
-    if (nativeModifiers & B_CONTROL_KEY)
-        modifiers.add(WebEventModifier::AltKey); // Haiku Control is Alt
-    if (nativeModifiers & B_COMMAND_KEY)
-        modifiers.add(WebEventModifier::ControlKey); // Haiku Command is Control/Meta
-    if (nativeModifiers & B_OPTION_KEY)
-        modifiers.add(WebEventModifier::MetaKey);
-    if (nativeModifiers & B_CAPS_LOCK)
-        modifiers.add(WebEventModifier::CapsLockKey);
+    OptionSet<WebEventModifier> modifiers = extractModifiers(message);
 
     BPoint globalPosition;
     message->FindPoint("screen_where", &globalPosition);
@@ -116,10 +131,7 @@ WebMouseEvent WebEventFactory::createWebMouseEvent(const BMessage* message)
     message->FindInt32("be:delta_x", &deltaX);
     message->FindInt32("be:delta_y", &deltaY);
 
-    int64 when;
-    MonotonicTime timestamp = MonotonicTime::now();
-    if (message->FindInt64("when", &when) == B_OK)
-        timestamp = MonotonicTime::fromRawSeconds(when / 1000000.0);
+    MonotonicTime timestamp = extractTimestamp(message);
 
     return WebMouseEvent(
         WebEvent { type, modifiers, timestamp },
@@ -147,47 +159,32 @@ WebKeyboardEvent WebEventFactory::createWebKeyboardEvent(const BMessage* message
         return WebKeyboardEvent(WebEvent { WebEventType::KeyDown, { }, MonotonicTime::now() }, String(), String(), String(), String(), String(), 0, 0, 0, false, false, false);
 
     int32 nativeVirtualKeyCode = 0;
-    int32 nativeModifiers = 0;
     int32 rawChar = 0;
     bool autorepeat = false;
     const char* bytes = "";
 
     message->FindInt32("key", &nativeVirtualKeyCode);
-    message->FindInt32("modifiers", &nativeModifiers);
     message->FindBool("be:key_repeat", &autorepeat);
     if (message->FindInt32("raw_char", &rawChar) != B_OK)
         rawChar = 0;
     if (message->FindString("bytes", &bytes) != B_OK)
         bytes = "";
 
-    OptionSet<WebEventModifier> modifiers;
-    if (nativeModifiers & B_SHIFT_KEY)
-        modifiers.add(WebEventModifier::ShiftKey);
-    if (nativeModifiers & B_COMMAND_KEY)
-        modifiers.add(WebEventModifier::ControlKey); // Haiku Command -> Control
-    if (nativeModifiers & B_CONTROL_KEY)
-        modifiers.add(WebEventModifier::AltKey);     // Haiku Control -> Alt
-    if (nativeModifiers & B_OPTION_KEY)
-        modifiers.add(WebEventModifier::MetaKey);
-    if (nativeModifiers & B_CAPS_LOCK)
-        modifiers.add(WebEventModifier::CapsLockKey);
+    OptionSet<WebEventModifier> modifiers = extractModifiers(message);
 
     BString bbytes(bytes);
 
-    int64 when;
-    MonotonicTime timestamp = MonotonicTime::now();
-    if (message->FindInt64("when", &when) == B_OK)
-        timestamp = MonotonicTime::fromRawSeconds(when / 1000000.0);
+    MonotonicTime timestamp = extractTimestamp(message);
 
     return WebKeyboardEvent(
-        WebEvent{ type, modifiers, timestamp },
+        WebEvent { type, modifiers, timestamp },
         String::fromUTF8(bytes), // text
         String::fromUTF8(bytes), // unmodifiedText
         PlatformKeyboardEvent::KeyValueForKeyEvent(bbytes, nativeVirtualKeyCode), // key
         PlatformKeyboardEvent::KeyCodeForKeyEvent(nativeVirtualKeyCode), // code
         PlatformKeyboardEvent::keyIdentifierForHaikuKeyCode(bytes[0], nativeVirtualKeyCode), // Keyidentifier
         PlatformKeyboardEvent::windowsKeyCodeForKeyEvent(bytes[0], nativeVirtualKeyCode), // windowsVirtualKeyCode
-        nativeVirtualKeyCode, // nativeVirtualKeyCode
+        nativeVirtualKeyCode,
         0, // macCharCode
         autorepeat,
         false, // isKeypad
@@ -196,20 +193,7 @@ WebKeyboardEvent WebEventFactory::createWebKeyboardEvent(const BMessage* message
 
 WebWheelEvent WebEventFactory::createWebWheelEvent(const BMessage* message)
 {
-    OptionSet<WebEventModifier> modifiers;
-    int32 nativeModifiers;
-    if (message->FindInt32("modifiers", &nativeModifiers) == B_OK) {
-        if (nativeModifiers & B_SHIFT_KEY)
-            modifiers.add(WebEventModifier::ShiftKey);
-        if (nativeModifiers & B_COMMAND_KEY)
-            modifiers.add(WebEventModifier::ControlKey);
-        if (nativeModifiers & B_CONTROL_KEY)
-            modifiers.add(WebEventModifier::AltKey);
-        if (nativeModifiers & B_OPTION_KEY)
-            modifiers.add(WebEventModifier::MetaKey);
-        if (nativeModifiers & B_CAPS_LOCK)
-            modifiers.add(WebEventModifier::CapsLockKey);
-    }
+    OptionSet<WebEventModifier> modifiers = extractModifiers(message);
 
     float wheelDeltaX = 0;
     float wheelDeltaY = 0;
@@ -233,46 +217,42 @@ WebWheelEvent WebEventFactory::createWebWheelEvent(const BMessage* message)
     if (message->FindPoint("screen_where", &globalPosition) != B_OK)
         globalPosition = BPoint(0, 0);
 
-    int64 when;
-    MonotonicTime timestamp = MonotonicTime::now();
-    if (message->FindInt64("when", &when) == B_OK)
-        timestamp = MonotonicTime::fromRawSeconds(when / 1000000.0);
+    MonotonicTime timestamp = extractTimestamp(message);
 
     return WebWheelEvent(
-        WebEvent{ WebEventType::Wheel, modifiers, timestamp},
+        WebEvent { WebEventType::Wheel, modifiers, timestamp },
         IntPoint(position), // position
         IntPoint(globalPosition), // globalPosition
-        FloatSize(wheelDeltaX, wheelDeltaY), //delta
-        FloatSize(wheelTicksX, wheelTicksY),// wheelticks
-        WebWheelEvent::Granularity::ScrollByPixelWheelEvent// granularity
-        );
+        FloatSize(wheelDeltaX, wheelDeltaY), // delta
+        FloatSize(wheelTicksX, wheelTicksY), // wheelticks
+        WebWheelEvent::Granularity::ScrollByPixelWheelEvent // granularity
+    );
 }
 
 WebTouchEvent WebEventFactory::createWebTouchEvent(const BMessage* message)
 {
     WebEventType type;
     switch (message->what) {
-        case B_TOUCH_DOWN: type = WebEventType::TouchStart; break;
-        case B_TOUCH_UP: type = WebEventType::TouchEnd; break;
-        case B_TOUCH_MOVED: type = WebEventType::TouchMove; break;
-        case B_TOUCH_CANCEL: type = WebEventType::TouchCancel; break;
-        default: type = WebEventType::TouchCancel; break;
+    case B_TOUCH_DOWN:
+        type = WebEventType::TouchStart;
+        break;
+    case B_TOUCH_UP:
+        type = WebEventType::TouchEnd;
+        break;
+    case B_TOUCH_MOVED:
+        type = WebEventType::TouchMove;
+        break;
+    case B_TOUCH_CANCEL:
+        type = WebEventType::TouchCancel;
+        break;
+    default:
+        type = WebEventType::TouchCancel;
+        break;
     }
 
-    OptionSet<WebEventModifier> modifiers;
-    int32 nativeModifiers;
-    if (message->FindInt32("modifiers", &nativeModifiers) == B_OK) {
-        if (nativeModifiers & B_SHIFT_KEY) modifiers.add(WebEventModifier::ShiftKey);
-        if (nativeModifiers & B_COMMAND_KEY) modifiers.add(WebEventModifier::ControlKey);
-        if (nativeModifiers & B_CONTROL_KEY) modifiers.add(WebEventModifier::AltKey);
-        if (nativeModifiers & B_OPTION_KEY) modifiers.add(WebEventModifier::MetaKey);
-        if (nativeModifiers & B_CAPS_LOCK) modifiers.add(WebEventModifier::CapsLockKey);
-    }
+    OptionSet<WebEventModifier> modifiers = extractModifiers(message);
 
-    int64 when;
-    MonotonicTime timestamp = MonotonicTime::now();
-    if (message->FindInt64("when", &when) == B_OK)
-        timestamp = MonotonicTime::fromRawSeconds(when / 1000000.0);
+    MonotonicTime timestamp = extractTimestamp(message);
 
     Vector<WebPlatformTouchPoint> touchPoints;
 
@@ -280,25 +260,34 @@ WebTouchEvent WebEventFactory::createWebTouchEvent(const BMessage* message)
     for (int32 i = 0; message->FindInt32("be:touch_id", i, &touchId) == B_OK; i++) {
         BPoint location;
         if (message->FindPoint("be:view_where", i, &location) != B_OK)
-            location = BPoint(0,0);
+            location = BPoint(0, 0);
 
         BPoint screenLocation;
         if (message->FindPoint("be:screen_where", i, &screenLocation) != B_OK)
-             screenLocation = BPoint(0,0);
+            screenLocation = BPoint(0, 0);
 
         WebPlatformTouchPoint::TouchPointState state = WebPlatformTouchPoint::TouchPointState::Stationary;
         switch (type) {
-            case WebEventType::TouchStart: state = WebPlatformTouchPoint::TouchPointState::Pressed; break;
-            case WebEventType::TouchEnd: state = WebPlatformTouchPoint::TouchPointState::Released; break;
-            case WebEventType::TouchMove: state = WebPlatformTouchPoint::TouchPointState::Moved; break;
-            case WebEventType::TouchCancel: state = WebPlatformTouchPoint::TouchPointState::Cancelled; break;
-            default: break;
+        case WebEventType::TouchStart:
+            state = WebPlatformTouchPoint::TouchPointState::Pressed;
+            break;
+        case WebEventType::TouchEnd:
+            state = WebPlatformTouchPoint::TouchPointState::Released;
+            break;
+        case WebEventType::TouchMove:
+            state = WebPlatformTouchPoint::TouchPointState::Moved;
+            break;
+        case WebEventType::TouchCancel:
+            state = WebPlatformTouchPoint::TouchPointState::Cancelled;
+            break;
+        default:
+            break;
         }
 
         touchPoints.append(WebPlatformTouchPoint(touchId, state, IntPoint(screenLocation), IntPoint(location)));
     }
 
-    return WebTouchEvent(WebEvent { type, modifiers, timestamp }, WTFMove(touchPoints), { }, { });
+    return WebTouchEvent(WebEvent { type, modifiers, timestamp }, WTF::move(touchPoints), { }, { });
 }
 
 }

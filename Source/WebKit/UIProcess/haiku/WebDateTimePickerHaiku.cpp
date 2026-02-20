@@ -28,34 +28,32 @@
 
 #include "WebPageProxy.h"
 #include <WebCore/InputTypeNames.h>
-#include <wtf/text/CString.h>
 #include <wtf/RunLoop.h>
+#include <wtf/text/CString.h>
 
-#include <cstdlib>
 #include <cerrno>
+#include <cstdlib>
 
-#include <support/Locker.h>
-#include <locale/Collator.h>
-#include <private/shared/CalendarView.h>
+#include <Button.h>
+#include <GroupLayoutBuilder.h>
 #include <LocaleRoster.h>
 #include <MenuField.h>
 #include <MenuItem.h>
 #include <SeparatorView.h>
 #include <TextControl.h>
 #include <TimeFormat.h>
-#include <Button.h>
-#include <GroupLayoutBuilder.h>
 #include <Window.h>
+#include <locale/Collator.h>
+#include <private/shared/CalendarView.h>
+#include <support/Locker.h>
 
 namespace WebKit {
 using namespace WebCore;
 
-class DateTimeChooserWindow: public BWindow
-{
+class DateTimeChooserWindow : public BWindow {
 public:
     DateTimeChooserWindow(WebDateTimePickerHaiku& picker)
-        : BWindow(BRect(0, 0, 10, 10), "Date Picker", B_FLOATING_WINDOW,
-            B_NOT_RESIZABLE | B_NOT_ZOOMABLE | B_AUTO_UPDATE_SIZE_LIMITS)
+        : BWindow(BRect(0, 0, 10, 10), "Date Picker", B_FLOATING_WINDOW, B_NOT_RESIZABLE | B_NOT_ZOOMABLE | B_AUTO_UPDATE_SIZE_LIMITS)
         , m_picker(picker)
         , m_calendar(nullptr)
         , m_yearControl(nullptr)
@@ -87,16 +85,17 @@ public:
         CenterOnScreen();
     }
 
-    void Configure(const WebCore::DateTimeChooserParameters& params) {
+    void Configure(const WebCore::DateTimeChooserParameters& params)
+    {
         MoveTo(BRect(params.anchorRectInRootView).LeftTop());
 
         if (params.type == InputTypeNames::datetimelocal()
-                || params.type == InputTypeNames::date()
-                || params.type == InputTypeNames::week()
-                || params.type == InputTypeNames::month()) {
+            || params.type == InputTypeNames::date()
+            || params.type == InputTypeNames::week()
+            || params.type == InputTypeNames::month()) {
             BDateFormat format;
 
-            m_yearControl = new BTextControl("year", NULL, NULL,
+            m_yearControl = new BTextControl("year", nullptr, nullptr,
                 new BMessage('yech'));
             m_yearControl->SetModificationMessage(new BMessage('yech'));
             m_yearControl->TextView()->SetMaxBytes(6);
@@ -113,13 +112,13 @@ public:
             }
 
             BGroupLayoutBuilder(m_mainGroup)
-                .AddGroup(B_VERTICAL)
-                    .AddGroup(B_HORIZONTAL)
-                        .Add(new BMenuField(NULL, monthMenu))
-                        .Add(m_yearControl)
-                    .End()
-                    .Add(m_calendar = new BPrivate::BCalendarView("Date"))
-                .End()
+            .AddGroup(B_VERTICAL)
+            .AddGroup(B_HORIZONTAL)
+            .Add(new BMenuField(nullptr, monthMenu))
+            .Add(m_yearControl)
+            .End()
+            .Add(m_calendar = new BPrivate::BCalendarView("Date"))
+            .End()
             .End();
 
             BDate initialDate;
@@ -129,7 +128,7 @@ public:
             else if (params.type == InputTypeNames::month()) {
                 format.SetDateFormat(B_LONG_DATE_FORMAT, "yyyy'-'MM");
             } else if (params.type == InputTypeNames::week())
-                format.SetDateFormat(B_LONG_DATE_FORMAT, "yyyy'-W'ww");
+                format.SetDateFormat(B_LONG_DATE_FORMAT, "YYYY'-W'ww");
 
             BString currentValue(params.currentValue.utf8().data());
             format.Parse(currentValue, B_LONG_DATE_FORMAT, initialDate);
@@ -147,10 +146,10 @@ public:
         }
 
         if (params.type == InputTypeNames::datetimelocal())
-           m_mainGroup->AddChild(new BSeparatorView(B_VERTICAL));
+            m_mainGroup->AddChild(new BSeparatorView(B_VERTICAL));
 
         if (params.type == InputTypeNames::datetimelocal()
-                || params.type == InputTypeNames::time()) {
+            || params.type == InputTypeNames::time()) {
             m_hourMenu = new BMenu("hour");
             m_hourMenu->SetLabelFromMarked(true);
             m_minuteMenu = new BMenu("minute");
@@ -166,7 +165,7 @@ public:
             for (int i = 0; i < 24; i++) {
                 BString label;
                 label << i;
-                m_hourMenu->AddItem(new BMenuItem(label, NULL));
+                m_hourMenu->AddItem(new BMenuItem(label, nullptr));
             }
 
             if (BMenuItem* item = m_hourMenu->ItemAt(initialTime.Hour()))
@@ -175,18 +174,18 @@ public:
             for (int i = 0; i < 60; i++) {
                 BString label;
                 label << i;
-                m_minuteMenu->AddItem(new BMenuItem(label, NULL));
+                m_minuteMenu->AddItem(new BMenuItem(label, nullptr));
             }
 
             if (BMenuItem* item = m_minuteMenu->ItemAt(initialTime.Minute()))
                 item->SetMarked(true);
 
             BGroupLayoutBuilder(m_mainGroup)
-                .AddGroup(B_VERTICAL)
-                    .AddGroup(B_HORIZONTAL)
-                        .Add(new BMenuField(NULL, m_hourMenu))
-                        .Add(new BMenuField(NULL, m_minuteMenu))
-                        .AddGlue();
+            .AddGroup(B_VERTICAL)
+            .AddGroup(B_HORIZONTAL)
+            .Add(new BMenuField(nullptr, m_hourMenu))
+            .Add(new BMenuField(nullptr, m_minuteMenu))
+            .AddGlue();
         }
 
         if (params.type == InputTypeNames::month()) {
@@ -203,74 +202,79 @@ public:
         }
     }
 
-    void MessageReceived(BMessage* message) override {
-        switch(message->what) {
-            case 'done':
-            {
-                BString str;
-                BLanguage language("en");
-                BFormattingConventions conventions("en_GB");
+    void MessageReceived(BMessage* message) override
+    {
+        switch (message->what) {
+        case 'done': {
+            BString str;
+            BLanguage language("en");
+            BFormattingConventions conventions("en_GB");
 
-                if (m_calendar) {
-                    conventions.SetExplicitDateFormat(B_LONG_DATE_FORMAT, m_format);
-                    BDateFormat formatter(language, conventions);
-                    formatter.Format(str, m_calendar->Date(), B_LONG_DATE_FORMAT);
-                }
-
-                if (m_hourMenu && m_hourMenu->Superitem()) {
-                    BString timeStr;
-                    timeStr << m_hourMenu->Superitem()->Label();
-                    if (timeStr.Length() < 2) timeStr.Prepend("0");
-                    timeStr << ':';
-                    if (m_minuteMenu && m_minuteMenu->Superitem())
-                        timeStr << m_minuteMenu->Superitem()->Label();
-
-                    // If we have a calendar, str already contains "yyyy-MM-ddT" due to format.
-                    // If not (Time type), str is empty.
-                    str << timeStr;
-                }
-
-                String dateString = String::fromUTF8(str.String());
-                RunLoop::main().dispatch([picker = m_picker, dateString]() {
-                    if (picker)
-                        picker->didChooseDate(dateString);
-                });
-                [[fallthrough]];
+            if (m_calendar) {
+                conventions.SetExplicitDateFormat(B_LONG_DATE_FORMAT, m_format);
+                BDateFormat formatter(language, conventions);
+                formatter.Format(str, m_calendar->Date(), B_LONG_DATE_FORMAT);
             }
-            case 'canc':
-                PostMessage(B_QUIT_REQUESTED);
-                return;
 
-            case 'moch':
-            {
+            if (m_hourMenu && m_hourMenu->Superitem()) {
+                BString timeStr;
+                timeStr << m_hourMenu->Superitem()->Label();
+                if (timeStr.Length() < 2)
+                    timeStr.Prepend("0");
+                timeStr << ':';
+                if (m_minuteMenu && m_minuteMenu->Superitem()) {
+                    BString minuteStr = m_minuteMenu->Superitem()->Label();
+                    if (minuteStr.Length() < 2)
+                        minuteStr.Prepend("0");
+                    timeStr << minuteStr;
+                }
+
+                // If we have a calendar, str already contains "yyyy-MM-ddT" due to format.
+                // If not (Time type), str is empty.
+                str << timeStr;
+            }
+
+            String dateString = String::fromUTF8(str.String());
+            RunLoop::main().dispatch([picker = m_picker, dateString]() {
+                if (picker)
+                    picker->didChooseDate(dateString);
+            });
+            [[fallthrough]];
+        }
+        case 'canc':
+            PostMessage(B_QUIT_REQUESTED);
+            return;
+
+        case 'moch':
+            if (m_calendar)
+                m_calendar->SetMonth(message->FindInt32("month"));
+            return;
+
+        case 'yech': {
+            char* p;
+            errno = 0;
+            int year = strtol(m_yearControl->Text(), &p, 10);
+            if (errno == ERANGE || year > 275759 || year <= 0
+                || p == m_yearControl->Text() || *p != '\0') {
+                m_yearControl->MarkAsInvalid(true);
+                m_okButton->SetEnabled(false);
+            } else {
+                m_yearControl->MarkAsInvalid(false);
+                m_okButton->SetEnabled(true);
                 if (m_calendar)
-                    m_calendar->SetMonth(message->FindInt32("month"));
-                return;
+                    m_calendar->SetYear(year);
             }
-
-            case 'yech':
-            {
-                char* p;
-                errno = 0;
-                int year = strtol(m_yearControl->Text(), &p, 10);
-                if (errno == ERANGE || year > 275759 || year <= 0
-                        || p == m_yearControl->Text() || *p != '\0') {
-                    m_yearControl->MarkAsInvalid(true);
-                    m_okButton->SetEnabled(false);
-                } else {
-                    m_yearControl->MarkAsInvalid(false);
-                    m_okButton->SetEnabled(true);
-                    if (m_calendar)
-                        m_calendar->SetYear(year);
-                }
-                return;
-            }
+            return;
+        }
+        default:
+            break;
         }
 
         BWindow::MessageReceived(message);
     }
 
-    bool QuitRequested() override {
+    bool QuitRequested() override
+    {
         if (m_picker) {
             RunLoop::main().dispatch([picker = m_picker]() {
                 if (picker)

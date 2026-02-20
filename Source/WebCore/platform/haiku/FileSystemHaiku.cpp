@@ -27,7 +27,7 @@
  */
 
 #include "config.h"
-#include "wtf/FileSystem.h"
+#include <wtf/FileSystem.h>
 
 #include <wtf/text/CString.h>
 
@@ -212,14 +212,14 @@ int writeToFile(PlatformFileHandle handle, const void* data, int length)
 {
     if (handle == invalidPlatformFileHandle)
         return -1;
-    return handle->Write(data, length);
+    return static_cast<int>(handle->Write(data, length));
 }
 
 int readFromFile(PlatformFileHandle handle, void* data, int length)
 {
     if (handle == invalidPlatformFileHandle)
         return -1;
-    return handle->Read(data, length);
+    return static_cast<int>(handle->Read(data, length));
 }
 
 bool fileIsDirectory(const String& path)
@@ -230,12 +230,12 @@ bool fileIsDirectory(const String& path)
 
 bool hardLink(const String& targetPath, const String& linkPath)
 {
-    return link(targetPath.utf8().data(), linkPath.utf8().data()) == 0;
+    return !link(targetPath.utf8().data(), linkPath.utf8().data());
 }
 
 bool symlink(const String& targetPath, const String& linkPath)
 {
-    return ::symlink(targetPath.utf8().data(), linkPath.utf8().data()) == 0;
+    return !::symlink(targetPath.utf8().data(), linkPath.utf8().data());
 }
 
 std::optional<int32_t> getVolumeId(const String& path)
