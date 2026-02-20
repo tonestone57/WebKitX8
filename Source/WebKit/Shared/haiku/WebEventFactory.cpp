@@ -27,18 +27,15 @@
 #include "WebEventFactory.h"
 
 #include "NativeWebTouchEvent.h"
+#include "PlatformKeyboardEvent.h"
 #include "WebEventModifier.h"
 #include "WebMouseEventButton.h"
-#include "WebEventType.h"
-
-#include "PlatformKeyboardEvent.h"
-#include <WebCore/IntPoint.h>
-#include <wtf/WallTime.h>
-
 #include <AppDefs.h>
 #include <InterfaceDefs.h>
 #include <Message.h>
 #include <View.h>
+#include <WebCore/IntPoint.h>
+#include <wtf/WallTime.h>
 
 namespace WebKit {
 using namespace WebCore;
@@ -287,7 +284,7 @@ WebTouchEvent WebEventFactory::createWebTouchEvent(const BMessage* message)
         touchPoints.append(WebPlatformTouchPoint(touchId, state, IntPoint(screenLocation), IntPoint(location)));
     }
 
-    return WebTouchEvent(WebEvent { type, modifiers, timestamp }, WTFMove(touchPoints), { }, { });
+    return WebTouchEvent(WebEvent { type, modifiers, timestamp }, WTF::move(touchPoints), { }, { });
 }
 
 }

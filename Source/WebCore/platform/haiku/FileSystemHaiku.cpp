@@ -29,8 +29,6 @@
 #include "config.h"
 #include <wtf/FileSystem.h>
 
-#include <wtf/text/CString.h>
-
 #include <Directory.h>
 #include <Entry.h>
 #include <File.h>
@@ -39,6 +37,7 @@
 #include <fs_attr.h>
 #include <fs_info.h>
 #include <unistd.h>
+#include <wtf/text/CString.h>
 
 
 namespace WebCore {

@@ -27,13 +27,6 @@
 #include "WebDateTimePickerHaiku.h"
 
 #include "WebPageProxy.h"
-#include <WebCore/InputTypeNames.h>
-#include <wtf/RunLoop.h>
-#include <wtf/text/CString.h>
-
-#include <cerrno>
-#include <cstdlib>
-
 #include <Button.h>
 #include <GroupLayoutBuilder.h>
 #include <LocaleRoster.h>
@@ -42,10 +35,15 @@
 #include <SeparatorView.h>
 #include <TextControl.h>
 #include <TimeFormat.h>
+#include <WebCore/InputTypeNames.h>
 #include <Window.h>
+#include <cerrno>
+#include <cstdlib>
 #include <locale/Collator.h>
 #include <private/shared/CalendarView.h>
 #include <support/Locker.h>
+#include <wtf/RunLoop.h>
+#include <wtf/text/CString.h>
 
 namespace WebKit {
 using namespace WebCore;
@@ -112,14 +110,14 @@ public:
             }
 
             BGroupLayoutBuilder(m_mainGroup)
-            .AddGroup(B_VERTICAL)
-            .AddGroup(B_HORIZONTAL)
-            .Add(new BMenuField(nullptr, monthMenu))
-            .Add(m_yearControl)
-            .End()
-            .Add(m_calendar = new BPrivate::BCalendarView("Date"))
-            .End()
-            .End();
+                .AddGroup(B_VERTICAL)
+                .AddGroup(B_HORIZONTAL)
+                .Add(new BMenuField(nullptr, monthMenu))
+                .Add(m_yearControl)
+                .End()
+                .Add(m_calendar = new BPrivate::BCalendarView("Date"))
+                .End()
+                .End();
 
             BDate initialDate;
 
@@ -181,11 +179,11 @@ public:
                 item->SetMarked(true);
 
             BGroupLayoutBuilder(m_mainGroup)
-            .AddGroup(B_VERTICAL)
-            .AddGroup(B_HORIZONTAL)
-            .Add(new BMenuField(nullptr, m_hourMenu))
-            .Add(new BMenuField(nullptr, m_minuteMenu))
-            .AddGlue();
+                .AddGroup(B_VERTICAL)
+                .AddGroup(B_HORIZONTAL)
+                .Add(new BMenuField(nullptr, m_hourMenu))
+                .Add(new BMenuField(nullptr, m_minuteMenu))
+                .AddGlue();
         }
 
         if (params.type == InputTypeNames::month()) {

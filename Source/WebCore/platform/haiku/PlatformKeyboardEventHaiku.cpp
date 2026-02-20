@@ -155,7 +155,7 @@ int PlatformKeyboardEvent::windowsKeyCodeForKeyEvent(char singleByte, int keyCod
     case B_TAB:
         return VK_TAB; // (09) TAB key
     case B_RETURN:
-        return VK_RETURN; //(0D) Return key
+        return VK_RETURN; // (0D) Return key
     case B_ESCAPE:
         return VK_ESCAPE; // (1B) ESC key
     case B_SPACE:
@@ -329,25 +329,25 @@ int PlatformKeyboardEvent::windowsKeyCodeForKeyEvent(char singleByte, int keyCod
 String PlatformKeyboardEvent::KeyValueForKeyEvent(BString bytes, int keyCode)
 {
     switch (bytes.ByteAt(0)) {
-        case B_FUNCTION_KEY:
-            switch (keyCode) {
-                case B_F1_KEY: return "F1"_s;
-                case B_F2_KEY: return "F2"_s;
-                case B_F3_KEY: return "F3"_s;
-                case B_F4_KEY: return "F4"_s;
-                case B_F5_KEY: return "F5"_s;
-                case B_F6_KEY: return "F6"_s;
-                case B_F7_KEY: return "F7"_s;
-                case B_F8_KEY: return "F8"_s;
-                case B_F9_KEY: return "F9"_s;
-                case B_F10_KEY: return "F10"_s;
-                case B_F11_KEY: return "F11"_s;
-                case B_F12_KEY: return "F12"_s;
-                case B_PRINT_KEY: return "Print"_s;
-                case B_PAUSE_KEY: return "Pause"_s;
-                case B_SCROLL_KEY: return "ScrollLock"_s;
-            }
-            break;
+    case B_FUNCTION_KEY:
+        switch (keyCode) {
+        case B_F1_KEY: return "F1"_s;
+        case B_F2_KEY: return "F2"_s;
+        case B_F3_KEY: return "F3"_s;
+        case B_F4_KEY: return "F4"_s;
+        case B_F5_KEY: return "F5"_s;
+        case B_F6_KEY: return "F6"_s;
+        case B_F7_KEY: return "F7"_s;
+        case B_F8_KEY: return "F8"_s;
+        case B_F9_KEY: return "F9"_s;
+        case B_F10_KEY: return "F10"_s;
+        case B_F11_KEY: return "F11"_s;
+        case B_F12_KEY: return "F12"_s;
+        case B_PRINT_KEY: return "Print"_s;
+        case B_PAUSE_KEY: return "Pause"_s;
+        case B_SCROLL_KEY: return "ScrollLock"_s;
+        }
+        break;
 
     case B_BACKSPACE: return "Backspace"_s;
     case B_LEFT_ARROW: return "ArrowLeft"_s;
@@ -435,12 +435,12 @@ String PlatformKeyboardEvent::KeyCodeForKeyEvent(int keyCode)
         case 0x0035: return "End"_s;
         case 0x0036: return "PageDown"_s;
 
-        case 0x0037: return "Numpad7"_s;
-        case 0x0038: return "Numpad8"_s;
-        case 0x0039: return "Numpad9"_s;
-        case 0x003A: return "NumpadAdd"_s;
+    case 0x0037: return "Numpad7"_s;
+    case 0x0038: return "Numpad8"_s;
+    case 0x0039: return "Numpad9"_s;
+    case 0x003A: return "NumpadAdd"_s;
 
-        case 0x003B: return "CapsLock"_s;
+    case 0x003B: return "CapsLock"_s;
         case 0x003C: return "KeyA"_s;
         case 0x003D: return "KeyS"_s;
         case 0x003E: return "KeyD"_s;
@@ -454,11 +454,11 @@ String PlatformKeyboardEvent::KeyCodeForKeyEvent(int keyCode)
         case 0x0046: return "Quote"_s;
         case 0x0047: return "Return"_s;
 
-        case 0x0048: return "Numpad4"_s;
-        case 0x0049: return "Numpad5"_s;
-        case 0x004A: return "Numpad6"_s;
+    case 0x0048: return "Numpad4"_s;
+    case 0x0049: return "Numpad5"_s;
+    case 0x004A: return "Numpad6"_s;
 
-        case 0x004B: return "ShiftLeft"_s;
+    case 0x004B: return "ShiftLeft"_s;
         case 0x004C: return "KeyZ"_s;
         case 0x004D: return "KeyX"_s;
         case 0x004E: return "KeyC"_s;
@@ -484,13 +484,13 @@ String PlatformKeyboardEvent::KeyCodeForKeyEvent(int keyCode)
         case 0x0061: return "ArrowLeft"_s;
         case 0x0062: return "ArrowDown"_s;
         case 0x0063: return "ArrowRight"_s;
-        case 0x0064: return "Numpad0"_s;
-        case 0x0065: return "NumpadDecimal"_s;
-        case 0x0066: return "MetaLeft"_s;
-        case 0x0067: return "MetaRight"_s;
-        case 0x0068: return "ContextMenu"_s;
-        case 0x0069: return "IntlBackslash"_s;
-        case 0x006a: return "NumPadEqual"_s;
+    case 0x0064: return "Numpad0"_s;
+    case 0x0065: return "NumpadDecimal"_s;
+    case 0x0066: return "MetaLeft"_s;
+    case 0x0067: return "MetaRight"_s;
+    case 0x0068: return "ContextMenu"_s;
+    case 0x0069: return "IntlBackslash"_s;
+    case 0x006a: return "NumPadEqual"_s;
     }
     return "Unidentified"_s;
 }

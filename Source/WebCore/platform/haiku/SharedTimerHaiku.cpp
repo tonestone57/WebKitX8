@@ -30,9 +30,9 @@
 #include <Looper.h>
 #include <MessageFilter.h>
 #include <MessageRunner.h>
-#include <support/Locker.h>
-#include <support/Autolock.h>
 #include <stdio.h>
+#include <support/Autolock.h>
+#include <support/Locker.h>
 
 #define FIRE_MESSAGE 'fire'
 
