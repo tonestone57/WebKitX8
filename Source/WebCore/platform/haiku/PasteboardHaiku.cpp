@@ -28,36 +28,33 @@
 #include "config.h"
 #include "Pasteboard.h"
 
-#include "PasteboardContextHaiku.h"
 #include "Color.h"
 #include "DocumentFragment.h"
 #include "DragData.h"
 #include "Editor.h"
 #include "Frame.h"
 #include "LocalFrameInlines.h"
-#include "wtf/URL.h"
+#include "PasteboardContextHaiku.h"
 #include "SimpleRange.h"
 #include "TextResourceDecoder.h"
 #include "markup.h"
-
-#include <support/Locker.h>
-#include <app/Clipboard.h>
+#include <BitmapStream.h>
 #include <Entry.h>
 #include <Message.h>
 #include <Path.h>
 #include <String.h>
-#include <wtf/text/CString.h>
-
-#include <BitmapStream.h>
 #include <TranslatorRoster.h>
+#include <app/Clipboard.h>
+#include <support/Locker.h>
 #include <wtf/Scope.h>
-
+#include <wtf/URL.h>
+#include <wtf/text/CString.h>
 
 namespace WebCore {
 
-    std::unique_ptr<Pasteboard> Pasteboard::createForCopyAndPaste(std::unique_ptr<PasteboardContext>&& context)
+std::unique_ptr<Pasteboard> Pasteboard::createForCopyAndPaste(std::unique_ptr<PasteboardContext>&& context)
 {
-    return std::make_unique<Pasteboard>(std::move(context));
+    return makeUnique<Pasteboard>(WTF::move(context));
 }
 
 #if ENABLE(DRAG_SUPPORT)
@@ -68,7 +65,7 @@ std::unique_ptr<Pasteboard> Pasteboard::createForDragAndDrop(std::unique_ptr<Pas
     if (!context)
         context = makeUnique<PasteboardContextHaiku>(nullptr); // Marker for "use drag clipboard"
 
-    return createForCopyAndPaste(std::move(context));
+    return createForCopyAndPaste(WTF::move(context));
 }
 
 std::unique_ptr<Pasteboard> Pasteboard::create(const DragData& dragData)
@@ -77,8 +74,8 @@ std::unique_ptr<Pasteboard> Pasteboard::create(const DragData& dragData)
 }
 #endif
 
-Pasteboard::Pasteboard(std::unique_ptr<WebCore::PasteboardContext, std::default_delete<WebCore::PasteboardContext> >&& context)
-    : m_context(std::move(context))
+Pasteboard::Pasteboard(std::unique_ptr<WebCore::PasteboardContext>&& context)
+    : m_context(WTF::move(context))
 {
 }
 
@@ -121,10 +118,14 @@ public:
     }
 
     BMessage* message() const { return m_message; }
-    bool isValid() const { return m_message != nullptr; }
+    bool isValid() const { return !!m_message; }
 
     void commit() { m_committed = true; }
-    void clear() { if (m_message) m_message->MakeEmpty(); }
+    void clear()
+    {
+        if (m_message)
+            m_message->MakeEmpty();
+    }
 
 private:
     BMessage* m_message = nullptr;
@@ -153,8 +154,7 @@ void Pasteboard::writeString(const String& type, const String& data)
         bdata->RemoveName(typeUTF8.data());
 
         CString dataUTF8 = data.utf8();
-        if (bdata->AddData(typeUTF8.data(), B_MIME_TYPE,
-                dataUTF8.data(), dataUTF8.length()) == B_OK)
+        if (bdata->AddData(typeUTF8.data(), B_MIME_TYPE, dataUTF8.data(), dataUTF8.length()) == B_OK)
             result = true;
     }
 
@@ -238,14 +238,15 @@ void WebCore::Pasteboard::write(WebCore::PasteboardImage const& pasteboardImage)
         // BBitmapStream takes the bitmap but we must detach it to prevent deletion
         BBitmapStream stream(platformImage.get());
         BBitmap* tmp = nullptr;
-        auto detach = makeScopeExit([&] { stream.DetachBitmap(&tmp); });
+        auto detach = makeScopeExit([&] {
+            stream.DetachBitmap(&tmp);
+        });
 
         BMallocIO outStream;
 
         // Translate to PNG
-        if (roster->Translate(&stream, NULL, NULL, &outStream, B_PNG_FORMAT) == B_OK) {
-             data->AddData("image/png", B_MIME_TYPE, outStream.Buffer(), outStream.BufferLength());
-        }
+        if (roster->Translate(&stream, nullptr, nullptr, &outStream, B_PNG_FORMAT) == B_OK)
+            data->AddData("image/png", B_MIME_TYPE, outStream.Buffer(), outStream.BufferLength());
     }
 
     transaction.commit();
@@ -327,9 +328,8 @@ void Pasteboard::write(const PasteboardURL& url)
     if (url.url.protocolIs("file"_s)) {
         BEntry entry(url.url.fileSystemPath().utf8().data());
         entry_ref ref;
-        if (entry.GetRef(&ref) == B_OK) {
+        if (entry.GetRef(&ref) == B_OK)
             data->AddRef("refs", &ref);
-        }
     }
 
     transaction.commit();
@@ -382,7 +382,7 @@ bool Pasteboard::canSmartReplace()
 }
 
 
-void Pasteboard::read(PasteboardWebContentReader& reader, WebContentReadingPolicy, std::optional<long unsigned int>)
+void Pasteboard::read(PasteboardWebContentReader& reader, WebContentReadingPolicy, std::optional<unsigned long>)
 {
     PasteboardTransaction transaction(context());
     if (!transaction.isValid())
@@ -392,31 +392,24 @@ void Pasteboard::read(PasteboardWebContentReader& reader, WebContentReadingPolic
     if (!data)
         return;
 
-    const char* buffer = 0;
+    const char* buffer = nullptr;
     ssize_t bufferLength;
 
-    if (data->FindData("text/html", B_MIME_TYPE, (const void**)&buffer, &bufferLength) == B_OK) {
+    if (data->FindData("text/html", B_MIME_TYPE, reinterpret_cast<const void**>(&buffer), &bufferLength) == B_OK) {
         String html = String::fromUTF8(std::span<const char>(buffer, bufferLength));
         if (reader.readHTML(html))
             return;
     }
 
-    if (data->FindData("text/plain", B_MIME_TYPE, (const void**)&buffer, &bufferLength) == B_OK) {
+    if (data->FindData("text/plain", B_MIME_TYPE, reinterpret_cast<const void**>(&buffer), &bufferLength) == B_OK) {
         String text = String::fromUTF8(std::span<const char>(buffer, bufferLength));
         if (reader.readPlainText(text))
             return;
     }
-
-    // Also try reading general text if specific MIME types failed but we have something
-    if (data->HasData("text/plain", B_MIME_TYPE)) {
-         // Already handled above
-    } else {
-        // Fallback for other types?
-    }
 }
 
 
-void Pasteboard::read(PasteboardPlainText& text, WebCore::PlainTextURLReadingPolicy, std::optional<long unsigned int>)
+void Pasteboard::read(PasteboardPlainText& text, WebCore::PlainTextURLReadingPolicy, std::optional<unsigned long>)
 {
     PasteboardTransaction transaction(context());
     if (!transaction.isValid())
@@ -428,13 +421,11 @@ void Pasteboard::read(PasteboardPlainText& text, WebCore::PlainTextURLReadingPol
 
     const char* buffer = 0;
     ssize_t bufferLength;
-    if (data->FindData("text/plain", B_MIME_TYPE, 
-            reinterpret_cast<const void**>(&buffer), &bufferLength) == B_OK)
+    if (data->FindData("text/plain", B_MIME_TYPE, reinterpret_cast<const void**>(&buffer), &bufferLength) == B_OK)
         text.text = String::fromUTF8(std::span<const char>(buffer, bufferLength));
 }
 
-RefPtr<DocumentFragment> Pasteboard::documentFragment(LocalFrame& frame, const SimpleRange& context,
-													  bool allowPlainText, bool& chosePlainText)
+RefPtr<DocumentFragment> Pasteboard::documentFragment(LocalFrame& frame, const SimpleRange& context, bool allowPlainText, bool& chosePlainText)
 {
     chosePlainText = false;
 
@@ -446,16 +437,16 @@ RefPtr<DocumentFragment> Pasteboard::documentFragment(LocalFrame& frame, const S
     if (!data)
         return nullptr;
 
-    const char* buffer = 0;
+    const char* buffer = nullptr;
     ssize_t bufferLength;
     if (data->FindData("text/html", B_MIME_TYPE, reinterpret_cast<const void**>(&buffer), &bufferLength) == B_OK) {
-        RefPtr<TextResourceDecoder> decoder = TextResourceDecoder::create(ASCIILiteral::fromLiteralUnsafe("text/plain"), PAL::UTF8Encoding(), true);
+        RefPtr<TextResourceDecoder> decoder = TextResourceDecoder::create("text/plain"_s, PAL::UTF8Encoding(), true);
         StringBuilder html;
         html.append(decoder->decode(std::span<const unsigned char>((const unsigned char*)buffer, bufferLength)));
         html.append(decoder->flush());
 
         if (!html.isEmpty()) {
-            RefPtr<DocumentFragment> fragment = createFragmentFromMarkup(*frame.document(), html.toString(), String(), {});
+            RefPtr<DocumentFragment> fragment = createFragmentFromMarkup(*frame.document(), html.toString(), String(), { });
             if (fragment)
                 return fragment;
         }
@@ -479,7 +470,8 @@ RefPtr<DocumentFragment> Pasteboard::documentFragment(LocalFrame& frame, const S
 bool Pasteboard::hasData()
 {
     PasteboardTransaction transaction(context());
-    if (!transaction.isValid()) return false;
+    if (!transaction.isValid())
+        return false;
 
     BMessage* data = transaction.message();
     if (data)
@@ -491,7 +483,8 @@ bool Pasteboard::hasData()
 void Pasteboard::clear(const String& type)
 {
     PasteboardTransaction transaction(context());
-    if (!transaction.isValid()) return;
+    if (!transaction.isValid())
+        return;
 
     BMessage* data = transaction.message();
     if (data) {
@@ -515,12 +508,8 @@ String Pasteboard::readString(const String& type)
         BMessage* data = transaction.message();
         const char* buffer = nullptr;
         ssize_t bufferLength = 0;
-        if (data) {
-            if (data->FindData(type.utf8().data(), B_MIME_TYPE,
-                reinterpret_cast<const void**>(&buffer), &bufferLength) == B_OK) {
-                result.SetTo(buffer, bufferLength);
-            }
-        }
+        if (data && data->FindData(type.utf8().data(), B_MIME_TYPE, reinterpret_cast<const void**>(&buffer), &bufferLength) == B_OK)
+            result.SetTo(buffer, bufferLength);
     }
 
     return String::fromUTF8(result.String());
@@ -528,13 +517,14 @@ String Pasteboard::readString(const String& type)
 
 String Pasteboard::readStringInCustomData(const String& type)
 {
-	return readString(type);
+    return readString(type);
 }
 
 void Pasteboard::clear()
 {
     PasteboardTransaction transaction(context());
-    if (!transaction.isValid()) return;
+    if (!transaction.isValid())
+        return;
 
     transaction.clear();
     transaction.commit();
@@ -562,7 +552,7 @@ Vector<String> Pasteboard::typesForLegacyUnsafeBindings()
             int32 count;
 
             for (int32 i = 0; data->GetInfo(B_ANY_TYPE, i, &name, &type, &count) == B_OK; i++) {
-                if (strncmp(name, "be:", 3) == 0)
+                if (StringView::fromLatin1(name).startsWith("be:"_s))
                     continue;
                 result.append(String::fromUTF8(name));
             }
@@ -574,35 +564,36 @@ Vector<String> Pasteboard::typesForLegacyUnsafeBindings()
 
 Vector<String> Pasteboard::typesSafeForBindings(const String&)
 {
-	return typesForLegacyUnsafeBindings();
+    return typesForLegacyUnsafeBindings();
 }
 
 void Pasteboard::writeCustomData(const WTF::Vector<PasteboardCustomData>& data)
 {
-	if (!data.isEmpty()) {
-		const auto& customData = data[0];
-		customData.forEachPlatformString([this] (auto& type, auto& string) {
-			writeString(type, string);
-		});
-	}
+    if (!data.isEmpty()) {
+        const auto& customData = data[0];
+        customData.forEachPlatformString([this](auto& type, auto& string) {
+            writeString(type, string);
+        });
+    }
 }
 
 void Pasteboard::read(WebCore::PasteboardFileReader& reader, std::optional<unsigned long>)
 {
     PasteboardTransaction transaction(context());
-    if (!transaction.isValid()) return;
+    if (!transaction.isValid())
+        return;
 
     BMessage* data = transaction.message();
-    if (!data) return;
+    if (!data)
+        return;
 
     entry_ref ref;
     for (int32 i = 0; data->FindRef("refs", i, &ref) == B_OK; i++) {
         BEntry entry(&ref, true);
         if (entry.InitCheck() == B_OK) {
             BPath path;
-            if (entry.GetPath(&path) == B_OK) {
+            if (entry.GetPath(&path) == B_OK)
                 reader.readFilename(String::fromUTF8(path.Path()));
-            }
         }
     }
 }

@@ -155,7 +155,7 @@ int PlatformKeyboardEvent::windowsKeyCodeForKeyEvent(char singleByte, int keyCod
     case B_TAB:
         return VK_TAB; // (09) TAB key
     case B_RETURN:
-        return VK_RETURN; //(0D) Return key
+        return VK_RETURN; // (0D) Return key
     case B_ESCAPE:
         return VK_ESCAPE; // (1B) ESC key
     case B_SPACE:
@@ -329,41 +329,41 @@ int PlatformKeyboardEvent::windowsKeyCodeForKeyEvent(char singleByte, int keyCod
 String PlatformKeyboardEvent::KeyValueForKeyEvent(BString bytes, int keyCode)
 {
     switch (bytes.ByteAt(0)) {
-        case B_FUNCTION_KEY:
-            switch (keyCode) {
-                case B_F1_KEY: return "F1"_s;
-                case B_F2_KEY: return "F2"_s;
-                case B_F3_KEY: return "F3"_s;
-                case B_F4_KEY: return "F4"_s;
-                case B_F5_KEY: return "F5"_s;
-                case B_F6_KEY: return "F6"_s;
-                case B_F7_KEY: return "F7"_s;
-                case B_F8_KEY: return "F8"_s;
-                case B_F9_KEY: return "F9"_s;
-                case B_F10_KEY: return "F10"_s;
-                case B_F11_KEY: return "F11"_s;
-                case B_F12_KEY: return "F12"_s;
-                case B_PRINT_KEY: return "Print"_s;
-                case B_PAUSE_KEY: return "Pause"_s;
-                case B_SCROLL_KEY: return "ScrollLock"_s;
-            }
-            break;
+    case B_FUNCTION_KEY:
+        switch (keyCode) {
+        case B_F1_KEY: return "F1"_s;
+        case B_F2_KEY: return "F2"_s;
+        case B_F3_KEY: return "F3"_s;
+        case B_F4_KEY: return "F4"_s;
+        case B_F5_KEY: return "F5"_s;
+        case B_F6_KEY: return "F6"_s;
+        case B_F7_KEY: return "F7"_s;
+        case B_F8_KEY: return "F8"_s;
+        case B_F9_KEY: return "F9"_s;
+        case B_F10_KEY: return "F10"_s;
+        case B_F11_KEY: return "F11"_s;
+        case B_F12_KEY: return "F12"_s;
+        case B_PRINT_KEY: return "Print"_s;
+        case B_PAUSE_KEY: return "Pause"_s;
+        case B_SCROLL_KEY: return "ScrollLock"_s;
+        }
+        break;
 
-        case B_BACKSPACE: return "Backspace"_s;
-        case B_LEFT_ARROW: return "ArrowLeft"_s;
-        case B_RIGHT_ARROW: return "ArrowRight"_s;
-        case B_UP_ARROW: return "ArrowUp"_s;
-        case B_DOWN_ARROW: return "ArrowDown"_s;
-        case B_INSERT: return "Insert"_s;
-        case B_ENTER: return "Enter"_s;
-        case B_DELETE: return "Delete"_s;
-        case B_HOME: return "Home"_s;
-        case B_END: return "End"_s;
-        case B_PAGE_UP: return "PageUp"_s;
-        case B_PAGE_DOWN: return "PageDown"_s;
-        case B_TAB: return "Tab"_s;
-        case B_SPACE: return " "_s;
-        case B_ESCAPE: return "Escape"_s;
+    case B_BACKSPACE: return "Backspace"_s;
+    case B_LEFT_ARROW: return "ArrowLeft"_s;
+    case B_RIGHT_ARROW: return "ArrowRight"_s;
+    case B_UP_ARROW: return "ArrowUp"_s;
+    case B_DOWN_ARROW: return "ArrowDown"_s;
+    case B_INSERT: return "Insert"_s;
+    case B_ENTER: return "Enter"_s;
+    case B_DELETE: return "Delete"_s;
+    case B_HOME: return "Home"_s;
+    case B_END: return "End"_s;
+    case B_PAGE_UP: return "PageUp"_s;
+    case B_PAGE_DOWN: return "PageDown"_s;
+    case B_TAB: return "Tab"_s;
+    case B_SPACE: return " "_s;
+    case B_ESCAPE: return "Escape"_s;
 
         default:
             return String::fromUTF8(bytes);
@@ -374,44 +374,44 @@ String PlatformKeyboardEvent::KeyValueForKeyEvent(BString bytes, int keyCode)
 String PlatformKeyboardEvent::KeyCodeForKeyEvent(int keyCode)
 {
     switch (keyCode) {
-        case 0x0001: return "Escape"_s;
-        case 0x0002: return "F1"_s;
-        case 0x0003: return "F2"_s;
-        case 0x0004: return "F3"_s;
-        case 0x0005: return "F4"_s;
-        case 0x0006: return "F5"_s;
-        case 0x0007: return "F6"_s;
-        case 0x0008: return "F7"_s;
-        case 0x0009: return "F8"_s;
-        case 0x000A: return "F9"_s;
-        case 0x000B: return "F10"_s;
-        case 0x000C: return "F11"_s;
-        case 0x000D: return "F12"_s;
+    case 0x0001: return "Escape"_s;
+    case 0x0002: return "F1"_s;
+    case 0x0003: return "F2"_s;
+    case 0x0004: return "F3"_s;
+    case 0x0005: return "F4"_s;
+    case 0x0006: return "F5"_s;
+    case 0x0007: return "F6"_s;
+    case 0x0008: return "F7"_s;
+    case 0x0009: return "F8"_s;
+    case 0x000A: return "F9"_s;
+    case 0x000B: return "F10"_s;
+    case 0x000C: return "F11"_s;
+    case 0x000D: return "F12"_s;
 
-        case 0x000E: return "PrintScreen"_s;
-        case 0x000F: return "ScrollLock"_s;
-        case 0x0010: return "Pause"_s;
+    case 0x000E: return "PrintScreen"_s;
+    case 0x000F: return "ScrollLock"_s;
+    case 0x0010: return "Pause"_s;
 
-        case 0x0011: return "Backquote"_s;
-        case 0x0012: return "Digit1"_s;
-        case 0x0013: return "Digit2"_s;
-        case 0x0014: return "Digit3"_s;
-        case 0x0015: return "Digit4"_s;
-        case 0x0016: return "Digit5"_s;
-        case 0x0017: return "Digit6"_s;
-        case 0x0018: return "Digit7"_s;
-        case 0x0019: return "Digit8"_s;
-        case 0x001A: return "Digit9"_s;
-        case 0x001B: return "Digit0"_s;
-        case 0x001C: return "Minus"_s;
-        case 0x001D: return "Equal"_s;
-        case 0x001E: return "Backspace"_s;
+    case 0x0011: return "Backquote"_s;
+    case 0x0012: return "Digit1"_s;
+    case 0x0013: return "Digit2"_s;
+    case 0x0014: return "Digit3"_s;
+    case 0x0015: return "Digit4"_s;
+    case 0x0016: return "Digit5"_s;
+    case 0x0017: return "Digit6"_s;
+    case 0x0018: return "Digit7"_s;
+    case 0x0019: return "Digit8"_s;
+    case 0x001A: return "Digit9"_s;
+    case 0x001B: return "Digit0"_s;
+    case 0x001C: return "Minus"_s;
+    case 0x001D: return "Equal"_s;
+    case 0x001E: return "Backspace"_s;
 
-        case 0x001F: return "Insert"_s;
-        case 0x0020: return "Home"_s;
-        case 0x0021: return "PageUp"_s;
-            
-        case 0x0022: return "NumLock"_s;
+    case 0x001F: return "Insert"_s;
+    case 0x0020: return "Home"_s;
+    case 0x0021: return "PageUp"_s;
+
+    case 0x0022: return "NumLock"_s;
         case 0x0023: return "NumpadDivide"_s;
         case 0x0024: return "NumpadMultiply"_s;
         case 0x0025: return "NumpadSubtract"_s;
@@ -435,12 +435,12 @@ String PlatformKeyboardEvent::KeyCodeForKeyEvent(int keyCode)
         case 0x0035: return "End"_s;
         case 0x0036: return "PageDown"_s;
 
-        case 0x0037: return "Numpad7"_s;
-        case 0x0038: return "Numpad8"_s;
-        case 0x0039: return "Numpad9"_s;
-        case 0x003A: return "NumpadAdd"_s;
+    case 0x0037: return "Numpad7"_s;
+    case 0x0038: return "Numpad8"_s;
+    case 0x0039: return "Numpad9"_s;
+    case 0x003A: return "NumpadAdd"_s;
 
-        case 0x003B: return "CapsLock"_s;
+    case 0x003B: return "CapsLock"_s;
         case 0x003C: return "KeyA"_s;
         case 0x003D: return "KeyS"_s;
         case 0x003E: return "KeyD"_s;
@@ -454,11 +454,11 @@ String PlatformKeyboardEvent::KeyCodeForKeyEvent(int keyCode)
         case 0x0046: return "Quote"_s;
         case 0x0047: return "Return"_s;
 
-        case 0x0048: return "Numpad4"_s;
-        case 0x0049: return "Numpad5"_s;
-        case 0x004A: return "Numpad6"_s;
+    case 0x0048: return "Numpad4"_s;
+    case 0x0049: return "Numpad5"_s;
+    case 0x004A: return "Numpad6"_s;
 
-        case 0x004B: return "ShiftLeft"_s;
+    case 0x004B: return "ShiftLeft"_s;
         case 0x004C: return "KeyZ"_s;
         case 0x004D: return "KeyX"_s;
         case 0x004E: return "KeyC"_s;
@@ -484,13 +484,13 @@ String PlatformKeyboardEvent::KeyCodeForKeyEvent(int keyCode)
         case 0x0061: return "ArrowLeft"_s;
         case 0x0062: return "ArrowDown"_s;
         case 0x0063: return "ArrowRight"_s;
-        case 0x0064: return "Numpad0"_s;
-        case 0x0065: return "NumpadDecimal"_s;
-        case 0x0066: return "MetaLeft"_s;
-        case 0x0067: return "MetaRight"_s;
-        case 0x0068: return "ContextMenu"_s;
-        case 0x0069: return "IntlBackslash"_s;
-        case 0x006a: return "NumPadEqual"_s;
+    case 0x0064: return "Numpad0"_s;
+    case 0x0065: return "NumpadDecimal"_s;
+    case 0x0066: return "MetaLeft"_s;
+    case 0x0067: return "MetaRight"_s;
+    case 0x0068: return "ContextMenu"_s;
+    case 0x0069: return "IntlBackslash"_s;
+    case 0x006a: return "NumPadEqual"_s;
     }
     return "Unidentified"_s;
 }
@@ -530,14 +530,11 @@ PlatformKeyboardEvent::PlatformKeyboardEvent(const BMessage* message)
     if (modifiers & B_OPTION_KEY)
         m_modifiers.add(PlatformEvent::Modifier::MetaKey);
 
-    m_timestamp = MonotonicTime::now(); // Approximate, should use 'when' from message if available
     int64 when;
-    if (message->FindInt64("when", &when) == B_OK) {
-        // Haiku 'when' is system_time() (microseconds since boot)
-        // MonotonicTime needs to be compatible.
-        // Assuming MonotonicTime::fromRawSeconds uses compatible base or we just use now() for simplicity.
-        // using now() is safer for sync.
-    }
+    if (message->FindInt64("when", &when) == B_OK)
+        m_timestamp = MonotonicTime::fromRawSeconds(when / 1000000.0);
+    else
+        m_timestamp = MonotonicTime::now();
 }
 
 void PlatformKeyboardEvent::disambiguateKeyDownEvent(Type type, bool backwardCompatibilityMode)

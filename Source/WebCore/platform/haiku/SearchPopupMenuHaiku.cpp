@@ -45,21 +45,34 @@ void SearchPopupMenuHaiku::saveRecentSearches(const AtomString& name, const Vect
     path.Append("RecentSearches");
 
     BMessage message;
-    BFile file(path.Path(), B_READ_WRITE | B_CREATE_FILE);
-    if (file.InitCheck() == B_OK)
-        message.Unflatten(&file);
+    {
+        BFile file(path.Path(), B_READ_ONLY);
+        if (file.InitCheck() == B_OK)
+            message.Unflatten(&file);
+    }
 
     BMessage searches;
     for (const auto& item : searchItems) {
         searches.AddString("items", item.string.utf8().data());
+        searches.AddDouble("times", item.time.secondsSinceEpoch().seconds());
     }
 
     message.RemoveName(name.string().utf8().data());
     message.AddMessage(name.string().utf8().data(), &searches);
 
-    file.Seek(0, SEEK_SET);
-    file.SetSize(0);
-    message.Flatten(&file);
+    BPath tempPath(path);
+    if (tempPath.GetParent(&tempPath) != B_OK)
+        return;
+    tempPath.Append("RecentSearches.tmp");
+
+    BFile tempFile(tempPath.Path(), B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
+    if (tempFile.InitCheck() == B_OK) {
+        if (message.Flatten(&tempFile) == B_OK) {
+            tempFile.Unset();
+            BEntry tempEntry(tempPath.Path());
+            tempEntry.Rename(path.Leaf(), true);
+        }
+    }
 }
 
 void SearchPopupMenuHaiku::loadRecentSearches(const AtomString& name, Vector<RecentSearch>& searchItems)
@@ -74,9 +87,12 @@ void SearchPopupMenuHaiku::loadRecentSearches(const AtomString& name, Vector<Rec
             if (message.FindMessage(name.string().utf8().data(), &searches) == B_OK) {
                 const char* item;
                 for (int32 i = 0; searches.FindString("items", i, &item) == B_OK; i++) {
-                     RecentSearch search;
-                     search.string = String::fromUTF8(item);
-                     searchItems.append(search);
+                    RecentSearch search;
+                    search.string = String::fromUTF8(item);
+                    double time;
+                    if (searches.FindDouble("times", i, &time) == B_OK)
+                        search.time = WallTime::fromRawSeconds(time);
+                    searchItems.append(search);
                 }
             }
         }

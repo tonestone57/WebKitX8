@@ -66,7 +66,7 @@ static const unsigned s_holdOffMultiplier = 20;
 
 #if OS(HAIKU)
 static const Seconds s_memoryPressurePollingInterval { 2_s };
-static const size_t s_memoryPressureAbsoluteThreshold = 256 * MB;
+static const size_t s_memoryPressureAbsoluteThreshold = 128 * MB;
 static const double s_memoryPressureRelativeThreshold = 0.20;
 static const size_t s_memoryPressureRelativeThresholdCap = 1024 * MB;
 

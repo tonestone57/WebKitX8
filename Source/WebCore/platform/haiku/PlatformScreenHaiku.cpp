@@ -36,11 +36,22 @@
 #include "Page.h"
 #include "Widget.h"
 #include <GraphicsDefs.h>
-#include <interface/Screen.h>
 #include <interface/Deskbar.h>
+#include <interface/Screen.h>
 
 
 namespace WebCore {
+
+static BScreen screenForWidget(Widget* widget)
+{
+    if (widget) {
+        if (BView* view = widget->platformWidget()) {
+            if (BWindow* window = view->Window())
+                return BScreen(window);
+        }
+    }
+    return BScreen(B_MAIN_SCREEN_ID);
+}
 
 int screenHorizontalDPI(Widget*)
 {
@@ -59,14 +70,7 @@ bool screenHasInvertedColors()
 
 FloatRect screenRect(Widget* widget)
 {
-    BScreen screen;
-    if (widget) {
-        if (BView* view = widget->platformWidget()) {
-            if (BWindow* window = view->Window())
-                screen = BScreen(window);
-        }
-    }
-
+    BScreen screen = screenForWidget(widget);
     if (!screen.IsValid())
         return FloatRect();
     // BRect is inclusive, so add 1 to width and height
@@ -76,14 +80,7 @@ FloatRect screenRect(Widget* widget)
 
 FloatRect screenAvailableRect(Widget* widget)
 {
-    BScreen screen;
-    if (widget) {
-        if (BView* view = widget->platformWidget()) {
-            if (BWindow* window = view->Window())
-                screen = BScreen(window);
-        }
-    }
-
+    BScreen screen = screenForWidget(widget);
     if (!screen.IsValid())
         return FloatRect();
 
@@ -96,17 +93,17 @@ FloatRect screenAvailableRect(Widget* widget)
 
     if (deskbarFrame.IsValid() && frame.Intersects(deskbarFrame)) {
         if (deskbarFrame.top <= frame.top && deskbarFrame.bottom >= frame.bottom) {
-             // Vertical deskbar
-             if (deskbarFrame.left <= frame.left)
-                 frame.left = deskbarFrame.right + 1;
-             else
-                 frame.right = deskbarFrame.left - 1;
+            // Vertical deskbar
+            if (deskbarFrame.left <= frame.left)
+                frame.left = deskbarFrame.right + 1;
+            else
+                frame.right = deskbarFrame.left - 1;
         } else if (deskbarFrame.left <= frame.left && deskbarFrame.right >= frame.right) {
-             // Horizontal deskbar
-             if (deskbarFrame.top <= frame.top)
-                 frame.top = deskbarFrame.bottom + 1;
-             else
-                 frame.bottom = deskbarFrame.top - 1;
+            // Horizontal deskbar
+            if (deskbarFrame.top <= frame.top)
+                frame.top = deskbarFrame.bottom + 1;
+            else
+                frame.bottom = deskbarFrame.top - 1;
         }
     }
 
@@ -115,14 +112,7 @@ FloatRect screenAvailableRect(Widget* widget)
 
 bool screenSupportsExtendedColor(Widget* widget)
 {
-    BScreen screen;
-    if (widget) {
-        if (BView* view = widget->platformWidget()) {
-            if (BWindow* window = view->Window())
-                screen = BScreen(window);
-        }
-    }
-
+    BScreen screen = screenForWidget(widget);
     if (!screen.IsValid())
         return false;
 
@@ -130,9 +120,9 @@ bool screenSupportsExtendedColor(Widget* widget)
     return false;
 }
 
-int screenDepth(Widget*)
+int screenDepth(Widget* widget)
 {
-    BScreen screen;
+    BScreen screen = screenForWidget(widget);
     if (!screen.IsValid())
         return 8;
 
@@ -157,34 +147,34 @@ int screenDepth(Widget*)
     }
 }
 
-int screenDepthPerComponent(Widget*)
+int screenDepthPerComponent(Widget* widget)
 {
-    BScreen screen(B_MAIN_SCREEN_ID);
+    BScreen screen = screenForWidget(widget);
     if (!screen.IsValid())
         return 8;
 
     switch (screen.ColorSpace()) {
-        case B_RGBA32:
-        case B_RGB32:
-        case B_RGB24:
-            return 8;
-        case B_RGB16:
-        case B_RGB15:
-            return 5;
-        case B_CMAP8:
-        case B_GRAY8:
-            return 8;
-        case B_GRAY1:
-        case B_MONOCHROME_1_BIT:
-            return 1;
-        default:
-            return 8;
+    case B_RGBA32:
+    case B_RGB32:
+    case B_RGB24:
+        return 8;
+    case B_RGB16:
+    case B_RGB15:
+        return 5;
+    case B_CMAP8:
+    case B_GRAY8:
+        return 8;
+    case B_GRAY1:
+    case B_MONOCHROME_1_BIT:
+        return 1;
+    default:
+        return 8;
     }
 }
 
-bool screenIsMonochrome(Widget*)
+bool screenIsMonochrome(Widget* widget)
 {
-    BScreen screen;
+    BScreen screen = screenForWidget(widget);
     if (!screen.IsValid())
         return false;
     return screen.ColorSpace() == B_MONOCHROME_1_BIT || screen.ColorSpace() == B_GRAY1;

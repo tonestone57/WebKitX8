@@ -30,9 +30,9 @@
 #include <Looper.h>
 #include <MessageFilter.h>
 #include <MessageRunner.h>
-#include <support/Locker.h>
-#include <support/Autolock.h>
 #include <stdio.h>
+#include <support/Autolock.h>
+#include <support/Locker.h>
 
 #define FIRE_MESSAGE 'fire'
 
@@ -60,8 +60,8 @@ private:
 
 SharedTimerHaiku::SharedTimerHaiku()
     : BHandler("WebKit shared timer")
-    , m_timerFunction(0)
-    , m_runner(0)
+    , m_timerFunction(nullptr)
+    , m_runner(nullptr)
 {
 }
 
