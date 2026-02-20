@@ -27,9 +27,9 @@
 # This script generates C++ bindings for JavaScript builtins.
 # Generators for individual files are located in the builtins/ directory.
 
+import argparse
 import fnmatch
 import logging
-import optparse
 import os
 import sys
 
@@ -127,17 +127,19 @@ def generate_bindings_for_builtins_files(builtins_files=[],
 
 if __name__ == '__main__':
     allowed_framework_names = ['JavaScriptCore', 'WebCore']
-    cli_parser = optparse.OptionParser(usage="usage: %prog [options] Builtin1.js [, Builtin2.js, ...]")
-    cli_parser.add_option("-i", "--input-directory", help="If specified, generates builtins from all JavaScript files in the specified directory in addition to specific files passed as arguments.")
-    cli_parser.add_option("-o", "--output-directory", help="Directory where generated files should be written.")
-    cli_parser.add_option("--framework", type="choice", choices=allowed_framework_names, help="Destination framework for generated files.")
-    cli_parser.add_option("--force", action="store_true", help="Force output of generated scripts, even if nothing changed.")
-    cli_parser.add_option("--combined", action="store_true", help="Produce one .h/.cpp file instead of producing one per builtin object.")
-    cli_parser.add_option("--wrappers-only", action="store_true", help="Produce .h/.cpp wrapper files to ease integration of the builtins.")
-    cli_parser.add_option("-v", "--debug", action="store_true", help="Log extra output for debugging the generator itself.")
-    cli_parser.add_option("-t", "--test", action="store_true", help="Enable test mode.")
+    cli_parser = argparse.ArgumentParser(usage="%(prog)s [options] Builtin1.js [, Builtin2.js, ...]")
+    cli_parser.add_argument("-i", "--input-directory", help="If specified, generates builtins from all JavaScript files in the specified directory in addition to specific files passed as arguments.")
+    cli_parser.add_argument("-o", "--output-directory", help="Directory where generated files should be written.")
+    cli_parser.add_argument("--framework", choices=allowed_framework_names, help="Destination framework for generated files.")
+    cli_parser.add_argument("--force", action="store_true", help="Force output of generated scripts, even if nothing changed.")
+    cli_parser.add_argument("--combined", action="store_true", help="Produce one .h/.cpp file instead of producing one per builtin object.")
+    cli_parser.add_argument("--wrappers-only", action="store_true", help="Produce .h/.cpp wrapper files to ease integration of the builtins.")
+    cli_parser.add_argument("-v", "--debug", action="store_true", help="Log extra output for debugging the generator itself.")
+    cli_parser.add_argument("-t", "--test", action="store_true", help="Enable test mode.")
+    cli_parser.add_argument("builtins", nargs="*", help=argparse.SUPPRESS)
 
-    arg_options, arg_values = cli_parser.parse_args()
+    arg_options = cli_parser.parse_args()
+    arg_values = arg_options.builtins
     if len(arg_values) == 0 and not arg_options.input_directory:
         raise ParseException("At least one input file or directory expected.")
 
