@@ -35,6 +35,21 @@ document.addEventListener("DOMContentLoaded", (event) => {
 });
 
 window.addEventListener("message", (event) => {
+    if (event.source !== window.opener)
+        return;
+
+    if (typeof event.data !== "string")
+        return;
+
+    let isTrustedOrigin = event.origin === window.location.origin
+        || event.origin === "null"
+        || event.origin === "file://"
+        || /^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(event.origin)
+        || /^https?:\/\/localhost(:\d+)?$/.test(event.origin);
+
+    if (!isTrustedOrigin)
+        return;
+
     try {
         eval(event.data);
     } catch (e) {
