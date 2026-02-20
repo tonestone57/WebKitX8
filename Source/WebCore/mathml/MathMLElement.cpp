@@ -157,10 +157,9 @@ static String convertMathSizeIfNeeded(const AtomString& value)
         return "1.5em"_s;
 
     // FIXME: mathsize accepts any MathML length, including named spaces (see parseMathMLLength).
-    // FIXME: Might be better to use double than float.
     // FIXME: Might be better to use "shortest" numeric formatting instead of fixed width.
     bool ok = false;
-    float unitlessValue = value.toFloat(&ok);
+    double unitlessValue = value.toDouble(&ok);
     if (!ok)
         return value;
     return makeString(FormattedNumber::fixedWidth(unitlessValue * 100, 3), '%');
