@@ -55,9 +55,9 @@
 
 namespace WebCore {
 
-    std::unique_ptr<Pasteboard> Pasteboard::createForCopyAndPaste(std::unique_ptr<PasteboardContext>&& context)
+std::unique_ptr<Pasteboard> Pasteboard::createForCopyAndPaste(std::unique_ptr<PasteboardContext>&& context)
 {
-    return std::make_unique<Pasteboard>(std::move(context));
+    return std::make_unique<Pasteboard>(WTFMove(context));
 }
 
 #if ENABLE(DRAG_SUPPORT)
@@ -433,8 +433,7 @@ void Pasteboard::read(PasteboardPlainText& text, WebCore::PlainTextURLReadingPol
         text.text = String::fromUTF8(std::span<const char>(buffer, bufferLength));
 }
 
-RefPtr<DocumentFragment> Pasteboard::documentFragment(LocalFrame& frame, const SimpleRange& context,
-													  bool allowPlainText, bool& chosePlainText)
+RefPtr<DocumentFragment> Pasteboard::documentFragment(LocalFrame& frame, const SimpleRange& context, bool allowPlainText, bool& chosePlainText)
 {
     chosePlainText = false;
 
@@ -449,13 +448,13 @@ RefPtr<DocumentFragment> Pasteboard::documentFragment(LocalFrame& frame, const S
     const char* buffer = 0;
     ssize_t bufferLength;
     if (data->FindData("text/html", B_MIME_TYPE, reinterpret_cast<const void**>(&buffer), &bufferLength) == B_OK) {
-        RefPtr<TextResourceDecoder> decoder = TextResourceDecoder::create(ASCIILiteral::fromLiteralUnsafe("text/plain"), PAL::UTF8Encoding(), true);
+        RefPtr<TextResourceDecoder> decoder = TextResourceDecoder::create("text/plain"_s, PAL::UTF8Encoding(), true);
         StringBuilder html;
         html.append(decoder->decode(std::span<const unsigned char>((const unsigned char*)buffer, bufferLength)));
         html.append(decoder->flush());
 
         if (!html.isEmpty()) {
-            RefPtr<DocumentFragment> fragment = createFragmentFromMarkup(*frame.document(), html.toString(), String(), {});
+            RefPtr<DocumentFragment> fragment = createFragmentFromMarkup(*frame.document(), html.toString(), String(), { });
             if (fragment)
                 return fragment;
         }
@@ -528,7 +527,7 @@ String Pasteboard::readString(const String& type)
 
 String Pasteboard::readStringInCustomData(const String& type)
 {
-	return readString(type);
+    return readString(type);
 }
 
 void Pasteboard::clear()
@@ -579,12 +578,12 @@ Vector<String> Pasteboard::typesSafeForBindings(const String&)
 
 void Pasteboard::writeCustomData(const WTF::Vector<PasteboardCustomData>& data)
 {
-	if (!data.isEmpty()) {
-		const auto& customData = data[0];
-		customData.forEachPlatformString([this] (auto& type, auto& string) {
-			writeString(type, string);
-		});
-	}
+    if (!data.isEmpty()) {
+        const auto& customData = data[0];
+        customData.forEachPlatformString([this](auto& type, auto& string) {
+            writeString(type, string);
+        });
+    }
 }
 
 void Pasteboard::read(WebCore::PasteboardFileReader& reader, std::optional<unsigned long>)

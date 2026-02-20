@@ -41,13 +41,11 @@ static BMessageRunner* runner = nullptr;
 static uint32_t s_timerGeneration = 0;
 
 
-class SharedTimerHandlerHaiku: public BHandler
-{
+class SharedTimerHandlerHaiku : public BHandler {
 public:
     void MessageReceived(BMessage* message) override
     {
-        if (message->what == 'shrt')
-        {
+        if (message->what == 'shrt') {
             uint32_t generation = 0;
             // Legacy check: if no generation is found, it's 0. But new timer starts at 1?
             // Actually let's assume all new messages have generation.
@@ -59,7 +57,7 @@ public:
                 return;
 
             delete runner;
-            runner = NULL;
+            runner = nullptr;
             MainThreadSharedTimer::singleton().fired();
             return;
         }
@@ -68,29 +66,26 @@ public:
     }
 };
 
-
 static SharedTimerHandlerHaiku* handler = nullptr;
-
 
 void MainThreadSharedTimer::stop()
 {
     delete runner;
-    runner = NULL;
+    runner = nullptr;
     // Increment generation to invalidate any pending messages
     s_timerGeneration++;
 }
 
 void MainThreadSharedTimer::setFireInterval(WTF::Seconds interval)
 {
-    if (!handler)
-    {
+    if (!handler) {
         handler = new SharedTimerHandlerHaiku();
         be_app->AddHandler(handler);
     }
 
     if (runner) {
         delete runner;
-        runner = NULL;
+        runner = nullptr;
     }
 
     s_timerGeneration++;

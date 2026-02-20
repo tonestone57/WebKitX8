@@ -287,7 +287,7 @@ WebTouchEvent WebEventFactory::createWebTouchEvent(const BMessage* message)
         touchPoints.append(WebPlatformTouchPoint(touchId, state, IntPoint(screenLocation), IntPoint(location)));
     }
 
-    return WebTouchEvent(WebEvent { type, modifiers, timestamp }, WTF::move(touchPoints), { }, { });
+    return WebTouchEvent(WebEvent { type, modifiers, timestamp }, WTFMove(touchPoints), { }, { });
 }
 
 }
