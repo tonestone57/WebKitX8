@@ -57,7 +57,7 @@ public:
     enum class LengthType { Cm, Em, Ex, In, MathUnit, Mm, ParsingFailed, Pc, Percentage, Pt, Px, UnitLess };
     struct Length {
         LengthType type { LengthType::ParsingFailed };
-        float value { 0 };
+        double value { 0 };
     };
 
     enum class BooleanValue { True, False, Default };

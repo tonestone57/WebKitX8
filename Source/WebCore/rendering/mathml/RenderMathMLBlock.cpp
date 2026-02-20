@@ -102,15 +102,15 @@ LayoutUnit toUserUnits(const MathMLElement::Length& length, const RenderStyle& s
     switch (length.type) {
     // Zoom for physical units needs to be accounted for.
     case MathMLElement::LengthType::Cm:
-        return LayoutUnit(style.usedZoom() * length.value * static_cast<float>(CSS::pixelsPerCm));
+        return LayoutUnit(style.usedZoom() * length.value * CSS::pixelsPerCm);
     case MathMLElement::LengthType::In:
-        return LayoutUnit(style.usedZoom() * length.value * static_cast<float>(CSS::pixelsPerInch));
+        return LayoutUnit(style.usedZoom() * length.value * CSS::pixelsPerInch);
     case MathMLElement::LengthType::Mm:
-        return LayoutUnit(style.usedZoom() * length.value * static_cast<float>(CSS::pixelsPerMm));
+        return LayoutUnit(style.usedZoom() * length.value * CSS::pixelsPerMm);
     case MathMLElement::LengthType::Pc:
-        return LayoutUnit(style.usedZoom() * length.value * static_cast<float>(CSS::pixelsPerPc));
+        return LayoutUnit(style.usedZoom() * length.value * CSS::pixelsPerPc);
     case MathMLElement::LengthType::Pt:
-        return LayoutUnit(style.usedZoom() * length.value * static_cast<float>(CSS::pixelsPerPt));
+        return LayoutUnit(style.usedZoom() * length.value * CSS::pixelsPerPt);
     case MathMLElement::LengthType::Px:
         return LayoutUnit(style.usedZoom() * length.value);
 
