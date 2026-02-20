@@ -233,6 +233,8 @@ WI.Recording = class Recording extends WI.Object
             return WI.unlocalizedString("WebGLVertexArrayObject");
         case WI.Recording.Swizzle.DOMPointInit:
             return WI.unlocalizedString("DOMPointInit");
+        case WI.Recording.Swizzle.ImageDataSettings:
+            return WI.unlocalizedString("ImageDataSettings");
         default:
             console.error("Unknown swizzle type", swizzleType);
             return null;
@@ -387,6 +389,9 @@ WI.Recording = class Recording extends WI.Object
 
         if (type === WI.Recording.Swizzle.DOMMatrix)
             return new DOMMatrix(index);
+
+        if (type === WI.Recording.Swizzle.ImageDataSettings)
+            return {colorSpace: index[0] || undefined, pixelFormat: index[1]};
 
         // FIXME: <https://webkit.org/b/176009> Web Inspector: send data for WebGL objects during a recording instead of a placeholder string
         if (type === WI.Recording.Swizzle.TypedArray
@@ -1026,6 +1031,8 @@ WI.Recording.Swizzle = {
     WebGLSync: 22,
     WebGLTransformFeedback: 23,
     WebGLVertexArrayObject: 24,
+    DOMPointInit: 25,
+    ImageDataSettings: 26,
 
     // Special frontend-only swizzle types.
     CallStack: Symbol("CallStack"),

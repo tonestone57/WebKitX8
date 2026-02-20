@@ -26,6 +26,9 @@
 #include "config.h"
 #include "InspectorCanvasArguments.h"
 
+#include "ImageDataSettings.h"
+#include "JSImageDataPixelFormat.h"
+#include "JSPredefinedColorSpace.h"
 #include "Path2D.h"
 #include "WebGLBuffer.h"
 #include "WebGLFramebuffer.h"
@@ -58,10 +61,15 @@ auto InspectorCanvasArgumentProcessor<IDLDictionary<DOMMatrix2DInit>>::operator(
     return {{ WTF::move(array), RecordingSwizzleType::DOMMatrix }};
 }
 
-auto InspectorCanvasArgumentProcessor<IDLDictionary<ImageDataSettings>>::operator()(InspectorCanvas&, const ImageDataSettings&) -> std::optional<InspectorCanvasProcessedArgument>
+auto InspectorCanvasArgumentProcessor<IDLDictionary<ImageDataSettings>>::operator()(InspectorCanvas&, const ImageDataSettings& argument) -> std::optional<InspectorCanvasProcessedArgument>
 {
-    // FIXME: Implement.
-    return std::nullopt;
+    auto array = JSON::ArrayOf<JSON::Value>::create();
+    if (argument.colorSpace)
+        array->addItem(convertEnumerationToString(*argument.colorSpace));
+    else
+        array->addItem(JSON::Value::null());
+    array->addItem(convertEnumerationToString(argument.pixelFormat));
+    return {{ WTF::move(array), RecordingSwizzleType::ImageDataSettings }};
 }
 
 // MARK: - Strings
