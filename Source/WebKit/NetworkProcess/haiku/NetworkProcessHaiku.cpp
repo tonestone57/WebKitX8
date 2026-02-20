@@ -24,9 +24,9 @@
  */
 
 #include "config.h"
-#include "NetworkProcess.h"
 #include "NetworkProcessHaiku.h"
 
+#include "NetworkProcess.h"
 #include "NetworkProcessCreationParameters.h"
 #include <WebCore/NotImplemented.h>
 #include <wtf/Assertions.h>
@@ -97,10 +97,9 @@ static void loadAllowedHosts()
         return;
 
     const char* host;
-    for (int32 i = 0; msg.FindString("host", i, &host) == B_OK; i++) {
-        Locker locker { s_allowedHostsLock };
+    Locker locker { s_allowedHostsLock };
+    for (int32 i = 0; msg.FindString("host", i, &host) == B_OK; i++)
         allowedHosts().add(String::fromUTF8(host));
-    }
 }
 
 void addAllowedHTTPSCertificateHost(const String& host)

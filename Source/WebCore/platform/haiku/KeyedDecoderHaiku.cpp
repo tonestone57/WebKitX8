@@ -34,7 +34,7 @@ namespace WebCore {
 
 std::unique_ptr<KeyedDecoder> KeyedDecoder::decoder(std::span<const uint8_t> data)
 {
-    return std::make_unique<KeyedDecoderHaiku>(data);
+    return makeUnique<KeyedDecoderHaiku>(data);
 }
 
 KeyedDecoderHaiku::KeyedDecoderHaiku(std::span<const uint8_t> data)
@@ -46,6 +46,12 @@ KeyedDecoderHaiku::KeyedDecoderHaiku(std::span<const uint8_t> data)
 
 KeyedDecoderHaiku::~KeyedDecoderHaiku()
 {
+    while (!m_messageStack.isEmpty()) {
+        auto* message = m_messageStack.takeLast();
+        if (message == currentMessage)
+            currentMessage = nullptr;
+        delete message;
+    }
     delete currentMessage;
 }
 
@@ -53,8 +59,7 @@ bool KeyedDecoderHaiku::decodeBytes(const String& key, std::span<const uint8_t>&
 {
     const void* storage;
     ssize_t storeSize;
-    if (currentMessage->FindData(key.utf8().data(), B_RAW_TYPE, &storage, &storeSize) == B_OK)
-    {
+    if (currentMessage->FindData(key.utf8().data(), B_RAW_TYPE, &storage, &storeSize) == B_OK) {
         bytes = std::span<const uint8_t>((const uint8_t*)storage, storeSize);
         return true;
     }
@@ -138,8 +143,7 @@ bool KeyedDecoderHaiku::beginArray(const String& key)
 bool KeyedDecoderHaiku::beginArrayElement()
 {
     BMessage* message = new BMessage();
-    if (currentMessage->FindMessage(m_keyStack.last().first.utf8().data(),
-            m_keyStack.last().second, message) == B_OK) {
+    if (currentMessage->FindMessage(m_keyStack.last().first.utf8().data(), m_keyStack.last().second, message) == B_OK) {
         m_messageStack.append(message);
         currentMessage = message;
         return true;
@@ -162,4 +166,3 @@ void KeyedDecoderHaiku::endArray()
 }
 
 } // namespace WebCore
-

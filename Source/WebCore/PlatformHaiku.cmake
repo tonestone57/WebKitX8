@@ -98,6 +98,7 @@ list(APPEND WebCore_SOURCES
   platform/haiku/PlatformSpeechSynthesizerHaiku.cpp
   platform/haiku/PopupMenuHaiku.cpp
   platform/haiku/ScrollbarThemeHaiku.cpp
+  platform/haiku/RecentSearchStorageHaiku.cpp
   platform/haiku/SearchPopupMenuHaiku.cpp
   platform/haiku/SharedTimerHaiku.cpp
   platform/haiku/SoundHaiku.cpp

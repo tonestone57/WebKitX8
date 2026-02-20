@@ -27,14 +27,11 @@
 #include "WebKitVersion.h"
 #include "WebPageProxy.h"
 
+#include <WebCore/RecentSearchStorageHaiku.h>
 #include <WebCore/UserAgent.h>
 
-#include <sys/utsname.h>
-
 #include <Directory.h>
-#include <File.h>
 #include <FindDirectory.h>
-#include <Message.h>
 #include <Path.h>
 
 namespace WebKit {
@@ -60,68 +57,12 @@ String WebPageProxy::standardUserAgent(const String& applicationNameForUserAgent
 
 void WebPageProxy::saveRecentSearches(IPC::Connection&, const String& name, const Vector<WebCore::RecentSearch>& searchItems)
 {
-    BPath path;
-    if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) != B_OK)
-        return;
-    path.Append("WebKit");
-    create_directory(path.Path(), 0755);
-    path.Append("RecentSearches");
-
-    BMessage message;
-    {
-        BFile file(path.Path(), B_READ_ONLY);
-        if (file.InitCheck() == B_OK)
-            message.Unflatten(&file);
-    }
-
-    BMessage searches;
-    for (const auto& item : searchItems) {
-        searches.AddString("items", item.string.utf8().data());
-        searches.AddDouble("times", item.time.secondsSinceEpoch().seconds());
-    }
-
-    message.RemoveName(name.utf8().data());
-    message.AddMessage(name.utf8().data(), &searches);
-
-    BPath tempPath(path);
-    if (tempPath.GetParent(&tempPath) != B_OK)
-        return;
-    tempPath.Append("RecentSearches.tmp");
-
-    BFile tempFile(tempPath.Path(), B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
-    if (tempFile.InitCheck() == B_OK) {
-        if (message.Flatten(&tempFile) == B_OK) {
-            tempFile.Unset();
-            BEntry tempEntry(tempPath.Path());
-            tempEntry.Rename(path.Leaf(), true);
-        }
-    }
+    WebCore::RecentSearchStorage::save(name, searchItems);
 }
 
 void WebPageProxy::loadRecentSearches(IPC::Connection&, const String& name, CompletionHandler<void(Vector<WebCore::RecentSearch>&&)>&& completionHandler)
 {
-    Vector<WebCore::RecentSearch> items;
-    BPath path;
-    if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK) {
-        path.Append("WebKit/RecentSearches");
-        BFile file(path.Path(), B_READ_ONLY);
-        BMessage message;
-        if (file.InitCheck() == B_OK && message.Unflatten(&file) == B_OK) {
-            BMessage searches;
-            if (message.FindMessage(name.utf8().data(), &searches) == B_OK) {
-                const char* item;
-                for (int32 i = 0; searches.FindString("items", i, &item) == B_OK; i++) {
-                     WebCore::RecentSearch search;
-                     search.string = String::fromUTF8(item);
-                     double time;
-                     if (searches.FindDouble("times", i, &time) == B_OK)
-                         search.time = WebCore::WallTime::fromRawSeconds(time);
-                     items.append(search);
-                }
-            }
-        }
-    }
-    completionHandler(WTFMove(items));
+    completionHandler(WebCore::RecentSearchStorage::load(name));
 }
 
 void WebPageProxy::didUpdateEditorState(const EditorState&, const EditorState&)

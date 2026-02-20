@@ -173,10 +173,12 @@ WebKeyboardEvent WebEventFactory::createWebKeyboardEvent(const BMessage* message
 
     MonotonicTime timestamp = extractTimestamp(message);
 
+    String text = String::fromUTF8(bytes);
+
     return WebKeyboardEvent(
         WebEvent { type, modifiers, timestamp },
-        String::fromUTF8(bytes), // text
-        String::fromUTF8(bytes), // unmodifiedText
+        text, // text
+        text, // unmodifiedText
         PlatformKeyboardEvent::KeyValueForKeyEvent(bbytes, nativeVirtualKeyCode), // key
         PlatformKeyboardEvent::KeyCodeForKeyEvent(nativeVirtualKeyCode), // code
         PlatformKeyboardEvent::keyIdentifierForHaikuKeyCode(bytes[0], nativeVirtualKeyCode), // Keyidentifier

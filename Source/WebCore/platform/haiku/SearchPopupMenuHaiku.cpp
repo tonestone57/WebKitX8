@@ -21,12 +21,7 @@
 #include "config.h"
 #include "SearchPopupMenuHaiku.h"
 
-
-#include <Directory.h>
-#include <File.h>
-#include <FindDirectory.h>
-#include <Message.h>
-#include <Path.h>
+#include "RecentSearchStorageHaiku.h"
 
 namespace WebCore {
 
@@ -37,66 +32,12 @@ SearchPopupMenuHaiku::SearchPopupMenuHaiku(PopupMenuClient* client)
 
 void SearchPopupMenuHaiku::saveRecentSearches(const AtomString& name, const Vector<RecentSearch>& searchItems)
 {
-    BPath path;
-    if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) != B_OK)
-        return;
-    path.Append("WebKit");
-    create_directory(path.Path(), 0755);
-    path.Append("RecentSearches");
-
-    BMessage message;
-    {
-        BFile file(path.Path(), B_READ_ONLY);
-        if (file.InitCheck() == B_OK)
-            message.Unflatten(&file);
-    }
-
-    BMessage searches;
-    for (const auto& item : searchItems) {
-        searches.AddString("items", item.string.utf8().data());
-        searches.AddDouble("times", item.time.secondsSinceEpoch().seconds());
-    }
-
-    message.RemoveName(name.string().utf8().data());
-    message.AddMessage(name.string().utf8().data(), &searches);
-
-    BPath tempPath(path);
-    if (tempPath.GetParent(&tempPath) != B_OK)
-        return;
-    tempPath.Append("RecentSearches.tmp");
-
-    BFile tempFile(tempPath.Path(), B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
-    if (tempFile.InitCheck() == B_OK) {
-        if (message.Flatten(&tempFile) == B_OK) {
-            tempFile.Unset();
-            BEntry tempEntry(tempPath.Path());
-            tempEntry.Rename(path.Leaf(), true);
-        }
-    }
+    RecentSearchStorage::save(name.string(), searchItems);
 }
 
 void SearchPopupMenuHaiku::loadRecentSearches(const AtomString& name, Vector<RecentSearch>& searchItems)
 {
-    BPath path;
-    if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK) {
-        path.Append("WebKit/RecentSearches");
-        BFile file(path.Path(), B_READ_ONLY);
-        BMessage message;
-        if (file.InitCheck() == B_OK && message.Unflatten(&file) == B_OK) {
-            BMessage searches;
-            if (message.FindMessage(name.string().utf8().data(), &searches) == B_OK) {
-                const char* item;
-                for (int32 i = 0; searches.FindString("items", i, &item) == B_OK; i++) {
-                    RecentSearch search;
-                    search.string = String::fromUTF8(item);
-                    double time;
-                    if (searches.FindDouble("times", i, &time) == B_OK)
-                        search.time = WallTime::fromRawSeconds(time);
-                    searchItems.append(search);
-                }
-            }
-        }
-    }
+    searchItems = RecentSearchStorage::load(name.string());
 }
 
 bool SearchPopupMenuHaiku::enabled()

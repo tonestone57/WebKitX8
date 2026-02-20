@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 Haiku, Inc.
+ * Copyright (C) 2024 Haiku, inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,34 +25,15 @@
 
 #pragma once
 
-#include "WebColorPicker.h"
-#include <WebCore/Color.h>
-#include <wtf/WeakPtr.h>
+#include "SearchPopupMenu.h"
+#include <wtf/Vector.h>
+#include <wtf/text/WTFString.h>
 
-class BWindow;
-class BColorControl;
+namespace WebCore {
 
-namespace WebKit {
+namespace RecentSearchStorage {
+void save(const String& name, const Vector<RecentSearch>&);
+Vector<RecentSearch> load(const String& name);
+}
 
-class WebPageProxy;
-
-class WebColorPickerHaiku final : public WebColorPicker, public CanMakeWeakPtr<WebColorPickerHaiku> {
-public:
-    static Ref<WebColorPickerHaiku> create(WebPageProxy&, const WebCore::Color& initialColor);
-    ~WebColorPickerHaiku();
-
-    void endPicker() override;
-    void setSelectedColor(const WebCore::Color&) override;
-    void showColorPicker(const WebCore::Color&) override;
-
-    // Called by BWindow message loop
-    void didChooseColor(const WebCore::Color&);
-    void didEndChooser();
-
-private:
-    WebColorPickerHaiku(WebPageProxy&, const WebCore::Color& initialColor);
-
-    BWindow* m_window;
-};
-
-} // namespace WebKit
+} // namespace WebCore

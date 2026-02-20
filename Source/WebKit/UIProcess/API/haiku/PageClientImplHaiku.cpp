@@ -35,15 +35,13 @@
 #include "../../haiku/WebContextMenuProxyHaiku.h"
 #include "../../haiku/WebDateTimePickerHaiku.h"
 #include "../../haiku/WebPopupMenuProxyHaiku.h"
-#include "../../haiku/WebContextMenuProxyHaiku.h"
 #include "WebViewConstants.h"
 
 #include "WebCore/Region.h"
-#include "WebFrameProxy.h"
-#include "ShareableBitmap.h"
-#include "WebCore/ShareableBitmap.h"
-#include "WebFullScreenManagerProxy.h"
 #include "PrintInfo.h"
+#include "WebCore/ShareableBitmap.h"
+#include "WebFrameProxy.h"
+#include "WebFullScreenManagerProxy.h"
 
 #include <View.h>
 #include <Window.h>
@@ -315,17 +313,6 @@ RefPtr<WebPopupMenuProxy> PageClientImpl::createPopupMenuProxy(WebPageProxy& pag
 #if ENABLE(CONTEXT_MENUS)
 Ref<WebContextMenuProxy> PageClientImpl::createContextMenuProxy(WebPageProxy& page, FrameInfoData&& frameInfo, ContextMenuContextData&& context, const UserData& userData)
 {
-    if (fWebView)
-        return WebContextMenuProxyHaiku::create(*fWebView, page, WTF::move(frameInfo), WTF::move(context), userData);
-    // This method returns Ref, so we can't return nullptr.
-    // However, createContextMenuProxy should arguably effectively check if the view is alive.
-    // But if fWebView is null, we are likely shutting down.
-    // We can't easily construct a valid Ref<WebContextMenuProxy> without a WebViewBase reference if the constructor requires it.
-    // Let's assume for now this won't be called if WebViewBase is dead (since PageClient is usually destroyed soon after).
-    // But to be safe, if we must return something, we might crash if we dereference fWebView.
-    // But fWebView is WeakPtr. *fWebView would crash if null.
-    // We should probably ASSERT or handle it.
-    // Given the architecture, if fWebView is null, the PageClientImpl should be dead or dying.
     RELEASE_ASSERT(fWebView);
     return WebContextMenuProxyHaiku::create(*fWebView, page, WTF::move(frameInfo), WTF::move(context), userData);
 }
@@ -516,7 +503,7 @@ private:
 
         m_page->drawRectToImage(m_frame, printInfo, rect, snapshotSize, [this, protectedThis = Ref { *this }](std::optional<ShareableBitmap::Handle>&& imageHandle) {
             if (imageHandle) {
-                m_snapshots.append(ShareableBitmap::create(WTFMove(*imageHandle)));
+                m_snapshots.append(ShareableBitmap::create(WTF::move(*imageHandle)));
             } else {
                 m_snapshots.append(nullptr);
             }
@@ -704,7 +691,7 @@ void PageClientImpl::startDrag(const WebCore::DragItem& dragItem, WebCore::Share
     }
 
     BBitmap* dragBitmap = nullptr;
-    auto shareableBitmap = ShareableBitmap::create(WTFMove(dragImageHandle));
+    auto shareableBitmap = ShareableBitmap::create(WTF::move(dragImageHandle));
     if (shareableBitmap) {
         auto bitmap = shareableBitmap->createBBitmap();
         if (bitmap)

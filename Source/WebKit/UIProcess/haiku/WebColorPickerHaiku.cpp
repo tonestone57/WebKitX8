@@ -27,15 +27,14 @@
 #include "WebColorPickerHaiku.h"
 
 #include "WebPageProxy.h"
-#include <WebCore/Color.h>
-#include <wtf/RunLoop.h>
-#include <Window.h>
 #include <ColorControl.h>
-#include <Message.h>
 #include <GroupLayout.h>
 #include <GroupLayoutBuilder.h>
-#include <Button.h>
+#include <Message.h>
 #include <Slider.h>
+#include <WebCore/Color.h>
+#include <Window.h>
+#include <wtf/RunLoop.h>
 
 namespace WebKit {
 using namespace WebCore;
@@ -70,27 +69,30 @@ public:
         CenterOnScreen();
     }
 
-    void MessageReceived(BMessage* message) override {
-        switch(message->what) {
-            case 'chng':
-            case 'alph': {
-                if (!m_picker) return;
+    void MessageReceived(BMessage* message) override
+    {
+        switch (message->what) {
+        case 'chng':
+        case 'alph': {
+            if (!m_picker)
+                return;
 
-                rgb_color rgb = m_colorControl->ValueAsColor();
-                uint8 alpha = (uint8)m_alphaSlider->Value();
-                Color color(SRGBA<uint8_t> { rgb.red, rgb.green, rgb.blue, alpha });
-                RunLoop::main().dispatch([picker = m_picker, color]() {
-                    if (picker)
-                        picker->didChooseColor(color);
-                });
-                break;
-            }
-            default:
-                BWindow::MessageReceived(message);
+            rgb_color rgb = m_colorControl->ValueAsColor();
+            uint8 alpha = (uint8)m_alphaSlider->Value();
+            Color color(SRGBA<uint8_t> { rgb.red, rgb.green, rgb.blue, alpha });
+            RunLoop::main().dispatch([picker = m_picker, color]() {
+                if (picker)
+                    picker->didChooseColor(color);
+            });
+            break;
+        }
+        default:
+            BWindow::MessageReceived(message);
         }
     }
 
-    bool QuitRequested() override {
+    bool QuitRequested() override
+    {
         if (m_picker) {
             RunLoop::main().dispatch([picker = m_picker]() {
                 if (picker)
@@ -114,7 +116,6 @@ Ref<WebColorPickerHaiku> WebColorPickerHaiku::create(WebPageProxy& page, const C
 WebColorPickerHaiku::WebColorPickerHaiku(WebPageProxy& page, const Color& initialColor)
     : WebColorPicker(&page.colorPickerClient())
     , m_window(nullptr)
-    , m_colorControl(nullptr)
 {
 }
 
@@ -140,12 +141,12 @@ void WebColorPickerHaiku::endPicker()
 void WebColorPickerHaiku::setSelectedColor(const Color& color)
 {
     if (m_window && m_window->Lock()) {
-        if (BView* view = m_window->FindView("picker")) {
-             static_cast<BColorControl*>(view)->SetValue(toHaikuColor(color));
-        }
-        if (BView* view = m_window->FindView("alpha")) {
-             static_cast<BSlider*>(view)->SetValue(color.toSRGB<uint8_t>().alpha);
-        }
+        if (BView* view = m_window->FindView("picker"))
+            static_cast<BColorControl*>(view)->SetValue(toHaikuColor(color));
+
+        if (BView* view = m_window->FindView("alpha"))
+            static_cast<BSlider*>(view)->SetValue(color.toSRGB<uint8_t>().alpha);
+
         m_window->Unlock();
     }
 }
