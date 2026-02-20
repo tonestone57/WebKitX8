@@ -184,18 +184,23 @@ void InspectorFrontendHost::disconnectClient()
 
 void InspectorFrontendHost::addSelfToGlobalObjectInWorld(DOMWrapperWorld& world)
 {
-    // FIXME: What guarantees m_frontendPage is non-null?
-    // FIXME: What guarantees globalObject's return value is non-null?
+    if (!m_frontendPage)
+        return;
+
     RefPtr localMainFrame = m_frontendPage->localMainFrame();
     if (!localMainFrame)
         return;
-    auto& globalObject = *localMainFrame->script().globalObject(world);
-    auto& vm = globalObject.vm();
+
+    auto* globalObject = localMainFrame->script().globalObject(world);
+    if (!globalObject)
+        return;
+
+    auto& vm = globalObject->vm();
     JSC::JSLockHolder lock(vm);
     auto scope = DECLARE_TOP_EXCEPTION_SCOPE(vm);
-    globalObject.putDirect(vm, JSC::Identifier::fromString(vm, "InspectorFrontendHost"_s), toJS<IDLInterface<InspectorFrontendHost>>(globalObject, globalObject, *this));
+    globalObject->putDirect(vm, JSC::Identifier::fromString(vm, "InspectorFrontendHost"_s), toJS<IDLInterface<InspectorFrontendHost>>(*globalObject, *globalObject, *this));
     if (scope.exception()) [[unlikely]]
-        reportException(&globalObject, scope.exception());
+        reportException(globalObject, scope.exception());
 }
 
 void InspectorFrontendHost::loaded()
@@ -612,6 +617,9 @@ void InspectorFrontendHost::showContextMenu(Event& event, Vector<ContextMenuItem
 void InspectorFrontendHost::dispatchEventAsContextMenuEvent(Event& event)
 {
 #if ENABLE(CONTEXT_MENUS) && USE(ACCESSIBILITY_CONTEXT_MENUS)
+    if (!m_frontendPage)
+        return;
+
     if (!is<MouseEvent>(event))
         return;
 
@@ -689,7 +697,7 @@ bool InspectorFrontendHost::engineeringSettingsAllowed()
 
 bool InspectorFrontendHost::supportsShowCertificate() const
 {
-    return m_frontendPage->settings().inspectorSupportsShowingCertificate();
+    return m_frontendPage && m_frontendPage->settings().inspectorSupportsShowingCertificate();
 }
 
 bool InspectorFrontendHost::showCertificate(const String& serializedCertificate)
