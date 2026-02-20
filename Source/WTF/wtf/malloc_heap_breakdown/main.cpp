@@ -26,12 +26,14 @@
 #include "malloc/malloc.h"
 
 #include <atomic>
+#include <cstdio>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <set>
 #include <thread>
+#include <string>
 #include <unistd.h>
 #include <vector>
 
@@ -213,8 +215,8 @@ private:
                             counter.id = newId;
                             counter.type = SYSPROF_CAPTURE_COUNTER_INT64;
                             counter.value.v64 = value;
-                            sprintf(counter.category, "%s", sysprofContext->processName.c_str());
-                            sprintf(counter.name, "%s", name);
+                            snprintf(counter.category, sizeof(counter.category), "%s", sysprofContext->processName.c_str());
+                            snprintf(counter.name, sizeof(counter.name), "%s", name);
                             countersToDefine.push_back(counter);
                             sysprofContext->zoneCounterIds.emplace(zone, newId);
                         }
