@@ -47,6 +47,7 @@
 #include "Settings.h"
 #include <wtf/TZoneMallocInlines.h>
 #include <wtf/text/MakeString.h>
+#include <wtf/text/StringConcatenateNumbers.h>
 #include <wtf/text/StringToIntegerConversion.h>
 
 namespace WebCore {
@@ -157,12 +158,11 @@ static String convertMathSizeIfNeeded(const AtomString& value)
         return "1.5em"_s;
 
     // FIXME: mathsize accepts any MathML length, including named spaces (see parseMathMLLength).
-    // FIXME: Might be better to use "shortest" numeric formatting instead of fixed width.
     bool ok = false;
     double unitlessValue = value.toDouble(&ok);
     if (!ok)
         return value;
-    return makeString(FormattedNumber::fixedWidth(unitlessValue * 100, 3), '%');
+    return makeString(FormattedCSSNumber::create(unitlessValue * 100), '%');
 }
 
 enum class ScriptLevelSyntax : uint8_t {
