@@ -34,6 +34,7 @@ class CertificateInfo;
 namespace WebKit {
 
 bool isHTTPSCertificateAllowed(const WTF::String& host, const WebCore::CertificateInfo&);
+bool isHTTPSCertificateAllowed(const WTF::String& host); // Overload for legacy host-only check
 void addHTTPSCertificateException(const WTF::String& host, const WebCore::CertificateInfo&);
 
 } // namespace WebKit

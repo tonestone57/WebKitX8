@@ -170,6 +170,72 @@ bool isHTTPSCertificateAllowed(const WTF::String& host, const WebCore::Certifica
     return false;
 }
 
+bool isHTTPSCertificateAllowed(const WTF::String& host)
+{
+    BPath path = getExceptionFilePath();
+    if (path.InitCheck() != B_OK)
+        return false;
+
+    int fd = open(path.Path(), O_RDONLY);
+    if (fd < 0)
+        return false;
+
+    if (flock(fd, LOCK_SH) != 0) {
+        close(fd);
+        return false;
+    }
+
+    BString content = readAllContent(fd);
+    flock(fd, LOCK_UN);
+    close(fd);
+
+    if (content.IsEmpty())
+        return false;
+
+    BString bHost(host.utf8().data());
+
+    int32 start = 0;
+    int32 end;
+    while ((end = content.FindFirst('\n', start)) != B_ERROR) {
+        BString line;
+        content.CopyInto(line, start, end - start);
+        start = end + 1;
+
+        if (line.IsEmpty()) continue;
+
+        int32 spacePos = line.FindFirst(' ');
+        if (spacePos != B_ERROR) {
+            BString lineHost;
+            line.CopyInto(lineHost, 0, spacePos);
+            if (lineHost == bHost)
+                return true;
+        } else {
+            // Legacy format (host only)
+            if (line == bHost)
+                return true;
+        }
+    }
+
+    // Handle last line if no newline
+    if (start < content.Length()) {
+        BString line;
+        content.CopyInto(line, start, content.Length() - start);
+        if (!line.IsEmpty()) {
+            int32 spacePos = line.FindFirst(' ');
+            if (spacePos != B_ERROR) {
+                BString lineHost;
+                line.CopyInto(lineHost, 0, spacePos);
+                if (lineHost == bHost)
+                    return true;
+            } else if (line == bHost) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 void addHTTPSCertificateException(const WTF::String& host, const WebCore::CertificateInfo& info)
 {
     BPath path = getExceptionFilePath();

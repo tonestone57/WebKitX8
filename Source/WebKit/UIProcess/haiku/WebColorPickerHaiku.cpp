@@ -192,7 +192,7 @@ void WebColorPickerHaiku::showColorPicker(const Color& color)
         return;
 
     m_state = ColorPickerState::create(this);
-    m_window = new ColorPickerWindow(m_state.copyRef(), color);
+    m_window = new ColorPickerWindow(Ref { *m_state }, color);
     m_window->Show();
 }
 

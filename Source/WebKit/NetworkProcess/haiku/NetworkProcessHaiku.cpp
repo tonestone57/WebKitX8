@@ -28,12 +28,10 @@
 #include "NetworkProcessHaiku.h"
 
 #include "NetworkProcessCreationParameters.h"
+#include "CertificateUtilitiesHaiku.h"
 #include <WebCore/NotImplemented.h>
 #include <wtf/Assertions.h>
 #include <wtf/Language.h>
-#include <wtf/HashSet.h>
-#include <wtf/Lock.h>
-#include <wtf/NeverDestroyed.h>
 #include <stdio.h>
 
 #include <Directory.h>
@@ -47,86 +45,27 @@ namespace WebKit {
 
 using namespace WebCore;
 
-static Lock s_allowedHostsLock;
-static HashSet<String>& allowedHosts()
-{
-    static NeverDestroyed<HashSet<String>> hosts;
-    return hosts;
-}
-
-static const char* kSettingsPath = "WebKit/CertificateExceptions";
-
-static void saveAllowedHosts()
-{
-    BPath path;
-    if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) != B_OK)
-        return;
-    path.Append(kSettingsPath);
-
-    BPath parent;
-    path.GetParent(&parent);
-    create_directory(parent.Path(), 0755);
-
-    BFile file(path.Path(), B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
-    if (file.InitCheck() != B_OK)
-        return;
-
-    BMessage msg;
-    {
-        Locker locker { s_allowedHostsLock };
-        for (const auto& host : allowedHosts()) {
-            msg.AddString("host", host.utf8().data());
-        }
-    }
-    msg.Flatten(&file);
-}
-
-static void loadAllowedHosts()
-{
-    BPath path;
-    if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) != B_OK)
-        return;
-    path.Append(kSettingsPath);
-
-    BFile file(path.Path(), B_READ_ONLY);
-    if (file.InitCheck() != B_OK)
-        return;
-
-    BMessage msg;
-    if (msg.Unflatten(&file) != B_OK)
-        return;
-
-    const char* host;
-    for (int32 i = 0; msg.FindString("host", i, &host) == B_OK; i++) {
-        Locker locker { s_allowedHostsLock };
-        allowedHosts().add(String::fromUTF8(host));
-    }
-}
-
 void addAllowedHTTPSCertificateHost(const String& host)
 {
-    Locker locker { s_allowedHostsLock };
-    allowedHosts().add(host);
+    // Legacy support: We can't provide full CertificateInfo here easily if this
+    // is called from a context without it. However, this function seems unused
+    // except by the legacy allowSpecificHTTPSCertificateForHost implementation below.
+    // Ideally, callers should use addHTTPSCertificateException directly.
 }
 
 bool isHTTPSCertificateHostAllowed(const String& host)
 {
-    Locker locker { s_allowedHostsLock };
-    return allowedHosts().contains(host);
+    return isHTTPSCertificateAllowed(host);
 }
 
 void NetworkProcess::platformInitializeNetworkProcess(const NetworkProcessCreationParameters& parameters)
 {
     WTF::listenForLanguageChangeNotifications();
-    loadAllowedHosts();
 }
 
 void NetworkProcess::allowSpecificHTTPSCertificateForHost(const CertificateInfo& certificateInfo, const String& host)
 {
-    // Store the host in our local set to bypass verification in NetworkDataTaskHaiku.
-    // This effectively persists the exception for this session and future sessions.
-    addAllowedHTTPSCertificateHost(host);
-    saveAllowedHosts();
+    addHTTPSCertificateException(host, certificateInfo);
 }
 
 void NetworkProcess::platformTerminate()

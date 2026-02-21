@@ -367,7 +367,7 @@ void WebDateTimePickerHaiku::showDateTimePicker(WebCore::DateTimeChooserParamete
         return;
 
     m_state = DateTimePickerState::create(this);
-    auto* window = new DateTimeChooserWindow(m_state.copyRef());
+    auto* window = new DateTimeChooserWindow(Ref { *m_state });
     window->Configure(params);
     window->Show();
     m_window = window;

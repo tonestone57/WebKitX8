@@ -35,6 +35,10 @@
 #include <wtf/CallbackAggregator.h>
 #include <wtf/Language.h>
 
+#if PLATFORM(HAIKU)
+#include "CertificateUtilitiesHaiku.h"
+#endif
+
 namespace WebKit {
 
 using namespace WebCore;
@@ -48,7 +52,11 @@ void NetworkProcess::platformInitializeNetworkProcess(const NetworkProcessCreati
 
 void NetworkProcess::allowSpecificHTTPSCertificateForHost(PAL::SessionID, const CertificateInfo& certificateInfo, const String& host)
 {
+#if PLATFORM(HAIKU)
+    addHTTPSCertificateException(host, certificateInfo);
+#else
     notImplemented();
+#endif
 }
 
 void NetworkProcess::clearDiskCache(WallTime modifiedSince, CompletionHandler<void()>&& completionHandler)
