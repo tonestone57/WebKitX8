@@ -32,10 +32,16 @@
 #include <sys/utsname.h>
 
 #include <Directory.h>
-#include <File.h>
+#include <DataIO.h>
 #include <FindDirectory.h>
 #include <Message.h>
 #include <Path.h>
+
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/file.h>
+#include <sys/stat.h>
+#include <stdlib.h>
 
 namespace WebKit {
 
@@ -58,6 +64,61 @@ String WebPageProxy::standardUserAgent(const String& applicationNameForUserAgent
     return WebCore::standardUserAgent(applicationNameForUserAgent);
 }
 
+static bool readMessageFromFile(int fd, BMessage& message)
+{
+    struct stat st;
+    if (fstat(fd, &st) != 0 || st.st_size == 0)
+        return false;
+
+    char* buffer = (char*)malloc(st.st_size);
+    if (!buffer) return false;
+
+    ssize_t bytesRead = 0;
+    while (bytesRead < st.st_size) {
+        ssize_t r = read(fd, buffer + bytesRead, st.st_size - bytesRead);
+        if (r < 0) {
+            if (errno == EINTR) continue;
+            free(buffer);
+            return false;
+        }
+        if (r == 0) break;
+        bytesRead += r;
+    }
+
+    if (bytesRead < st.st_size) {
+        free(buffer);
+        return false;
+    }
+
+    BMemoryIO io(buffer, st.st_size);
+    status_t result = message.Unflatten(&io);
+    free(buffer);
+    return result == B_OK;
+}
+
+static bool writeMessageToFile(int fd, const BMessage& message)
+{
+    BMallocIO io;
+    if (message.Flatten(&io) != B_OK)
+        return false;
+
+    if (ftruncate(fd, 0) != 0 || lseek(fd, 0, SEEK_SET) != 0)
+        return false;
+
+    const char* buffer = (const char*)io.Buffer();
+    size_t size = io.BufferLength();
+    ssize_t bytesWritten = 0;
+    while (bytesWritten < (ssize_t)size) {
+        ssize_t w = write(fd, buffer + bytesWritten, size - bytesWritten);
+        if (w < 0) {
+            if (errno == EINTR) continue;
+            return false;
+        }
+        bytesWritten += w;
+    }
+    return true;
+}
+
 void WebPageProxy::saveRecentSearches(IPC::Connection&, const String& name, const Vector<WebCore::RecentSearch>& searchItems)
 {
     BPath path;
@@ -67,12 +128,16 @@ void WebPageProxy::saveRecentSearches(IPC::Connection&, const String& name, cons
     create_directory(path.Path(), 0755);
     path.Append("RecentSearches");
 
-    BMessage message;
-    {
-        BFile file(path.Path(), B_READ_ONLY);
-        if (file.InitCheck() == B_OK)
-            message.Unflatten(&file);
+    int fd = open(path.Path(), O_RDWR | O_CREAT, 0644);
+    if (fd < 0) return;
+
+    if (flock(fd, LOCK_EX) != 0) {
+        close(fd);
+        return;
     }
+
+    BMessage message;
+    readMessageFromFile(fd, message);
 
     BMessage searches;
     for (const auto& item : searchItems) {
@@ -83,19 +148,10 @@ void WebPageProxy::saveRecentSearches(IPC::Connection&, const String& name, cons
     message.RemoveName(name.utf8().data());
     message.AddMessage(name.utf8().data(), &searches);
 
-    BPath tempPath(path);
-    if (tempPath.GetParent(&tempPath) != B_OK)
-        return;
-    tempPath.Append("RecentSearches.tmp");
+    writeMessageToFile(fd, message);
 
-    BFile tempFile(tempPath.Path(), B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
-    if (tempFile.InitCheck() == B_OK) {
-        if (message.Flatten(&tempFile) == B_OK) {
-            tempFile.Unset();
-            BEntry tempEntry(tempPath.Path());
-            tempEntry.Rename(path.Leaf(), true);
-        }
-    }
+    flock(fd, LOCK_UN);
+    close(fd);
 }
 
 void WebPageProxy::loadRecentSearches(IPC::Connection&, const String& name, CompletionHandler<void(Vector<WebCore::RecentSearch>&&)>&& completionHandler)
@@ -104,21 +160,28 @@ void WebPageProxy::loadRecentSearches(IPC::Connection&, const String& name, Comp
     BPath path;
     if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK) {
         path.Append("WebKit/RecentSearches");
-        BFile file(path.Path(), B_READ_ONLY);
-        BMessage message;
-        if (file.InitCheck() == B_OK && message.Unflatten(&file) == B_OK) {
-            BMessage searches;
-            if (message.FindMessage(name.utf8().data(), &searches) == B_OK) {
-                const char* item;
-                for (int32 i = 0; searches.FindString("items", i, &item) == B_OK; i++) {
-                     WebCore::RecentSearch search;
-                     search.string = String::fromUTF8(item);
-                     double time;
-                     if (searches.FindDouble("times", i, &time) == B_OK)
-                         search.time = WebCore::WallTime::fromRawSeconds(time);
-                     items.append(search);
+
+        int fd = open(path.Path(), O_RDONLY);
+        if (fd >= 0) {
+            if (flock(fd, LOCK_SH) == 0) {
+                BMessage message;
+                if (readMessageFromFile(fd, message)) {
+                    BMessage searches;
+                    if (message.FindMessage(name.utf8().data(), &searches) == B_OK) {
+                        const char* item;
+                        for (int32 i = 0; searches.FindString("items", i, &item) == B_OK; i++) {
+                             WebCore::RecentSearch search;
+                             search.string = String::fromUTF8(item);
+                             double time;
+                             if (searches.FindDouble("times", i, &time) == B_OK)
+                                 search.time = WebCore::WallTime::fromRawSeconds(time);
+                             items.append(search);
+                        }
+                    }
                 }
+                flock(fd, LOCK_UN);
             }
+            close(fd);
         }
     }
     completionHandler(WTFMove(items));

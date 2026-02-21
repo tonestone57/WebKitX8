@@ -28,7 +28,11 @@
 
 #include "WebPageProxy.h"
 #include <WebCore/Color.h>
+#include <wtf/Lock.h>
+#include <wtf/Ref.h>
+#include <wtf/RefPtr.h>
 #include <wtf/RunLoop.h>
+#include <wtf/ThreadSafeRefCounted.h>
 #include <Window.h>
 #include <ColorControl.h>
 #include <Message.h>
@@ -46,11 +50,48 @@ static rgb_color toHaikuColor(const Color& color)
     return { srgba.red, srgba.green, srgba.blue, srgba.alpha };
 }
 
+class ColorPickerState : public ThreadSafeRefCounted<ColorPickerState> {
+public:
+    static Ref<ColorPickerState> create(WebColorPickerHaiku* picker)
+    {
+        return adoptRef(*new ColorPickerState(picker));
+    }
+
+    void didChooseColor(const Color& color)
+    {
+        Locker locker(m_lock);
+        if (m_picker)
+            m_picker->didChooseColor(color);
+    }
+
+    void didEndChooser()
+    {
+        Locker locker(m_lock);
+        if (m_picker)
+            m_picker->didEndChooser();
+    }
+
+    void invalidate()
+    {
+        Locker locker(m_lock);
+        m_picker = nullptr;
+    }
+
+private:
+    ColorPickerState(WebColorPickerHaiku* picker)
+        : m_picker(picker)
+    {
+    }
+
+    Lock m_lock;
+    WebColorPickerHaiku* m_picker;
+};
+
 class ColorPickerWindow : public BWindow {
 public:
-    ColorPickerWindow(WebColorPickerHaiku& picker, const Color& color)
+    ColorPickerWindow(Ref<ColorPickerState>&& state, const Color& color)
         : BWindow(BRect(0, 0, 300, 200), "Color Picker", B_TITLED_WINDOW, B_NOT_RESIZABLE | B_NOT_ZOOMABLE | B_AUTO_UPDATE_SIZE_LIMITS)
-        , m_picker(picker)
+        , m_state(WTFMove(state))
     {
         m_colorControl = new BColorControl(B_ORIGIN, B_CELLS_32x8, 8, "picker", new BMessage('chng'));
         m_colorControl->SetValue(toHaikuColor(color));
@@ -74,14 +115,11 @@ public:
         switch(message->what) {
             case 'chng':
             case 'alph': {
-                if (!m_picker) return;
-
                 rgb_color rgb = m_colorControl->ValueAsColor();
                 uint8 alpha = (uint8)m_alphaSlider->Value();
                 Color color(SRGBA<uint8_t> { rgb.red, rgb.green, rgb.blue, alpha });
-                RunLoop::main().dispatch([picker = m_picker, color]() {
-                    if (picker)
-                        picker->didChooseColor(color);
+                RunLoop::main().dispatch([state = m_state, color]() {
+                    state->didChooseColor(color);
                 });
                 break;
             }
@@ -91,17 +129,14 @@ public:
     }
 
     bool QuitRequested() override {
-        if (m_picker) {
-            RunLoop::main().dispatch([picker = m_picker]() {
-                if (picker)
-                    picker->didEndChooser();
-            });
-        }
+        RunLoop::main().dispatch([state = m_state]() {
+            state->didEndChooser();
+        });
         return false;
     }
 
 private:
-    WeakPtr<WebColorPickerHaiku> m_picker;
+    Ref<ColorPickerState> m_state;
     BColorControl* m_colorControl;
     BSlider* m_alphaSlider;
 };
@@ -114,20 +149,21 @@ Ref<WebColorPickerHaiku> WebColorPickerHaiku::create(WebPageProxy& page, const C
 WebColorPickerHaiku::WebColorPickerHaiku(WebPageProxy& page, const Color& initialColor)
     : WebColorPicker(&page.colorPickerClient())
     , m_window(nullptr)
-    , m_colorControl(nullptr)
 {
 }
 
 WebColorPickerHaiku::~WebColorPickerHaiku()
 {
-    if (m_window) {
-        m_window->Lock();
-        m_window->Quit();
-    }
+    endPicker();
 }
 
 void WebColorPickerHaiku::endPicker()
 {
+    if (m_state) {
+        m_state->invalidate();
+        m_state = nullptr;
+    }
+
     if (m_window) {
         auto window = m_window;
         m_window = nullptr;
@@ -155,7 +191,8 @@ void WebColorPickerHaiku::showColorPicker(const Color& color)
     if (m_window)
         return;
 
-    m_window = new ColorPickerWindow(*this, color);
+    m_state = ColorPickerState::create(this);
+    m_window = new ColorPickerWindow(m_state.copyRef(), color);
     m_window->Show();
 }
 

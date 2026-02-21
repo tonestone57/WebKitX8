@@ -42,17 +42,57 @@
 #include <locale/Collator.h>
 #include <private/shared/CalendarView.h>
 #include <support/Locker.h>
+#include <wtf/Lock.h>
+#include <wtf/Ref.h>
 #include <wtf/RunLoop.h>
+#include <wtf/ThreadSafeRefCounted.h>
 #include <wtf/text/CString.h>
 
 namespace WebKit {
 using namespace WebCore;
 
+class DateTimePickerState : public ThreadSafeRefCounted<DateTimePickerState> {
+public:
+    static Ref<DateTimePickerState> create(WebDateTimePickerHaiku* picker)
+    {
+        return adoptRef(*new DateTimePickerState(picker));
+    }
+
+    void didChooseDate(const String& date)
+    {
+        Locker locker(m_lock);
+        if (m_picker)
+            m_picker->didChooseDate(date);
+    }
+
+    void didEndChooser()
+    {
+        Locker locker(m_lock);
+        if (m_picker)
+            m_picker->didEndChooser();
+    }
+
+    void invalidate()
+    {
+        Locker locker(m_lock);
+        m_picker = nullptr;
+    }
+
+private:
+    DateTimePickerState(WebDateTimePickerHaiku* picker)
+        : m_picker(picker)
+    {
+    }
+
+    Lock m_lock;
+    WebDateTimePickerHaiku* m_picker;
+};
+
 class DateTimeChooserWindow : public BWindow {
 public:
-    DateTimeChooserWindow(WebDateTimePickerHaiku& picker)
+    DateTimeChooserWindow(Ref<DateTimePickerState>&& state)
         : BWindow(BRect(0, 0, 10, 10), "Date Picker", B_FLOATING_WINDOW, B_NOT_RESIZABLE | B_NOT_ZOOMABLE | B_AUTO_UPDATE_SIZE_LIMITS)
-        , m_picker(picker)
+        , m_state(WTFMove(state))
         , m_calendar(nullptr)
         , m_yearControl(nullptr)
         , m_okButton(nullptr)
@@ -233,9 +273,8 @@ public:
             }
 
             String dateString = String::fromUTF8(str.String());
-            RunLoop::main().dispatch([picker = m_picker, dateString]() {
-                if (picker)
-                    picker->didChooseDate(dateString);
+            RunLoop::main().dispatch([state = m_state, dateString]() {
+                state->didChooseDate(dateString);
             });
             [[fallthrough]];
         }
@@ -273,17 +312,14 @@ public:
 
     bool QuitRequested() override
     {
-        if (m_picker) {
-            RunLoop::main().dispatch([picker = m_picker]() {
-                if (picker)
-                    picker->didEndChooser();
-            });
-        }
+        RunLoop::main().dispatch([state = m_state]() {
+            state->didEndChooser();
+        });
         return false;
     }
 
 private:
-    WeakPtr<WebDateTimePickerHaiku> m_picker;
+    Ref<DateTimePickerState> m_state;
     BPrivate::BCalendarView* m_calendar;
     BTextControl* m_yearControl;
     BButton* m_okButton;
@@ -306,14 +342,16 @@ WebDateTimePickerHaiku::WebDateTimePickerHaiku(WebPageProxy& page)
 
 WebDateTimePickerHaiku::~WebDateTimePickerHaiku()
 {
-    if (m_window) {
-        m_window->Lock();
-        m_window->Quit();
-    }
+    endPicker();
 }
 
 void WebDateTimePickerHaiku::endPicker()
 {
+    if (m_state) {
+        m_state->invalidate();
+        m_state = nullptr;
+    }
+
     if (m_window) {
         auto window = m_window;
         m_window = nullptr;
@@ -328,7 +366,8 @@ void WebDateTimePickerHaiku::showDateTimePicker(WebCore::DateTimeChooserParamete
     if (m_window)
         return;
 
-    auto* window = new DateTimeChooserWindow(*this);
+    m_state = DateTimePickerState::create(this);
+    auto* window = new DateTimeChooserWindow(m_state.copyRef());
     window->Configure(params);
     window->Show();
     m_window = window;
