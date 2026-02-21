@@ -36,6 +36,11 @@
 #include <Path.h>
 #include <String.h>
 
+#include <fcntl.h>
+#include <sys/file.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 namespace WebKit {
 
 static WTF::String computeSHA256Fingerprint(const WebCore::CertificateInfo& info)
@@ -66,27 +71,51 @@ static BPath getExceptionFilePath()
     return path;
 }
 
+static BString readAllContent(int fd)
+{
+    struct stat st;
+    if (fstat(fd, &st) != 0)
+        return BString();
+
+    if (st.st_size == 0)
+        return BString();
+
+    BString content;
+    char* buffer = content.LockBuffer(st.st_size);
+    ssize_t bytesRead = 0;
+    while (bytesRead < st.st_size) {
+        ssize_t r = read(fd, buffer + bytesRead, st.st_size - bytesRead);
+        if (r < 0) {
+            if (errno == EINTR) continue;
+            break;
+        }
+        if (r == 0) break;
+        bytesRead += r;
+    }
+    content.UnlockBuffer(bytesRead);
+    return content;
+}
+
 bool isHTTPSCertificateAllowed(const WTF::String& host, const WebCore::CertificateInfo& info)
 {
     BPath path = getExceptionFilePath();
     if (path.InitCheck() != B_OK)
         return false;
 
-    BFile file(path.Path(), B_READ_ONLY);
-    if (file.InitCheck() != B_OK)
+    int fd = open(path.Path(), O_RDONLY);
+    if (fd < 0)
         return false;
 
-    off_t size;
-    file.GetSize(&size);
-    if (size <= 0)
+    if (flock(fd, LOCK_SH) != 0) {
+        close(fd);
         return false;
+    }
 
-    BString content;
-    char* buffer = content.LockBuffer(size);
-    ssize_t bytesRead = file.Read(buffer, size);
-    content.UnlockBuffer(bytesRead > 0 ? bytesRead : 0);
+    BString content = readAllContent(fd);
+    flock(fd, LOCK_UN);
+    close(fd);
 
-    if (bytesRead < 0)
+    if (content.IsEmpty())
         return false;
 
     WTF::String fingerprint = computeSHA256Fingerprint(info);
@@ -134,8 +163,6 @@ bool isHTTPSCertificateAllowed(const WTF::String& host, const WebCore::Certifica
                     if (lineFingerprint == bFingerprint)
                         return true;
                 }
-            } else if (line == bHost) {
-                return false;
             }
         }
     }
@@ -149,77 +176,88 @@ void addHTTPSCertificateException(const WTF::String& host, const WebCore::Certif
     if (path.InitCheck() != B_OK)
         return;
 
+    // Open with O_RDWR | O_CREAT to ensure we can read and then write
+    int fd = open(path.Path(), O_RDWR | O_CREAT, 0644);
+    if (fd < 0)
+        return;
+
+    // Exclusive lock for writing
+    if (flock(fd, LOCK_EX) != 0) {
+        close(fd);
+        return;
+    }
+
+    BString content = readAllContent(fd);
     BString bHost(host.utf8().data());
     BString newContent;
 
-    // Read existing content
-    BFile readFile(path.Path(), B_READ_ONLY);
-    if (readFile.InitCheck() == B_OK) {
-        off_t size;
-        readFile.GetSize(&size);
-        if (size > 0) {
-            BString content;
-            char* buffer = content.LockBuffer(size);
-            ssize_t bytesRead = readFile.Read(buffer, size);
-            content.UnlockBuffer(bytesRead > 0 ? bytesRead : 0);
+    // Parse and filter existing content
+    if (!content.IsEmpty()) {
+        int32 start = 0;
+        int32 end;
+        while ((end = content.FindFirst('\n', start)) != B_ERROR) {
+            BString line;
+            content.CopyInto(line, start, end - start);
+            start = end + 1;
 
-            if (bytesRead > 0) {
-                int32 start = 0;
-                int32 end;
-                while ((end = content.FindFirst('\n', start)) != B_ERROR) {
-                    BString line;
-                    content.CopyInto(line, start, end - start);
-                    start = end + 1;
+            if (line.IsEmpty()) continue;
 
-                    if (line.IsEmpty()) continue;
+            bool isSameHost = false;
+            int32 spacePos = line.FindFirst(' ');
+            if (spacePos != B_ERROR) {
+                BString lineHost;
+                line.CopyInto(lineHost, 0, spacePos);
+                if (lineHost == bHost) isSameHost = true;
+            } else {
+                if (line == bHost) isSameHost = true;
+            }
 
-                    // Check if this line is for the same host
-                    bool isSameHost = false;
-                    int32 spacePos = line.FindFirst(' ');
-                    if (spacePos != B_ERROR) {
-                        BString lineHost;
-                        line.CopyInto(lineHost, 0, spacePos);
-                        if (lineHost == bHost) isSameHost = true;
-                    } else {
-                        if (line == bHost) isSameHost = true;
-                    }
+            if (!isSameHost) {
+                newContent << line << "\n";
+            }
+        }
 
-                    if (!isSameHost) {
-                        newContent << line << "\n";
-                    }
+        // Handle last line
+        if (start < content.Length()) {
+            BString line;
+            content.CopyInto(line, start, content.Length() - start);
+            if (!line.IsEmpty()) {
+                bool isSameHost = false;
+                int32 spacePos = line.FindFirst(' ');
+                if (spacePos != B_ERROR) {
+                    BString lineHost;
+                    line.CopyInto(lineHost, 0, spacePos);
+                    if (lineHost == bHost) isSameHost = true;
+                } else {
+                    if (line == bHost) isSameHost = true;
                 }
 
-                // Handle last line
-                if (start < content.Length()) {
-                    BString line;
-                    content.CopyInto(line, start, content.Length() - start);
-                    if (!line.IsEmpty()) {
-                        bool isSameHost = false;
-                        int32 spacePos = line.FindFirst(' ');
-                        if (spacePos != B_ERROR) {
-                            BString lineHost;
-                            line.CopyInto(lineHost, 0, spacePos);
-                            if (lineHost == bHost) isSameHost = true;
-                        } else {
-                            if (line == bHost) isSameHost = true;
-                        }
-
-                        if (!isSameHost) {
-                            newContent << line << "\n";
-                        }
-                    }
+                if (!isSameHost) {
+                    newContent << line << "\n";
                 }
             }
         }
     }
 
+    // Append new exception
     WTF::String fingerprint = computeSHA256Fingerprint(info);
     newContent << bHost << " " << fingerprint.utf8().data() << "\n";
 
-    BFile writeFile(path.Path(), B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
-    if (writeFile.InitCheck() == B_OK) {
-        writeFile.Write(newContent.String(), newContent.Length());
+    // Rewind and write
+    if (ftruncate(fd, 0) == 0 && lseek(fd, 0, SEEK_SET) == 0) {
+        ssize_t bytesWritten = 0;
+        while (bytesWritten < newContent.Length()) {
+            ssize_t w = write(fd, newContent.String() + bytesWritten, newContent.Length() - bytesWritten);
+            if (w < 0) {
+                if (errno == EINTR) continue;
+                break;
+            }
+            bytesWritten += w;
+        }
     }
+
+    flock(fd, LOCK_UN);
+    close(fd);
 }
 
 } // namespace WebKit
