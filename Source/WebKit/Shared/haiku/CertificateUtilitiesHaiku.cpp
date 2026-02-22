@@ -326,4 +326,65 @@ void addHTTPSCertificateException(const WTF::String& host, const WebCore::Certif
     close(fd);
 }
 
+WTF::HashSet<WTF::String> getAllAllowedCertificateHosts()
+{
+    WTF::HashSet<WTF::String> hosts;
+    BPath path = getExceptionFilePath();
+    if (path.InitCheck() != B_OK)
+        return hosts;
+
+    int fd = open(path.Path(), O_RDONLY);
+    if (fd < 0)
+        return hosts;
+
+    if (flock(fd, LOCK_SH) != 0) {
+        close(fd);
+        return hosts;
+    }
+
+    BString content = readAllContent(fd);
+    flock(fd, LOCK_UN);
+    close(fd);
+
+    if (content.IsEmpty())
+        return hosts;
+
+    int32 start = 0;
+    int32 end;
+    while ((end = content.FindFirst('\n', start)) != B_ERROR) {
+        BString line;
+        content.CopyInto(line, start, end - start);
+        start = end + 1;
+
+        if (line.IsEmpty()) continue;
+
+        int32 spacePos = line.FindFirst(' ');
+        if (spacePos != B_ERROR) {
+            BString host;
+            line.CopyInto(host, 0, spacePos);
+            hosts.add(WTF::String::fromUTF8(host.String()));
+        } else {
+            hosts.add(WTF::String::fromUTF8(line.String()));
+        }
+    }
+
+    // Handle last line
+    if (start < content.Length()) {
+        BString line;
+        content.CopyInto(line, start, content.Length() - start);
+        if (!line.IsEmpty()) {
+            int32 spacePos = line.FindFirst(' ');
+            if (spacePos != B_ERROR) {
+                BString host;
+                line.CopyInto(host, 0, spacePos);
+                hosts.add(WTF::String::fromUTF8(host.String()));
+            } else {
+                hosts.add(WTF::String::fromUTF8(line.String()));
+            }
+        }
+    }
+
+    return hosts;
+}
+
 } // namespace WebKit
