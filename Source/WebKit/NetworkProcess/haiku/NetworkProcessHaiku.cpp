@@ -32,9 +32,6 @@
 #include <WebCore/NotImplemented.h>
 #include <wtf/Assertions.h>
 #include <wtf/Language.h>
-#include <wtf/HashSet.h>
-#include <wtf/Lock.h>
-#include <wtf/NeverDestroyed.h>
 #include <stdio.h>
 
 #include <Directory.h>
@@ -46,45 +43,16 @@ namespace WebKit {
 
 using namespace WebCore;
 
-static Lock s_allowedHostsLock;
-static HashSet<String>& allowedHosts()
-{
-    static NeverDestroyed<HashSet<String>> hosts;
-    return hosts;
-}
-
-static void populateAllowedHosts()
-{
-    auto hosts = getAllAllowedCertificateHosts();
-    Locker locker { s_allowedHostsLock };
-    for (const auto& host : hosts) {
-        allowedHosts().add(host);
-    }
-}
-
-void addAllowedHTTPSCertificateHost(const String& host)
-{
-    Locker locker { s_allowedHostsLock };
-    allowedHosts().add(host);
-}
-
-bool isHTTPSCertificateHostAllowed(const String& host)
-{
-    Locker locker { s_allowedHostsLock };
-    return allowedHosts().contains(host);
-}
-
 void NetworkProcess::platformInitializeNetworkProcess(const NetworkProcessCreationParameters& parameters)
 {
     WTF::listenForLanguageChangeNotifications();
-    populateAllowedHosts();
+    // Ensure cache is populated
+    getAllAllowedCertificateHosts();
 }
 
 void NetworkProcess::allowSpecificHTTPSCertificateForHost(const CertificateInfo& certificateInfo, const String& host)
 {
     addHTTPSCertificateException(host, certificateInfo);
-    // Update local cache
-    addAllowedHTTPSCertificateHost(host);
 }
 
 void NetworkProcess::platformTerminate()

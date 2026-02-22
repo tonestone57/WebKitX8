@@ -37,7 +37,6 @@
 
 #if PLATFORM(HAIKU)
 #include "CertificateUtilitiesHaiku.h"
-#include "NetworkProcessHaiku.h"
 #endif
 
 namespace WebKit {
@@ -55,8 +54,6 @@ void NetworkProcess::allowSpecificHTTPSCertificateForHost(PAL::SessionID, const 
 {
 #if PLATFORM(HAIKU)
     addHTTPSCertificateException(host, certificateInfo);
-    // Sync the in-memory cache in NetworkProcessHaiku if we are running in that context
-    addAllowedHTTPSCertificateHost(host);
 #else
     notImplemented();
 #endif

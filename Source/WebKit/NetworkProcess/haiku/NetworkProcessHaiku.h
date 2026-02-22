@@ -25,12 +25,4 @@
 
 #pragma once
 
-#include <wtf/HashSet.h>
-#include <wtf/text/WTFString.h>
-
-namespace WebKit {
-
-void addAllowedHTTPSCertificateHost(const String& host);
-bool isHTTPSCertificateHostAllowed(const String& host);
-
-} // namespace WebKit
+// No exports needed currently.
