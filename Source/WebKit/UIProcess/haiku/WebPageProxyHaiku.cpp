@@ -102,6 +102,7 @@ static bool writeMessageToFile(int fd, const BMessage& message)
     if (message.Flatten(&io) != B_OK)
         return false;
 
+    // Use ftruncate after lock to ensure atomicity
     if (ftruncate(fd, 0) != 0 || lseek(fd, 0, SEEK_SET) != 0)
         return false;
 
@@ -128,6 +129,7 @@ void WebPageProxy::saveRecentSearches(IPC::Connection&, const String& name, cons
     create_directory(path.Path(), 0755);
     path.Append("RecentSearches");
 
+    // Open without O_TRUNC to allow safe locking
     int fd = open(path.Path(), O_RDWR | O_CREAT, 0644);
     if (fd < 0) return;
 

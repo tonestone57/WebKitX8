@@ -176,18 +176,22 @@ private:
             BDirectory dir(&ref);
             BPath path(&dir, name);
 
-            int fd = open(path.Path(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            // Open without O_TRUNC first to allow safe locking
+            int fd = open(path.Path(), O_WRONLY | O_CREAT, 0644);
             if (fd >= 0) {
                 if (flock(fd, LOCK_EX) == 0) {
-                    size_t length = strlen(content);
-                    ssize_t bytesWritten = 0;
-                    while (bytesWritten < (ssize_t)length) {
-                        ssize_t w = write(fd, content + bytesWritten, length - bytesWritten);
-                        if (w < 0) {
-                            if (errno == EINTR) continue;
-                            break;
+                    // Truncate now that we hold the lock
+                    if (ftruncate(fd, 0) == 0) {
+                        size_t length = strlen(content);
+                        ssize_t bytesWritten = 0;
+                        while (bytesWritten < (ssize_t)length) {
+                            ssize_t w = write(fd, content + bytesWritten, length - bytesWritten);
+                            if (w < 0) {
+                                if (errno == EINTR) continue;
+                                break;
+                            }
+                            bytesWritten += w;
                         }
-                        bytesWritten += w;
                     }
                     flock(fd, LOCK_UN);
                 }
