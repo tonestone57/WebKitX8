@@ -180,8 +180,15 @@ private:
             if (fd >= 0) {
                 if (flock(fd, LOCK_EX) == 0) {
                     size_t length = strlen(content);
-                    ssize_t written = write(fd, content, length);
-                    (void)written;
+                    ssize_t bytesWritten = 0;
+                    while (bytesWritten < (ssize_t)length) {
+                        ssize_t w = write(fd, content + bytesWritten, length - bytesWritten);
+                        if (w < 0) {
+                            if (errno == EINTR) continue;
+                            break;
+                        }
+                        bytesWritten += w;
+                    }
                     flock(fd, LOCK_UN);
                 }
                 close(fd);

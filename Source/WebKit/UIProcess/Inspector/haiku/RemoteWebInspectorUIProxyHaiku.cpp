@@ -158,9 +158,17 @@ private:
             int fd = open(path.Path(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
             if (fd >= 0) {
                 if (flock(fd, LOCK_EX) == 0) {
+                    const char* data = m_saveContent.utf8().data();
                     size_t length = m_saveContent.utf8().length();
-                    ssize_t written = write(fd, m_saveContent.utf8().data(), length);
-                    (void)written;
+                    ssize_t bytesWritten = 0;
+                    while (bytesWritten < (ssize_t)length) {
+                        ssize_t w = write(fd, data + bytesWritten, length - bytesWritten);
+                        if (w < 0) {
+                            if (errno == EINTR) continue;
+                            break;
+                        }
+                        bytesWritten += w;
+                    }
                     flock(fd, LOCK_UN);
                 }
                 close(fd);
