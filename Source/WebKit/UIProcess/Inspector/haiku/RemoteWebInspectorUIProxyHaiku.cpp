@@ -40,7 +40,6 @@
 #include <Bitmap.h>
 #include <Cursor.h>
 #include <Entry.h>
-#include <File.h>
 #include <FilePanel.h>
 #include <FindDirectory.h>
 #include <Message.h>
@@ -49,6 +48,11 @@
 #include <Roster.h>
 #include <Screen.h>
 #include <Window.h>
+
+#include <fcntl.h>
+#include <sys/file.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 namespace WebKit {
 
@@ -149,9 +153,18 @@ private:
         const char* name;
         if (message->FindRef("directory", &ref) == B_OK && message->FindString("name", &name) == B_OK) {
             BDirectory dir(&ref);
-            BFile file(&dir, name, B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
-            if (file.InitCheck() == B_OK)
-                file.Write(m_saveContent.utf8().data(), m_saveContent.utf8().length());
+            BPath path(&dir, name);
+
+            int fd = open(path.Path(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            if (fd >= 0) {
+                if (flock(fd, LOCK_EX) == 0) {
+                    size_t length = m_saveContent.utf8().length();
+                    ssize_t written = write(fd, m_saveContent.utf8().data(), length);
+                    (void)written;
+                    flock(fd, LOCK_UN);
+                }
+                close(fd);
+            }
         }
     }
 
@@ -261,22 +274,47 @@ void RemoteWebInspectorUIProxy::platformSave(Vector<WebCore::InspectorFrontendCl
 
 void RemoteWebInspectorUIProxy::platformLoad(const String& path, CompletionHandler<void(const String&)>&& completionHandler)
 {
-    BFile file(path.utf8().data(), B_READ_ONLY);
-    if (file.InitCheck() != B_OK) {
+    int fd = open(path.utf8().data(), O_RDONLY);
+    if (fd < 0) {
         completionHandler(String());
         return;
     }
 
-    off_t size;
-    file.GetSize(&size);
-
-    auto buffer = makeUniqueArray<char>(size + 1);
-    if (file.Read(buffer.get(), size) != size) {
+    if (flock(fd, LOCK_SH) != 0) {
+        close(fd);
         completionHandler(String());
         return;
     }
-    buffer[size] = '\0';
 
+    struct stat st;
+    if (fstat(fd, &st) != 0) {
+        flock(fd, LOCK_UN);
+        close(fd);
+        completionHandler(String());
+        return;
+    }
+
+    auto buffer = makeUniqueArray<char>(st.st_size + 1);
+    ssize_t bytesRead = 0;
+    while (bytesRead < st.st_size) {
+        ssize_t r = read(fd, buffer.get() + bytesRead, st.st_size - bytesRead);
+        if (r < 0) {
+            if (errno == EINTR) continue;
+            break;
+        }
+        if (r == 0) break;
+        bytesRead += r;
+    }
+
+    flock(fd, LOCK_UN);
+    close(fd);
+
+    if (bytesRead != st.st_size) {
+        completionHandler(String());
+        return;
+    }
+
+    buffer[st.st_size] = '\0';
     completionHandler(String::fromUTF8(buffer.get()));
 }
 
