@@ -26,6 +26,8 @@
 #pragma once
 
 #include <wtf/Forward.h>
+#include <wtf/HashSet.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 class CertificateInfo;
@@ -34,6 +36,8 @@ class CertificateInfo;
 namespace WebKit {
 
 bool isHTTPSCertificateAllowed(const WTF::String& host, const WebCore::CertificateInfo&);
+bool isHTTPSCertificateAllowed(const WTF::String& host);
 void addHTTPSCertificateException(const WTF::String& host, const WebCore::CertificateInfo&);
+WTF::HashSet<WTF::String> getAllAllowedCertificateHosts();
 
 } // namespace WebKit

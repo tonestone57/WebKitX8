@@ -27,15 +27,16 @@
 
 #include "WebDateTimePicker.h"
 #include <WebCore/DateTimeChooserParameters.h>
-#include <wtf/WeakPtr.h>
+#include <wtf/RefPtr.h>
 
 class BWindow;
 
 namespace WebKit {
 
 class WebPageProxy;
+class DateTimePickerState;
 
-class WebDateTimePickerHaiku final : public WebDateTimePicker, public CanMakeWeakPtr<WebDateTimePickerHaiku> {
+class WebDateTimePickerHaiku final : public WebDateTimePicker {
 public:
     static Ref<WebDateTimePickerHaiku> create(WebPageProxy&);
     ~WebDateTimePickerHaiku();
@@ -50,6 +51,7 @@ private:
     WebDateTimePickerHaiku(WebPageProxy&);
 
     BWindow* m_window;
+    RefPtr<DateTimePickerState> m_state;
 };
 
 } // namespace WebKit
